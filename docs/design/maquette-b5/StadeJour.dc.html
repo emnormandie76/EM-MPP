@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Stade · Jour de match, version claire</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,800&amp;family=Barlow:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1500px;">
+<dc-import name="Stade" accent="{{accent}}" bg="{{bg}}" surface="{{surface}}" hot="{{hot}}" raised="{{raised}}" chip="{{chip}}" line="{{line}}" line-strong="{{lineStrong}}" ink="{{ink}}" ink2="{{ink2}}" muted="{{muted}}" accent-ink="{{accentInk}}" accent-text="{{accentText}}" warn="{{warn}}" up="{{up}}" down="{{down}}" dots="{{dots}}" hint-size="1280px,1500px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1F5BFF","section":"Couleurs"},"bg":{"editor":"color","default":"#EDEFF3","section":"Couleurs"},"surface":{"editor":"color","default":"#FFFFFF","section":"Couleurs"},"hot":{"editor":"color","default":"#D2352B","section":"Couleurs"},"$preview":{"width":1280,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var p = this.props;
+    return {
+      accent: p.accent ?? '#1F5BFF',
+      bg: p.bg ?? '#EDEFF3',
+      surface: p.surface ?? '#FFFFFF',
+      hot: p.hot ?? '#D2352B',
+      raised: '#F4F5F8',
+      chip: '#E6E9EF',
+      line: '#D8DCE3',
+      lineStrong: '#B5BCC8',
+      ink: '#0B0E13',
+      ink2: '#2F3642',
+      muted: '#5B6472',
+      accentInk: '#FFFFFF',
+      accentText: '#1A4FE0',
+      warn: '#A15C00',
+      up: '#15803D',
+      down: '#C8321F',
+      dots: '#A3ABB8'
+    };
+  }
+}
+</script>
+</body>
+</html>

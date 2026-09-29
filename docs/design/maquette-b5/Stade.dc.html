@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Style B · Stade</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,800&amp;family=Barlow:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1500px; box-sizing: border-box; display: flex; flex-direction: column; background: {{bg}}; color: {{ink}}; font-family: 'Barlow', system-ui, sans-serif;">
+
+<header style="height: 72px; flex-shrink: 0; box-sizing: border-box; padding: 0 48px; display: flex; align-items: center; gap: 36px; background: {{bg}}; border-bottom: 1px solid {{line}};">
+<a href="#" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: {{ink}};">
+<span style="width: 34px; height: 34px; border-radius: 6px; background: {{accent}}; color: {{accentInk}}; display: flex; align-items: center; justify-content: center; transform: skewX(-8deg);">
+<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle></svg>
+</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 800; font-style: italic; letter-spacing: 0.01em; text-transform: uppercase;">Le Bon Chiffre</span>
+</a>
+<nav aria-label="Navigation principale" style="display: flex; align-items: center; gap: 6px; flex-grow: 1;">
+<a href="#" aria-current="page" style="padding: 7px 14px; border-radius: 6px; background: {{accent}}; color: {{accentInk}}; text-decoration: none; font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;">Accueil</a>
+<a href="#" style="padding: 7px 14px; border-radius: 6px; color: {{ink2}}; text-decoration: none; font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;">Mes pronos</a>
+<a href="#" style="padding: 7px 14px; border-radius: 6px; color: {{ink2}}; text-decoration: none; font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;">Classement</a>
+<a href="#" style="padding: 7px 14px; border-radius: 6px; color: {{ink2}}; text-decoration: none; font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;">Palmarès</a>
+<a href="#" style="padding: 7px 14px; border-radius: 6px; color: {{ink2}}; text-decoration: none; font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;">Règlement</a>
+</nav>
+<a href="#" style="font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: {{muted}}; text-decoration: none;">Admin</a>
+<div style="display: flex; align-items: center; gap: 10px;">
+<span style="width: 36px; height: 36px; box-sizing: border-box; border-radius: 50%; border: 2px solid {{accent}}; background: {{raised}}; color: {{ink}}; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;">CM</span>
+<span style="font-size: 15px; font-weight: 600;">Camille</span>
+</div>
+</header>
+
+<main style="flex-grow: 1; box-sizing: border-box; padding: 28px 48px 0; display: flex; flex-direction: column; gap: 24px;">
+
+<div role="status" style="display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 8px; font-size: 15px;">
+<span style="padding: 3px 8px; border-radius: 4px; background: {{accent}}; color: {{accentInk}}; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">Annonce</span>
+<span style="color: {{ink2}};">Les résultats de la JPO du 17 octobre sont en ligne : la médiane de l'équipe a fait mieux que tout le monde.</span>
+<span style="margin-left: auto; color: {{muted}}; font-size: 13px;">il y a 2 h</span>
+</div>
+
+<section style="display: flex; gap: 16px; align-items: stretch;">
+<div style="flex-grow: 1; padding: 22px 26px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px; display: flex; flex-direction: column; gap: 12px;">
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 44px; font-weight: 800; line-height: 1; text-transform: uppercase;">Salut Camille</h1>
+<p style="margin: 0; font-size: 16px; color: {{ink2}};">Encore <strong style="color: {{accentText}};">2 pronos à valider</strong> sur les 5 questions ouvertes.</p>
+<div style="display: flex; align-items: center; gap: 14px;">
+<div role="progressbar" aria-label="Pronos validés" aria-valuemin="0" aria-valuemax="5" aria-valuenow="3" style="flex-grow: 1; display: flex; gap: 6px;">
+<span style="flex-grow: 1; height: 10px; border-radius: 2px; background: {{accent}};"></span>
+<span style="flex-grow: 1; height: 10px; border-radius: 2px; background: {{accent}};"></span>
+<span style="flex-grow: 1; height: 10px; border-radius: 2px; background: {{accent}};"></span>
+<span style="flex-grow: 1; height: 10px; border-radius: 2px; background: {{line}};"></span>
+<span style="flex-grow: 1; height: 10px; border-radius: 2px; background: {{line}};"></span>
+</div>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">3/5 validés</span>
+</div>
+</div>
+<div style="width: 200px; box-sizing: border-box; padding: 18px 22px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px; display: flex; flex-direction: column; gap: 2px;">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: {{muted}};">Position</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 60px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;">4<span style="font-size: 28px;">e</span></span>
+<span style="font-size: 14px; font-weight: 700; color: {{up}};">▲ 2 places</span>
+</div>
+<div style="width: 200px; box-sizing: border-box; padding: 18px 22px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px; display: flex; flex-direction: column; gap: 2px;">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: {{muted}};">Points</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 60px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: {{accentText}};">432</span>
+<span style="font-size: 14px; color: {{muted}};">6 questions résolues</span>
+</div>
+<div style="width: 200px; box-sizing: border-box; padding: 18px 22px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px; display: flex; flex-direction: column; gap: 2px;">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: {{muted}};">Jokers</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 60px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;">1<span style="font-size: 28px; color: {{muted}};">/2</span></span>
+<span style="font-size: 14px; color: {{muted}};">restant cette saison</span>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px;">
+
+<section style="grid-column: span 8; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between;">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 800; text-transform: uppercase;">Clôture imminente</h2>
+<a href="#" style="font-size: 15px; font-weight: 600; color: {{accentText}};">Les 5 questions ouvertes</a>
+</div>
+
+<article style="display: flex; align-items: center; gap: 20px; padding: 16px 18px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px;">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span style="padding: 2px 8px; border-radius: 4px; background: {{chip}}; color: {{ink2}}; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">JPO</span>
+<span style="padding: 2px 8px; border-radius: 4px; background: {{accent}}; color: {{accentInk}}; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">Nouveau</span>
+</div>
+<h3 style="margin: 0; font-size: 18px; font-weight: 600;">Combien de participants à la JPO du samedi 28 novembre ?</h3>
+<span style="font-size: 14px; color: {{muted}};">Nombre · coef. ×1</span>
+</div>
+<div role="timer" aria-label="Clôture dans {{c1.label}}" style="display: flex; gap: 5px;">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{hot}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; color: {{hot}}; font-variant-numeric: tabular-nums;">{{c1.d}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">J</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{hot}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; color: {{hot}}; font-variant-numeric: tabular-nums;">{{c1.h}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">H</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{hot}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; color: {{hot}}; font-variant-numeric: tabular-nums;">{{c1.m}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">MIN</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{hot}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; color: {{hot}}; font-variant-numeric: tabular-nums;">{{c1.s}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">S</span></div>
+</div>
+<span style="width: 112px; box-sizing: border-box; text-align: center; padding: 6px 0; border-radius: 4px; border: 1.5px solid {{hot}}; color: {{hot}}; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;">À faire</span>
+<a href="#" style="width: 136px; box-sizing: border-box; text-align: center; padding: 11px 0; border-radius: 6px; background: {{accent}}; color: {{accentInk}}; font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none;">Pronostiquer</a>
+</article>
+
+<article style="display: flex; align-items: center; gap: 20px; padding: 16px 18px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px;">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span style="padding: 2px 8px; border-radius: 4px; background: {{chip}}; color: {{ink2}}; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">Candidatures</span>
+</div>
+<h3 style="margin: 0; font-size: 18px; font-weight: 600;">Combien de candidatures au total au 31 mai 2027 ?</h3>
+<span style="font-size: 14px; color: {{muted}};">Nombre · coef. ×3</span>
+</div>
+<div role="timer" aria-label="Clôture dans {{c2.label}}" style="display: flex; gap: 5px;">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{line}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;">{{c2.d}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">J</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{line}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;">{{c2.h}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">H</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{line}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;">{{c2.m}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">MIN</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{line}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;">{{c2.s}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">S</span></div>
+</div>
+<span style="width: 112px; box-sizing: border-box; text-align: center; padding: 6px 0; border-radius: 4px; border: 1.5px solid {{warn}}; color: {{warn}}; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;">Enregistré</span>
+<a href="#" style="width: 136px; box-sizing: border-box; text-align: center; padding: 10px 0; border-radius: 6px; border: 1px solid {{lineStrong}}; color: {{ink}}; font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none;">Modifier</a>
+</article>
+
+<article style="display: flex; align-items: center; gap: 20px; padding: 16px 18px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px;">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span style="padding: 2px 8px; border-radius: 4px; background: {{chip}}; color: {{ink2}}; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">Intégration</span>
+</div>
+<h3 style="margin: 0; font-size: 18px; font-weight: 600;">Quel programme comptera le plus d'intégrés à la rentrée 2027 ?</h3>
+<span style="font-size: 14px; color: {{muted}};">Choix · coef. ×2</span>
+</div>
+<div role="timer" aria-label="Clôture dans {{c3.label}}" style="display: flex; gap: 5px;">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{line}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;">{{c3.d}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">J</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{line}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;">{{c3.h}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">H</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{line}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;">{{c3.m}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">MIN</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 3px;"><span style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: {{bg}}; border: 1px solid {{line}}; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;">{{c3.s}}</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: {{muted}};">S</span></div>
+</div>
+<span style="width: 112px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 0; border-radius: 4px; background: {{accent}}; color: {{accentInk}}; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round;"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>Validé</span>
+<a href="#" style="width: 136px; box-sizing: border-box; text-align: center; padding: 10px 0; border-radius: 6px; border: 1px solid {{lineStrong}}; color: {{ink}}; font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none;">Voir</a>
+</article>
+</section>
+
+<section style="grid-column: span 4; box-sizing: border-box; padding: 20px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between;">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 800; text-transform: uppercase;">Classement</h2>
+<span style="font-size: 13px; color: {{muted}};">Saison 2026-2027</span>
+</div>
+<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px;">
+<li style="display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 6px; background: {{raised}};">
+<span style="width: 22px; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 800; color: {{accentText}};">1</span>
+<span style="width: 32px; height: 32px; border-radius: 50%; background: {{chip}}; color: {{ink}}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">SL</span>
+<span style="flex-grow: 1; font-size: 16px; font-weight: 600;">Sarah L.</span>
+<span style="width: 30px; text-align: right; font-size: 13px; font-weight: 700; color: {{up}};">▲1</span>
+<span style="width: 48px; text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;">486</span>
+</li>
+<li style="display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 6px; background: {{raised}};">
+<span style="width: 22px; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 800; color: {{ink2}};">2</span>
+<span style="width: 32px; height: 32px; border-radius: 50%; background: {{chip}}; color: {{ink}}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">JM</span>
+<span style="flex-grow: 1; font-size: 16px; font-weight: 600;">Julien M.</span>
+<span style="width: 30px; text-align: right; font-size: 13px; font-weight: 700; color: {{down}};">▼1</span>
+<span style="width: 48px; text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;">471</span>
+</li>
+<li style="display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 6px; background: {{raised}};">
+<span style="width: 22px; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 800; color: {{ink2}};">3</span>
+<span style="width: 32px; height: 32px; border-radius: 50%; background: {{chip}}; color: {{ink}}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">IB</span>
+<span style="flex-grow: 1; font-size: 16px; font-weight: 600;">Inès B.</span>
+<span style="width: 30px; text-align: right; font-size: 13px; font-weight: 700; color: {{muted}};">=</span>
+<span style="width: 48px; text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;">455</span>
+</li>
+<li style="display: flex; align-items: center; gap: 12px; padding: 7px 9px; border-radius: 6px; border: 1.5px solid {{accent}}; background: {{accentSoft}};">
+<span style="width: 22px; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 800; color: {{ink}};">4</span>
+<span style="width: 32px; height: 32px; box-sizing: border-box; border-radius: 50%; border: 2px solid {{accent}}; background: {{raised}}; color: {{ink}}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">CM</span>
+<span style="flex-grow: 1; font-size: 16px; font-weight: 700;">Camille (toi)</span>
+<span style="width: 30px; text-align: right; font-size: 13px; font-weight: 700; color: {{up}};">▲2</span>
+<span style="width: 48px; text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; color: {{accentText}};">432</span>
+</li>
+<li style="display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 6px; background: {{raised}};">
+<span style="width: 22px; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 800; color: {{ink2}};">5</span>
+<span style="width: 32px; height: 32px; border-radius: 50%; background: {{chip}}; color: {{ink}}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">TR</span>
+<span style="flex-grow: 1; font-size: 16px; font-weight: 600;">Thomas R.</span>
+<span style="width: 30px; text-align: right; font-size: 13px; font-weight: 700; color: {{down}};">▼1</span>
+<span style="width: 48px; text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;">410</span>
+</li>
+<li style="display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 6px; background: {{raised}};">
+<span style="width: 22px; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 800; color: {{ink2}};">6</span>
+<span style="width: 32px; height: 32px; border-radius: 50%; background: {{chip}}; color: {{ink}}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">MK</span>
+<span style="flex-grow: 1; font-size: 16px; font-weight: 600;">Mehdi K.</span>
+<span style="width: 30px; text-align: right; font-size: 13px; font-weight: 700; color: {{down}};">▼1</span>
+<span style="width: 48px; text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;">398</span>
+</li>
+</ol>
+<a href="#" style="font-size: 15px; font-weight: 600; color: {{accentText}};">Tout le classement</a>
+</section>
+
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px;">
+
+<section style="grid-column: span 7; box-sizing: border-box; padding: 26px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px; display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span style="padding: 2px 8px; border-radius: 4px; background: {{chip}}; color: {{ink2}}; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">Candidatures</span>
+<span style="padding: 2px 8px; border-radius: 4px; border: 1px solid {{lineStrong}}; color: {{ink}}; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 800; letter-spacing: 0.08em;">COEF ×3</span>
+<span style="margin-left: auto; font-size: 14px; color: {{muted}};">Clôture dans <span style="font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 700; color: {{ink}};">{{c2.label}}</span></span>
+</div>
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 32px; font-weight: 800; line-height: 1.05; text-transform: uppercase;">Combien de candidatures au total au 31 mai 2027 ?</h2>
+<p style="margin: 0; font-size: 14px; color: {{muted}};">Source : tableau BI « Candidatures », total toutes filières au 31 mai à minuit.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<label for="prono-b" style="font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: {{muted}};">Ton prono</label>
+<div style="display: flex; align-items: center; gap: 10px; height: 62px; box-sizing: border-box; padding: 0 16px; border: 2px solid {{accent}}; border-radius: 8px; background: {{bg}};">
+<input id="prono-b" type="text" value="{{prono}}" onChange="{{setProno}}" style="flex-grow: 1; min-width: 0; border: none; outline: none; background: transparent; color: {{ink}}; font-family: 'Barlow Condensed', sans-serif; font-size: 36px; font-weight: 700; font-variant-numeric: tabular-nums;">
+<span style="font-size: 14px; color: {{muted}};">candidatures</span>
+</div>
+<label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; border: 1px dashed {{lineStrong}}; font-size: 15px; color: {{ink2}};"><input type="checkbox" checked="{{joker}}" onChange="{{toggleJoker}}" style="width: 18px; height: 18px; accent-color: {{accent}};"><span style="font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 800; letter-spacing: 0.06em; color: {{accentText}};">JOKER ×2</span>1 restant cette saison</label>
+<div style="display: flex; gap: 10px;">
+<button type="button" style="flex-grow: 1; height: 48px; border-radius: 6px; border: 1px solid {{lineStrong}}; background: transparent; color: {{ink}}; font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;">Enregistrer</button>
+<button type="button" style="flex-grow: 1; height: 48px; border-radius: 6px; border: none; background: {{accent}}; color: {{accentInk}}; font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;">Valider</button>
+</div>
+<p style="margin: 0; font-size: 13px; color: {{muted}};">Enregistré le 12 oct. à 9 h 41. Une fois validé, ton prono est définitif.</p>
+</div>
+<aside style="box-sizing: border-box; padding: 18px; background: {{bg}}; border: 1px solid {{line}}; border-radius: 8px; display: flex; flex-direction: column; gap: 14px;">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;">Pour t'aider</span>
+<a href="#" style="display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: {{accentText}};">Ouvrir le tableau BI « Candidatures »<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;"><path d="M14 4h6v6"></path><path d="M10 14L20 4"></path><path d="M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"></path></svg></a>
+<div style="display: flex; flex-direction: column; gap: 0;">
+<span style="font-size: 13px; color: {{muted}};">L'an dernier au 31 mai</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 34px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums;">2 318</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 13px; color: {{muted}};">Indice</span>
+<span style="font-size: 15px; color: {{ink2}};">Compare le nombre de candidatures fin octobre à celui de l'an dernier à la même date.</span>
+</div>
+</aside>
+</div>
+</section>
+
+<section style="grid-column: span 5; box-sizing: border-box; padding: 26px; background: {{surface}}; border: 1px solid {{line}}; border-radius: 10px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span style="padding: 2px 8px; border-radius: 4px; background: {{chip}}; color: {{ink2}}; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">JPO</span>
+<span style="padding: 2px 8px; border-radius: 4px; background: {{up}}; color: {{bg}}; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">Résultat</span>
+</div>
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 28px; font-weight: 800; line-height: 1.05; text-transform: uppercase;">Participants à la JPO du 17 octobre</h2>
+</div>
+<div style="display: flex; gap: 10px;">
+<div style="flex-grow: 1; padding: 10px 12px; border-radius: 8px; background: {{ink}}; color: {{bg}}; display: flex; flex-direction: column;"><span style="font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">Réel</span><span style="font-family: 'Barlow Condensed', sans-serif; font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;">250</span></div>
+<div style="flex-grow: 1; padding: 10px 12px; border-radius: 8px; background: {{raised}}; display: flex; flex-direction: column;"><span style="font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: {{muted}};">Médiane</span><span style="font-family: 'Barlow Condensed', sans-serif; font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;">251</span></div>
+<div style="flex-grow: 1; padding: 10px 12px; border-radius: 8px; background: {{raised}}; display: flex; flex-direction: column;"><span style="font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: {{muted}};">Moyenne</span><span style="font-family: 'Barlow Condensed', sans-serif; font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: {{hot}};">255</span></div>
+</div>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 112px; margin: 0 14px;">
+<div style="position: absolute; left: 0; right: 0; top: 86px; height: 2px; background: {{line}};"></div>
+<div style="position: absolute; left: 50%; top: 18px; height: 68px; width: 2px; margin-left: -1px; background: {{ink}};"></div>
+<span style="position: absolute; left: 50%; top: 0; transform: translateX(-50%); font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 0.06em; white-space: nowrap;">RÉEL 250</span>
+<div style="position: absolute; left: 52.5%; top: 28px; height: 58px; border-left: 2px dashed {{hot}};"></div>
+<span style="position: absolute; left: 15%; top: 52px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 27.5%; top: 40px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 35%; top: 62px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 39%; top: 44px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 42.5%; top: 64px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 45%; top: 40px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: {{accent}}; box-shadow: 0 0 0 4px {{accentSoft}};"></span>
+<span style="position: absolute; left: 45%; top: 20px; transform: translateX(-50%); font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; color: {{accentText}};">TOI</span>
+<span style="position: absolute; left: 56%; top: 54px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 60%; top: 38px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 67.5%; top: 62px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 75%; top: 44px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 80%; top: 64px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 90%; top: 48px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: {{dots}};"></span>
+<span style="position: absolute; left: 0%; top: 94px; transform: translateX(-50%); font-size: 12px; color: {{muted}};">150</span>
+<span style="position: absolute; left: 25%; top: 94px; transform: translateX(-50%); font-size: 12px; color: {{muted}};">200</span>
+<span style="position: absolute; left: 50%; top: 94px; transform: translateX(-50%); font-size: 12px; color: {{muted}};">250</span>
+<span style="position: absolute; left: 75%; top: 94px; transform: translateX(-50%); font-size: 12px; color: {{muted}};">300</span>
+<span style="position: absolute; left: 100%; top: 94px; transform: translateX(-50%); font-size: 12px; color: {{muted}};">350</span>
+</div>
+<figcaption style="font-size: 13px; color: {{muted}};">Chaque point est le prono d'un joueur. Trait plein : valeur réelle. Pointillés : moyenne de l'équipe.</figcaption>
+</figure>
+<div style="display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 8px; background: {{accent}}; color: {{accentInk}};">
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase;">Ton prono : 240 · écart 4 %</span>
+<span style="font-size: 14px; font-weight: 500;">65 pts + 20 pts bonus podium (le plus proche)</span>
+</div>
+<span style="margin-left: auto; font-family: 'Barlow Condensed', sans-serif; font-size: 44px; font-weight: 800; line-height: 1;">+85</span>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+<span style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; border: 1px solid {{accentText}}; color: {{accentText}}; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="9" r="5"></circle><path d="M8.5 13.5L7 21l5-3 5 3-1.5-7.5"></path></svg>Tireur d'élite</span>
+<span style="color: {{muted}};">Nouveau badge débloqué</span>
+</div>
+</section>
+
+</div>
+</main>
+
+<footer style="flex-shrink: 0; margin-top: 24px; box-sizing: border-box; padding: 20px 48px; display: flex; justify-content: space-between; border-top: 1px solid {{line}}; font-size: 13px; color: {{muted}};">
+<span>Le Bon Chiffre · Saison 2026-2027</span>
+<span>Règlement · Lots · Palmarès</span>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#C8F031","options":["#C8F031","#38BDF8","#FF7A59","#A78BFA"],"section":"Couleurs"},"bg":{"editor":"color","default":"#0B0E13","section":"Couleurs"},"surface":{"editor":"color","default":"#151A21","section":"Couleurs"},"hot":{"editor":"color","default":"#FF7A59","section":"Couleurs"},"raised":{"editor":null,"default":"#1C222B"},"chip":{"editor":null,"default":"#232A34"},"line":{"editor":null,"default":"#2A313C"},"lineStrong":{"editor":null,"default":"#3A4250"},"ink":{"editor":null,"default":"#F3F5F8"},"ink2":{"editor":null,"default":"#C9D0DB"},"muted":{"editor":null,"default":"#A0A9B8"},"accentInk":{"editor":null,"default":"#0B0E13"},"accentText":{"editor":null,"default":"#C8F031"},"warn":{"editor":null,"default":"#FBBF24"},"up":{"editor":null,"default":"#4ADE80"},"down":{"editor":null,"default":"#F87171"},"dots":{"editor":null,"default":"#5B6472"},"$preview":{"width":1280,"height":1500}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    var self = this;
+    this.t0 = this.t0 || Date.now();
+    this.timer = setInterval(function () { self.setState({ now: Date.now() }); }, 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this.timer);
+  }
+  countdown(ms) {
+    if (ms < 0) { ms = 0; }
+    var s = Math.floor(ms / 1000);
+    var d = Math.floor(s / 86400); s -= d * 86400;
+    var h = Math.floor(s / 3600); s -= h * 3600;
+    var m = Math.floor(s / 60); s -= m * 60;
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return { d: String(d), h: p(h), m: p(m), s: p(s), label: d + ' j ' + p(h) + ':' + p(m) + ':' + p(s) };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state || {};
+    var p = this.props;
+    var now = st.now || Date.now();
+    this.t0 = this.t0 || now;
+    var elapsed = now - this.t0;
+    var accent = p.accent ?? '#C8F031';
+    return {
+      accent: accent,
+      accentSoft: accent.length === 7 ? accent + '1F' : 'rgba(200, 240, 49, 0.12)',
+      accentInk: p.accentInk ?? '#0B0E13',
+      accentText: p.accentText ?? accent,
+      bg: p.bg ?? '#0B0E13',
+      surface: p.surface ?? '#151A21',
+      raised: p.raised ?? '#1C222B',
+      chip: p.chip ?? '#232A34',
+      line: p.line ?? '#2A313C',
+      lineStrong: p.lineStrong ?? '#3A4250',
+      ink: p.ink ?? '#F3F5F8',
+      ink2: p.ink2 ?? '#C9D0DB',
+      muted: p.muted ?? '#A0A9B8',
+      hot: p.hot ?? '#FF7A59',
+      warn: p.warn ?? '#FBBF24',
+      up: p.up ?? '#4ADE80',
+      down: p.down ?? '#F87171',
+      dots: p.dots ?? '#5B6472',
+      c1: this.countdown(((1 * 24 + 4) * 60 + 12) * 60000 + 33000 - elapsed),
+      c2: this.countdown(((3 * 24 + 7) * 60 + 45) * 60000 + 10000 - elapsed),
+      c3: this.countdown(((5 * 24 + 2) * 60 + 3) * 60000 + 50000 - elapsed),
+      prono: st.prono ?? '2 450',
+      setProno: function (e) { self.setState({ prono: e.target.value }); },
+      joker: st.joker ?? false,
+      toggleJoker: function () { self.setState({ joker: !(self.state && self.state.joker) }); }
+    };
+  }
+}
+</script>
+</body>
+</html>
