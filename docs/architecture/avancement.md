@@ -7,7 +7,7 @@
 | Étape | Titre | Date cible | Statut | Validée par l'utilisateur le | Notes |
 |---|---|---|---|---|---|
 | É1 | Socle du projet | 30/09/2026 | Validée | 30/09/2026 | Branche `etape-01-socle`, fusionnée dans `main` le 30/09. `verify` OK (25 tests unitaires), `test:e2e` OK (5 tests) |
-| É2 | Hébergement et base de données | 01/10/2026 | En cours | | Branche `etape-02-hebergement`, démarrée le 30/09 |
+| É2 | Hébergement et base de données | 01/10/2026 | En attente de validation | | Branche `etape-02-hebergement`. `verify` OK (38 tests unitaires et d'intégration), `test:e2e` OK (6 tests). Aperçu construit : migration avant `next build` sur `dev`, fonctions en `fra1`. Reste après H-08 : fusion dans `main`, contrôle de la production |
 | É3 | Données et moteur de règles | 02/10/2026 | À faire | | |
 | É4 | Comptes et accès | 05/10/2026 | À faire | | |
 | É5 | Back-office | 06/10/2026 | À faire | | |
