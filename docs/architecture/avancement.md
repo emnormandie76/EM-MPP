@@ -7,7 +7,7 @@
 | Étape | Titre | Date cible | Statut | Validée par l'utilisateur le | Notes |
 |---|---|---|---|---|---|
 | É1 | Socle du projet | 30/09/2026 | Validée | 30/09/2026 | Branche `etape-01-socle`, fusionnée dans `main` le 30/09. `verify` OK (25 tests unitaires), `test:e2e` OK (5 tests) |
-| É2 | Hébergement et base de données | 01/10/2026 | En attente de validation | | Branche `etape-02-hebergement`. `verify` OK (38 tests unitaires et d'intégration), `test:e2e` OK (6 tests). Aperçu construit : migration avant `next build` sur `dev`, fonctions en `fra1`. Reste après H-08 : fusion dans `main`, contrôle de la production |
+| É2 | Hébergement et base de données | 01/10/2026 | Validée | 30/09/2026 | Branche `etape-02-hebergement`, fusionnée dans `main` le 30/09. `verify` OK (38 tests unitaires et d'intégration), `test:e2e` OK (6 tests). Production : migration appliquée sur `main` avant le build, base marquée « production », `/api/health` à `ok: true` (fonction en `fra1`). `dev` non marquée |
 | É3 | Données et moteur de règles | 02/10/2026 | À faire | | |
 | É4 | Comptes et accès | 05/10/2026 | À faire | | |
 | É5 | Back-office | 06/10/2026 | À faire | | |
@@ -29,7 +29,7 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 | H-05 | Base de données Neon | É2 | Fait : base créée par l'utilisateur, branche `dev` créée ; variables de `dev` ajoutées par l'agent via les CLI Neon et Vercel (valeurs jamais affichées) | 30/09/2026 |
 | H-06 | Secrets et variables d'application | É2 | Fait par l'agent à la demande de l'utilisateur : `BETTER_AUTH_SECRET` (3 valeurs distinctes, Secret en Production et Preview), `BETTER_AUTH_URL` (Production, Development), `ADMIN_EMAILS` (2 adresses, 3 environnements), sans affichage ; `check:env` tout à OK | 30/09/2026 |
 | H-07 | Ouvrir les aperçus aux collègues | É9 | À faire | |
-| H-08 | Validation de fin d'étape | chaque étape | — | voir le tableau des étapes |
+| H-08 | Validation de fin d'étape | chaque étape | É1 et É2 faites | voir le tableau des étapes |
 | H-09 | Compte admin en production | après É4 | À faire | |
 | H-10 | Liste blanche de l'équipe | après H-09 | À faire | |
 | H-11 | Contenu de la campagne | après É5 | À faire | |
@@ -89,4 +89,6 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 | 30/09/2026 | PGlite exclu du paquet des fonctions Vercel (`outputFileTracingExcludes` dans `next.config.ts`) : il représentait 21 Mo sur 23 alors que la production ne le charge jamais. Les pilotes PGlite et WebSocket sont chargés à la demande (`createRequire`) et restent des dépendances de développement | agent (§3.3, §7.2) |
 | 30/09/2026 | Correctif de l'É1 : `README.md` était encore en UTF-16 (y compris dans le commit), converti en UTF-8 et complété avec les commandes de l'É2 | agent |
 | 30/09/2026 | `next dev` (16.3) ajoute à `CLAUDE.md` un bloc « nextjs-agent-rules » qui invite les agents à lire la documentation fournie dans `node_modules/next/dist/docs/`. Conservé (cohérent avec §1.2 et §14) ; on peut le couper avec `agentRules: false` dans `next.config.ts` | agent, à confirmer par l'utilisateur |
+| 30/09/2026 | H-08 de l'É2 : l'utilisateur a demandé la fusion dans `main`. Sans réponse sur les trois points ouverts, on garde les choix par défaut : bloc Next conservé dans `CLAUDE.md`, Neon Auth laissé activé (inutilisé), jeton GitHub toujours dans l'adresse du dépôt distant (retrait et révocation recommandés) | utilisateur |
+| 30/09/2026 | Journaux de build de production : Vercel masque (`[REDACTED]`) le nom d'hôte de la base, car les variables de production sont de type Secret. La vérification du marqueur se lit sur la ligne « Base marquée comme base de production » | agent |
 | 30/09/2026 | Point à surveiller : `pg` 8.23 affiche un avertissement sur `sslmode=require` (traité comme `verify-full`, sens qui changera avec `pg` 9). Sans effet aujourd'hui ; à traiter si l'on passe à `pg` 9 | agent (§14) |
