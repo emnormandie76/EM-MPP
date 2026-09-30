@@ -26,10 +26,31 @@ for (const url of ["/", "/profil", "/cette-page-n-existe-pas"]) {
   });
 }
 
-for (const url of ["/admin", "/admin/joueurs"]) {
+const ADMIN_PAGES = [
+  "/admin",
+  "/admin/joueurs",
+  "/admin/questions",
+  "/admin/questions/nouvelle",
+  "/admin/categories",
+  "/admin/saisons",
+  "/admin/annonces",
+];
+
+for (const url of ADMIN_PAGES) {
   test(`${url} (admin) has no serious or critical accessibility violation`, async ({ page }) => {
     await signIn(page, ACCOUNTS.admin);
     await page.goto(url);
+    expect(await blockingViolations(page)).toEqual([]);
+  });
+}
+
+// §9.4: /admin/questions/<id>, on an open question (follow-up) and on a closed one (result form).
+for (const title of ["Combien de participants à la JPO du 15 novembre ?", "Combien de visiteurs sur le stand du salon Studyrama ?"]) {
+  test(`/admin/questions/<id> « ${title} » has no serious or critical accessibility violation`, async ({ page }) => {
+    await signIn(page, ACCOUNTS.admin);
+    await page.goto("/admin/questions");
+    await page.getByRole("link", { name: title }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
     expect(await blockingViolations(page)).toEqual([]);
   });
 }

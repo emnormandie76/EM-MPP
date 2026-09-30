@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, formatDateTime, formatNumber, formatRelative } from "@/lib/format";
+import { formatCount, formatDate, formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 
 const NARROW_NBSP = " ";
 
@@ -35,6 +35,14 @@ describe("formatDateTime", () => {
   it("uses the Paris date, not the UTC date, around midnight", () => {
     // 22:30 UTC on 30 Sept is 00:30 on 1 Oct in Paris.
     expect(formatDateTime(new Date("2026-09-30T22:30:00Z"))).toBe("jeu. 1er oct. à 0 h 30");
+  });
+});
+
+describe("formatDate", () => {
+  it("shows the Paris day, with 1er for the first of the month", () => {
+    // 1 October 00:00 in Paris is still 30 September in UTC.
+    expect(formatDate(new Date("2026-09-30T22:00:00Z"))).toBe("1er oct. 2026");
+    expect(formatDate(new Date("2027-09-30T21:59:59Z"))).toBe("30 sept. 2027");
   });
 });
 

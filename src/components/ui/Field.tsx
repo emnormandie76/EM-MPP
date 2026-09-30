@@ -39,7 +39,7 @@ function FieldFrame({ id, label, hint, error, className, children }: FieldFrameP
 }
 
 const CONTROL_CLASSES =
-  "rounded-field border border-line-strong bg-surface px-3 text-base text-ink focus:border-accent aria-invalid:border-hot";
+  "rounded-field border border-line-strong bg-surface px-3 text-base text-ink focus:border-accent aria-invalid:border-hot disabled:cursor-not-allowed disabled:bg-raised disabled:text-muted";
 
 type FieldProps = ComponentProps<"input"> & {
   name: string;
@@ -86,6 +86,33 @@ export function TextAreaField({ name, id = name, label, hint, error, className, 
           className={`min-h-32 py-2.5 ${CONTROL_CLASSES}`}
           {...textAreaProps}
         />
+      )}
+    </FieldFrame>
+  );
+}
+
+type SelectFieldProps = ComponentProps<"select"> & {
+  name: string;
+  label: string;
+  hint?: string;
+  error?: string;
+};
+
+/** Labelled drop-down list. */
+export function SelectField({ name, id = name, label, hint, error, className, children, ...selectProps }: SelectFieldProps) {
+  return (
+    <FieldFrame id={id} label={label} hint={hint} error={error} className={className}>
+      {(describedBy) => (
+        <select
+          id={id}
+          name={name}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          className={`h-11 ${CONTROL_CLASSES}`}
+          {...selectProps}
+        >
+          {children}
+        </select>
       )}
     </FieldFrame>
   );

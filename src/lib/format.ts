@@ -24,6 +24,11 @@ function formatDayMonth(date: Date): string {
   return `${day === 1 ? "1er" : day} ${month}`;
 }
 
+/** "1er oct. 2026", "30 sept. 2027" (Paris time). */
+export function formatDate(date: Date): string {
+  return `${formatDayMonth(date)} ${format(date, "yyyy", { in: paris })}`;
+}
+
 /** "mer. 21 oct. à 18 h", "dim. 15 nov. à 18 h 30" (Paris time). */
 export function formatDateTime(date: Date): string {
   const weekday = format(date, "EEE", { locale: fr, in: paris });
