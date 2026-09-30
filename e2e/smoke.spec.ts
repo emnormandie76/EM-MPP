@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { seasonLabelFor } from "../src/lib/game/time";
 
 test("home page answers with the B5 header, in French", async ({ page }) => {
   const response = await page.goto("/");
@@ -12,6 +13,11 @@ test("home page answers with the B5 header, in French", async ({ page }) => {
   await expect(
     page.getByRole("navigation", { name: "Navigation principale" }).getByRole("link", { name: "Accueil" }),
   ).toHaveAttribute("aria-current", "page");
+});
+
+test("the footer shows the current season, computed on each request", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("contentinfo")).toContainText(`Saison ${seasonLabelFor(new Date())}`);
 });
 
 test("an unknown address shows the French 404 page", async ({ page }) => {

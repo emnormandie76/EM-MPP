@@ -35,9 +35,23 @@ npx playwright install chromium
 | `npm run db:check` | test de connexion à la base, sans afficher l'URL |
 | `npm run db:generate` | nouvelle migration après un changement de schéma |
 | `npm run db:migrate` | applique les migrations sur la base de `.env.local` |
+| `npm run db:seed -- --yes` | **efface** la base de développement de `.env.local` et la remplit avec les données de test (refusé sur la production) |
 | `npm run build:vercel` | build Vercel : migrations, puis build (lancé par Vercel) |
 
-Arrive à l'étape 3 : `db:seed`. La liste complète se trouve dans l'[architecture, §3.2](docs/architecture/architecture.md#32-scripts-npm).
+La liste complète se trouve dans l'[architecture, §3.2](docs/architecture/architecture.md#32-scripts-npm).
+
+Comptes du seed (mot de passe `Test-1234!`) : `admin@example.test`, `joueur1@example.test` à `joueur8@example.test`, `desactive@example.test` (compte désactivé).
+
+## Schéma de la base
+
+- Tables de l'application : `src/lib/db/schema/app.ts`. Après une modification : `npm run db:generate`, relire le SQL produit dans `drizzle/`, puis `npm run db:migrate`.
+- Tables de Better Auth : `src/lib/db/schema/auth.ts`, généré à partir de `src/lib/auth/auth.ts`. Après un changement de configuration qui touche les tables :
+
+  ```bash
+  DB_DRIVER=pglite npx auth@1.7.6 generate --config src/lib/auth/auth.ts --output src/lib/db/schema/auth.ts
+  ```
+
+  puis repasser toutes les colonnes `timestamp(...)` en `{ withTimezone: true }` (un test le vérifie), et générer la migration.
 
 ## Documentation
 

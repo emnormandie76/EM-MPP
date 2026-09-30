@@ -1,0 +1,619 @@
+import { generateId } from "better-auth";
+import { hashPassword } from "better-auth/crypto";
+import { eq, sql } from "drizzle-orm";
+import { defaultAvatarFor } from "../../src/lib/avatars";
+import type { Database } from "../../src/lib/db/client";
+import {
+  account,
+  allowedEmail,
+  announcement,
+  category,
+  prediction,
+  predictionEvent,
+  prize,
+  question,
+  questionOption,
+  season,
+  seasonStanding,
+  user,
+} from "../../src/lib/db/schema";
+import { computeStandings, type StandingsPrediction, type StandingsQuestion } from "../../src/lib/game/standings";
+import { previousSeasonLabel, seasonBounds, seasonLabelFor } from "../../src/lib/game/time";
+import { isMarkedAsProduction } from "./db";
+
+// Development and end-to-end data set (architecture §9.6). It ERASES every row (application and
+// accounts, not app_meta) and inserts the data below, in one transaction.
+//
+// Dates are relative to `now`. The questions of the current season must close inside it: near a
+// season change (1 October), the gaps are shrunk to fit, so the data set stays consistent on any
+// day. In mid-season, "3 days ago" is exactly 3 days ago.
+
+export const SEED_PASSWORD = "Test-1234!";
+/** Value of another player's prediction on an open question: must never reach the page (§9.3). */
+export const WITNESS_VALUE = 987654;
+
+export class SeedRefusedError extends Error {}
+
+type Env = Record<string, string | undefined>;
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+/** Past offsets of the current season are expressed in days out of this span… */
+const PAST_SPAN_DAYS = 30;
+/** …and future ones out of this span (all strictly below it). */
+const FUTURE_SPAN_DAYS = 7;
+
+/** Why seeding this database is forbidden, or null. */
+export async function seedRefusal(db: Database, env: Env): Promise<string | null> {
+  if (env.VERCEL_ENV === "production") return "VERCEL_ENV=production : le seed est interdit en production.";
+  if (await isMarkedAsProduction(db)) return "cette base est marquée comme base de production : le seed y est interdit.";
+  return null;
+}
+
+const PEOPLE = {
+  admin: { email: "admin@example.test", name: "Admin", role: "admin" },
+  sarah: { email: "joueur1@example.test", name: "Sarah" },
+  julien: { email: "joueur2@example.test", name: "Julien" },
+  ines: { email: "joueur3@example.test", name: "Inès" },
+  camille: { email: "joueur4@example.test", name: "Camille" },
+  thomas: { email: "joueur5@example.test", name: "Thomas" },
+  mehdi: { email: "joueur6@example.test", name: "Mehdi" },
+  lea: { email: "joueur7@example.test", name: "Léa" },
+  hugo: { email: "joueur8@example.test", name: "Hugo" },
+  nora: { email: "desactive@example.test", name: "Nora", banned: true },
+} as const satisfies Record<string, { email: string; name: string; role?: "admin"; banned?: boolean }>;
+
+type Person = keyof typeof PEOPLE;
+
+/** On the allow list without an account: for sign-up tests. */
+const NEW_EMAILS = ["nouveau1@example.test", "nouveau2@example.test"];
+
+export type SeedSummary = {
+  users: number;
+  allowedEmails: number;
+  categories: number;
+  seasons: { previous: string; current: string };
+  questions: number;
+  predictions: number;
+  events: number;
+  announcements: number;
+  prizes: number;
+  standings: number;
+};
+
+/** Erases every table of the public schema except app_meta, and restarts the identities. */
+async function clearDatabase(db: Database): Promise<void> {
+  const result = (await db.execute(
+    sql`select tablename from pg_tables where schemaname = 'public' and tablename <> 'app_meta'`,
+  )) as unknown as { rows: { tablename: string }[] };
+  if (result.rows.length === 0) return;
+  const tables = sql.join(
+    result.rows.map(({ tablename }) => sql.identifier(tablename)),
+    sql`, `,
+  );
+  await db.execute(sql`truncate table ${tables} restart identity cascade`);
+}
+
+function seedCalendar(now: Date) {
+  const currentLabel = seasonLabelFor(now);
+  const current = seasonBounds(currentLabel);
+  const previousLabel = previousSeasonLabel(currentLabel);
+  const previous = seasonBounds(previousLabel);
+  const pastSpan = Math.min(now.getTime() - current.startsAt.getTime(), PAST_SPAN_DAYS * DAY);
+  const futureSpan = Math.min(current.endsAt.getTime() - now.getTime(), FUTURE_SPAN_DAYS * DAY);
+  const shift = (ms: number) => new Date(now.getTime() + ms);
+  return {
+    currentLabel,
+    previousLabel,
+    /** Exact offset from now, for dates that do not decide a season. */
+    shift,
+    /** In the current season, `days` (≤ 30) before now. */
+    daysAgo: (days: number) => shift(-(days / PAST_SPAN_DAYS) * pastSpan),
+    /** In the current season, `days` (< 7) after now. */
+    daysAhead: (days: number) => shift((days / FUTURE_SPAN_DAYS) * futureSpan),
+    /** `days` after the start of the previous season. */
+    previousSeasonDay: (days: number) => new Date(previous.startsAt.getTime() + days * DAY),
+  };
+}
+
+type QuestionSpec = {
+  category: string;
+  type: "number" | "choice";
+  priceIsRight?: boolean;
+  title: string;
+  description?: string;
+  unit?: string;
+  source: string;
+  help?: { biUrl?: string; lastYear?: string; hint?: string };
+  coefficient?: 1 | 2 | 3;
+  status: "draft" | "published" | "cancelled";
+  opensAt?: Date;
+  closesAt?: Date;
+  expectedResultAt?: Date;
+  options?: string[];
+  result?: number | string;
+  resolvedAt?: Date;
+  correctedAt?: Date;
+  cancelledAt?: Date;
+};
+
+type SeededQuestion = {
+  id: number;
+  optionIds: Map<string, number>;
+  /** Scoring data, for a resolved question. */
+  scoring: StandingsQuestion | null;
+};
+
+type PredictionSpec = {
+  person: Person;
+  /** A number, or the label of an option. */
+  answer: number | string;
+  joker?: boolean;
+  validated?: boolean;
+};
+
+export async function seedDatabase(db: Database, { now, env }: { now: Date; env: Env }): Promise<SeedSummary> {
+  const refusal = await seedRefusal(db, env);
+  if (refusal) throw new SeedRefusedError(refusal);
+
+  const calendar = seedCalendar(now);
+  const { shift, daysAgo, daysAhead, previousSeasonDay } = calendar;
+  const passwordHash = await hashPassword(SEED_PASSWORD);
+
+  return db.transaction(async (tx) => {
+    await clearDatabase(tx);
+
+    // Accounts: the same password for everyone, hashed the way Better Auth does.
+    const ids = Object.fromEntries(Object.keys(PEOPLE).map((person) => [person, generateId()])) as Record<Person, string>;
+    await tx.insert(user).values(
+      (Object.entries(PEOPLE) as [Person, (typeof PEOPLE)[Person]][]).map(([person, data]) => ({
+        id: ids[person],
+        name: data.name,
+        email: data.email,
+        role: "role" in data ? data.role : "player",
+        banned: "banned" in data ? data.banned : false,
+        banReason: "banned" in data ? "A quitté l'équipe" : null,
+        avatar: defaultAvatarFor(ids[person]),
+        // Camille last came 2 hours ago: the question opened 1 hour ago is new to her (§5.9).
+        lastSeenAt: person === "camille" ? shift(-2 * HOUR) : null,
+      })),
+    );
+    await tx.insert(account).values(
+      Object.values(ids).map((userId) => ({
+        id: generateId(),
+        accountId: userId,
+        providerId: "credential",
+        userId,
+        password: passwordHash,
+        updatedAt: now,
+      })),
+    );
+    const allowed = [
+      ...Object.values(PEOPLE)
+        .filter((data) => !("role" in data))
+        .map(({ email }) => email),
+      ...NEW_EMAILS,
+    ];
+    await tx.insert(allowedEmail).values(allowed.map((email) => ({ email, createdBy: ids.admin })));
+
+    const categories = await tx
+      .insert(category)
+      .values([
+        { name: "JPO" },
+        { name: "Candidatures" },
+        { name: "Intégration" },
+        { name: "Archivée", archivedAt: shift(-30 * DAY) },
+      ])
+      .returning();
+    const categoryId = new Map(categories.map(({ id, name }) => [name, id]));
+
+    const seasons = await tx
+      .insert(season)
+      .values([
+        {
+          label: calendar.previousLabel,
+          ...seasonBounds(calendar.previousLabel),
+          proclaimedAt: previousSeasonDay(150),
+        },
+        { label: calendar.currentLabel, ...seasonBounds(calendar.currentLabel) },
+      ])
+      .returning();
+    const seasonId = new Map(seasons.map(({ id, label }) => [label, id]));
+
+    let questionCount = 0;
+    let predictionCount = 0;
+    let eventCount = 0;
+
+    async function addQuestion(spec: QuestionSpec): Promise<SeededQuestion> {
+      const label = spec.closesAt ? seasonLabelFor(spec.closesAt) : null;
+      if (label !== null && !seasonId.has(label)) throw new Error(`Seed question outside the seeded seasons: ${spec.title}`);
+      const [row] = await tx
+        .insert(question)
+        .values({
+          seasonId: label === null ? null : seasonId.get(label),
+          categoryId: categoryId.get(spec.category)!,
+          type: spec.type,
+          priceIsRight: spec.priceIsRight ?? false,
+          title: spec.title,
+          description: spec.description ?? null,
+          unit: spec.unit ?? null,
+          source: spec.source,
+          helpBiUrl: spec.help?.biUrl ?? null,
+          helpLastYear: spec.help?.lastYear ?? null,
+          helpHint: spec.help?.hint ?? null,
+          opensAt: spec.opensAt ?? null,
+          closesAt: spec.closesAt ?? null,
+          expectedResultAt: spec.expectedResultAt ?? null,
+          coefficient: spec.coefficient ?? 1,
+          status: spec.status,
+          resultNumber: typeof spec.result === "number" ? spec.result : null,
+          resolvedAt: spec.resolvedAt ?? null,
+          correctedAt: spec.correctedAt ?? null,
+          cancelledAt: spec.cancelledAt ?? null,
+          createdBy: ids.admin,
+        })
+        .returning();
+
+      const options = spec.options?.length
+        ? await tx
+            .insert(questionOption)
+            .values(spec.options.map((optionLabel, index) => ({ questionId: row.id, label: optionLabel, position: index + 1 })))
+            .returning()
+        : [];
+      const optionIds = new Map(options.map(({ id, label: optionLabel }) => [optionLabel, id]));
+
+      let resultOptionId: number | null = null;
+      if (typeof spec.result === "string") {
+        resultOptionId = optionIds.get(spec.result)!;
+        await tx.update(question).set({ resultOptionId }).where(eq(question.id, row.id));
+      }
+      questionCount += 1;
+      const { id, type, priceIsRight, coefficient, resultNumber, resolvedAt } = row;
+      const scoring = resolvedAt ? { id, type, priceIsRight, coefficient, resultNumber, resultOptionId, resolvedAt } : null;
+      return { id, optionIds, scoring };
+    }
+
+    /** Predictions made at `playedAt`, with their events: saved, then joker_on, then validated. */
+    async function addPredictions(q: SeededQuestion, playedAt: Date, specs: PredictionSpec[]): Promise<StandingsPrediction[]> {
+      const made: StandingsPrediction[] = [];
+      for (const spec of specs) {
+        const valueNumber = typeof spec.answer === "number" ? spec.answer : null;
+        const optionId = typeof spec.answer === "string" ? q.optionIds.get(spec.answer)! : null;
+        const joker = spec.joker ?? false;
+        const jokerAt = new Date(playedAt.getTime() + 2 * MINUTE);
+        const validatedAt = spec.validated ? new Date(playedAt.getTime() + 10 * MINUTE) : null;
+        const [row] = await tx
+          .insert(prediction)
+          .values({
+            questionId: q.id,
+            userId: ids[spec.person],
+            valueNumber,
+            optionId,
+            joker,
+            validatedAt,
+            createdAt: playedAt,
+            updatedAt: validatedAt ?? (joker ? jokerAt : playedAt),
+          })
+          .returning();
+        const event = { predictionId: row.id, questionId: q.id, ownerId: row.userId, actorId: row.userId, valueNumber, optionId };
+        const events: (typeof predictionEvent.$inferInsert)[] = [{ ...event, type: "saved", joker: false, createdAt: playedAt }];
+        if (joker) events.push({ ...event, type: "joker_on", joker: true, createdAt: jokerAt });
+        if (validatedAt) events.push({ ...event, type: "validated", joker, createdAt: validatedAt });
+        await tx.insert(predictionEvent).values(events);
+        predictionCount += 1;
+        eventCount += events.length;
+        made.push({ questionId: q.id, userId: row.userId, valueNumber, optionId, joker });
+      }
+      return made;
+    }
+
+    /** Predictions are made a day after the opening of past questions (opened a week before closing). */
+    const weekBefore = (closesAt: Date) => new Date(closesAt.getTime() - 7 * DAY);
+    const playedOn = (closesAt: Date) => new Date(closesAt.getTime() - 6 * DAY);
+    const openOpening = shift(-3 * DAY);
+    const openPlay = shift(-2 * DAY);
+
+    // Previous season: proclaimed, 2 resolved questions and its palmarès.
+    const pr1Closes = previousSeasonDay(27);
+    const pr1 = await addQuestion({
+      category: "Candidatures",
+      type: "number",
+      title: "Combien de candidatures Grande École au 31 mars ?",
+      unit: "candidatures",
+      source: "Tableau BI « Candidatures », total au 31/03 à minuit",
+      status: "published",
+      opensAt: weekBefore(pr1Closes),
+      closesAt: pr1Closes,
+      expectedResultAt: previousSeasonDay(60),
+      result: 1200,
+      resolvedAt: previousSeasonDay(60),
+    });
+    const pr2Closes = previousSeasonDay(97);
+    const pr2 = await addQuestion({
+      category: "Intégration",
+      type: "choice",
+      title: "Le campus du Havre dépassera-t-il 400 intégrés à la rentrée ?",
+      source: "Tableau BI « Intégration », effectif au 15/09",
+      status: "published",
+      opensAt: weekBefore(pr2Closes),
+      closesAt: pr2Closes,
+      options: ["Oui", "Non"],
+      result: "Oui",
+      resolvedAt: previousSeasonDay(120),
+    });
+    const previousPredictions = [
+      ...(await addPredictions(pr1, playedOn(pr1Closes), [
+        { person: "sarah", answer: 1210, validated: true },
+        { person: "ines", answer: 1180, validated: true },
+        { person: "julien", answer: 1100 },
+        { person: "camille", answer: 1500, validated: true },
+        { person: "thomas", answer: 900 },
+      ])),
+      ...(await addPredictions(pr2, playedOn(pr2Closes), [
+        { person: "sarah", answer: "Non", validated: true },
+        { person: "ines", answer: "Oui", validated: true },
+        { person: "julien", answer: "Oui" },
+        { person: "camille", answer: "Oui", validated: true },
+        { person: "thomas", answer: "Non", validated: true },
+        { person: "mehdi", answer: "Oui" },
+      ])),
+    ];
+
+    // Current season, resolved: vector P1 (podium with ties), vector J3 (Juste Prix), a choice.
+    const r1Closes = daysAgo(20);
+    const r1 = await addQuestion({
+      category: "JPO",
+      type: "number",
+      title: "Combien de participants à la JPO de septembre ?",
+      unit: "participants",
+      source: "Tableau BI « JPO », feuilles d'émargement",
+      status: "published",
+      opensAt: weekBefore(r1Closes),
+      closesAt: r1Closes,
+      expectedResultAt: daysAgo(15),
+      result: 250,
+      resolvedAt: daysAgo(15),
+    });
+    const r2Closes = daysAgo(12);
+    const r2 = await addQuestion({
+      category: "Candidatures",
+      type: "number",
+      priceIsRight: true,
+      title: "Combien de candidatures BBA pendant la semaine de rentrée ?",
+      unit: "candidatures",
+      source: "Tableau BI « Candidatures », semaine 37",
+      status: "published",
+      opensAt: weekBefore(r2Closes),
+      closesAt: r2Closes,
+      expectedResultAt: daysAgo(8),
+      result: 250,
+      resolvedAt: daysAgo(8),
+      correctedAt: daysAgo(7),
+    });
+    const r3Closes = daysAgo(6);
+    const r3 = await addQuestion({
+      category: "Intégration",
+      type: "choice",
+      title: "Quel campus comptera le plus d'intégrés en Bachelor ?",
+      source: "Tableau BI « Intégration », effectifs par campus",
+      coefficient: 2,
+      status: "published",
+      opensAt: weekBefore(r3Closes),
+      closesAt: r3Closes,
+      options: ["Caen", "Le Havre", "Paris"],
+      result: "Le Havre",
+      resolvedAt: daysAgo(3),
+    });
+    await addPredictions(r1, playedOn(r1Closes), [
+      { person: "sarah", answer: 240, validated: true },
+      { person: "julien", answer: 262, joker: true, validated: true },
+      { person: "ines", answer: 235, validated: true },
+      { person: "camille", answer: 235 },
+      { person: "thomas", answer: 300, validated: true },
+    ]);
+    await addPredictions(r2, playedOn(r2Closes), [
+      { person: "mehdi", answer: 251, validated: true },
+      { person: "sarah", answer: 245, validated: true },
+      { person: "lea", answer: 230 },
+    ]);
+    await addPredictions(r3, playedOn(r3Closes), [
+      { person: "sarah", answer: "Caen", validated: true },
+      { person: "julien", answer: "Le Havre", validated: true },
+      { person: "ines", answer: "Le Havre", validated: true },
+      { person: "camille", answer: "Paris" },
+      { person: "thomas", answer: "Le Havre", joker: true, validated: true },
+      { person: "hugo", answer: "Le Havre", validated: true },
+      { person: "admin", answer: "Caen", validated: true },
+      { person: "nora", answer: "Le Havre", validated: true },
+    ]);
+
+    // Current season, closed and waiting for its result.
+    const closedCloses = daysAgo(2);
+    const closed = await addQuestion({
+      category: "JPO",
+      type: "number",
+      title: "Combien de visiteurs sur le stand du salon Studyrama ?",
+      unit: "visiteurs",
+      source: "Compteur du stand, relevé par l'équipe salons",
+      status: "published",
+      opensAt: weekBefore(closedCloses),
+      closesAt: closedCloses,
+      expectedResultAt: shift(30 * DAY),
+    });
+    await addPredictions(closed, playedOn(closedCloses), [
+      { person: "sarah", answer: 180, validated: true },
+      { person: "julien", answer: 220 },
+      { person: "ines", answer: 250, validated: true },
+      { person: "camille", answer: 205 },
+      { person: "thomas", answer: 300, validated: true },
+      { person: "mehdi", answer: 240 },
+      { person: "hugo", answer: 262, validated: true },
+    ]);
+
+    // Current season, open: closing in 1 day (urgent), 3, 5 and 6 days.
+    const o1 = await addQuestion({
+      category: "JPO",
+      type: "number",
+      title: "Combien de participants à la JPO du 15 novembre ?",
+      description: "Participants présents, tous programmes confondus, accompagnants exclus.",
+      unit: "participants",
+      source: "Tableau BI « JPO », feuilles d'émargement du 15 novembre",
+      help: {
+        biUrl: "https://bi.example.test/jpo",
+        lastYear: "212",
+        hint: "Compare le nombre d'inscrits à J-7 avec celui de l'an dernier.",
+      },
+      status: "published",
+      opensAt: openOpening,
+      closesAt: daysAhead(1),
+      expectedResultAt: shift(45 * DAY),
+    });
+    const o2 = await addQuestion({
+      category: "Candidatures",
+      type: "number",
+      priceIsRight: true,
+      title: "Combien de candidatures Grande École au 31 mai ?",
+      unit: "candidatures",
+      source: "Tableau BI « Candidatures », total au 31/05 à minuit",
+      help: { biUrl: "https://bi.example.test/candidatures", lastYear: "2 318" },
+      coefficient: 2,
+      status: "published",
+      opensAt: openOpening,
+      closesAt: daysAhead(3),
+      expectedResultAt: shift(240 * DAY),
+    });
+    const o3 = await addQuestion({
+      category: "Candidatures",
+      type: "choice",
+      title: "Quel programme recevra le plus de candidatures en décembre ?",
+      source: "Tableau BI « Candidatures », total de décembre par programme",
+      help: { hint: "Regarde la saisonnalité des trois dernières années." },
+      status: "published",
+      opensAt: openOpening,
+      closesAt: daysAhead(5),
+      expectedResultAt: shift(95 * DAY),
+      options: ["BBA", "Grande École", "MSc"],
+    });
+    const o4 = await addQuestion({
+      category: "Intégration",
+      type: "choice",
+      title: "Le taux d'intégration du Bachelor dépassera-t-il 60 % ?",
+      source: "Tableau BI « Intégration », taux au 30/09",
+      status: "published",
+      // Opened 1 hour ago: new to Camille, whose last visit was 2 hours ago.
+      opensAt: shift(-HOUR),
+      closesAt: daysAhead(6),
+      options: ["Oui", "Non"],
+    });
+    await addPredictions(o1, openPlay, [
+      { person: "ines", answer: 240 },
+      { person: "camille", answer: 260, validated: true },
+      { person: "thomas", answer: 300, joker: true },
+      { person: "mehdi", answer: 210, validated: true },
+      { person: "hugo", answer: WITNESS_VALUE, joker: true, validated: true },
+      { person: "admin", answer: 250 },
+    ]);
+    await addPredictions(o2, openPlay, [
+      { person: "ines", answer: 2400, joker: true, validated: true },
+      { person: "lea", answer: 2300 },
+      { person: "camille", answer: 2150 },
+    ]);
+    await addPredictions(o3, openPlay, [
+      { person: "ines", answer: "Grande École" },
+      { person: "mehdi", answer: "BBA", joker: true, validated: true },
+      { person: "admin", answer: "MSc" },
+    ]);
+    await addPredictions(o4, shift(-45 * MINUTE), [{ person: "thomas", answer: "Oui", validated: true }]);
+
+    // Current season, scheduled: invisible to players until it opens.
+    await addQuestion({
+      category: "JPO",
+      type: "number",
+      title: "Combien de participants à la JPO de janvier ?",
+      unit: "participants",
+      source: "Tableau BI « JPO », feuilles d'émargement de janvier",
+      status: "published",
+      opensAt: daysAhead(2),
+      closesAt: daysAhead(6.5),
+    });
+
+    // Current season, cancelled while open, with a joker that is given back.
+    const cancelled = await addQuestion({
+      category: "Candidatures",
+      type: "number",
+      title: "Combien de dossiers complets au 15 octobre ?",
+      unit: "dossiers",
+      source: "Tableau BI « Candidatures », dossiers complets",
+      status: "cancelled",
+      opensAt: openOpening,
+      closesAt: daysAhead(4),
+      cancelledAt: shift(-DAY),
+    });
+    await addPredictions(cancelled, openPlay, [{ person: "hugo", answer: 1500, joker: true }]);
+
+    // A draft, without dates.
+    await addQuestion({
+      category: "Intégration",
+      type: "number",
+      title: "Combien d'intégrés en alternance à la rentrée de janvier ?",
+      unit: "intégrés",
+      source: "Tableau BI « Intégration », alternants",
+      status: "draft",
+    });
+
+    // Palmarès of the previous season, computed as the proclamation does (§5.12).
+    const players = (Object.entries(PEOPLE) as [Person, (typeof PEOPLE)[Person]][]).map(([person, data]) => ({
+      id: ids[person],
+      name: data.name,
+      banned: "banned" in data ? data.banned : false,
+    }));
+    const previousQuestions = [pr1.scoring!, pr2.scoring!];
+    const standings = computeStandings({ questions: previousQuestions, predictions: previousPredictions, players });
+    await tx.insert(seasonStanding).values(
+      standings.map((row) => ({
+        seasonId: seasonId.get(calendar.previousLabel)!,
+        userId: row.userId,
+        rank: row.rank,
+        points: row.points,
+        bullseyes: row.bullseyes,
+        meanError: row.meanError,
+        questionsPlayed: row.questionsPlayed,
+        nameSnapshot: row.name,
+      })),
+    );
+
+    const announcements = await tx.insert(announcement).values([
+      {
+        body: "Bienvenue sur Le Bon Chiffre ! Les questions de la campagne d'octobre sont ouvertes : valide tes pronos avant la clôture.",
+        createdBy: ids.admin,
+        createdAt: shift(-2 * DAY),
+        updatedAt: shift(-2 * DAY),
+      },
+      {
+        body: "Le résultat du Bachelor est tombé : va voir le classement !",
+        createdBy: ids.admin,
+        createdAt: shift(-3 * HOUR),
+        updatedAt: shift(-3 * HOUR),
+      },
+    ]).returning();
+    const prizes = await tx.insert(prize).values([
+      { seasonId: seasonId.get(calendar.currentLabel)!, rankLabel: "1er", description: "Un déjeuner d'équipe offert", position: 1 },
+      { seasonId: seasonId.get(calendar.currentLabel)!, rankLabel: "2e", description: "Un sweat de l'école", position: 2 },
+      { seasonId: seasonId.get(calendar.currentLabel)!, rankLabel: "3e", description: "Un mug de l'école", position: 3 },
+    ]).returning();
+
+    return {
+      users: Object.keys(PEOPLE).length,
+      allowedEmails: allowed.length,
+      categories: categories.length,
+      seasons: { previous: calendar.previousLabel, current: calendar.currentLabel },
+      questions: questionCount,
+      predictions: predictionCount,
+      events: eventCount,
+      announcements: announcements.length,
+      prizes: prizes.length,
+      standings: standings.length,
+    };
+  });
+}

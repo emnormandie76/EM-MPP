@@ -9,6 +9,9 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     setupFiles: ["vitest.setup.ts"],
+    // Starting PGlite and applying the migrations takes several seconds when every file runs at once.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     coverage: {
       provider: "v8",
       include: ["src/lib/**/*.ts"],

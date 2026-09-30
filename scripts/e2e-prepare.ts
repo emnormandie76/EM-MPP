@@ -1,8 +1,9 @@
-// Prepares the end-to-end database (architecture §9.4): deletes PGLITE_DIR, then migrates.
-// The seed arrives with step 3. PGlite is closed before the server starts (one connection at a time).
+// Prepares the end-to-end database (architecture §9.4): deletes PGLITE_DIR, migrates, seeds.
+// PGlite is closed before the server starts (one connection at a time).
 import { rmSync } from "node:fs";
 import path from "node:path";
 import { openPglite, safeMessage } from "./lib/db";
+import { seedDatabase } from "./lib/seed";
 
 async function main(): Promise<void> {
   const dir = process.env.PGLITE_DIR;
@@ -15,7 +16,8 @@ async function main(): Promise<void> {
   const target = await openPglite(dir);
   try {
     await target.migrate();
-    console.log(`Base de bout en bout prête : ${target.location}.`);
+    const summary = await seedDatabase(target.db, { now: new Date(), env: process.env });
+    console.log(`Base de bout en bout prête : ${target.location}, ${summary.questions} questions, ${summary.predictions} pronos.`);
   } finally {
     await target.close();
   }

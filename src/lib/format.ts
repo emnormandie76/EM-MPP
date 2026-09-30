@@ -1,9 +1,8 @@
 import { tz } from "@date-fns/tz";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { TIME_ZONE } from "./game/time";
 
-// Step 3 moves this constant to src/lib/game/time.ts.
-const TIME_ZONE = "Europe/Paris";
 const paris = tz(TIME_ZONE);
 
 const numberFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
