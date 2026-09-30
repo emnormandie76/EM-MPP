@@ -8,7 +8,7 @@
 |---|---|---|---|---|---|
 | É1 | Socle du projet | 30/09/2026 | Validée | 30/09/2026 | Branche `etape-01-socle`, fusionnée dans `main` le 30/09. `verify` OK (25 tests unitaires), `test:e2e` OK (5 tests) |
 | É2 | Hébergement et base de données | 01/10/2026 | Validée | 30/09/2026 | Branche `etape-02-hebergement`, fusionnée dans `main` le 30/09. `verify` OK (38 tests unitaires et d'intégration), `test:e2e` OK (6 tests). Production : migration appliquée sur `main` avant le build, base marquée « production », `/api/health` à `ok: true` (fonction en `fra1`). `dev` non marquée |
-| É3 | Données et moteur de règles | 02/10/2026 | À faire | | |
+| É3 | Données et moteur de règles | 02/10/2026 | Validée | 30/09/2026 | Branche `etape-03-donnees-regles`, commitée et poussée le 30/09 ; **fusion dans `main` pas encore faite** (voir les points ouverts). `verify` OK (286 tests unitaires et d'intégration), couverture de `src/lib/game` : 100 % des lignes, 97,6 % des branches ; `test:e2e` OK (7 tests, base e2e migrée et remplie par le seed). Migration appliquée sur `dev`, seed passé (10 comptes, 13 questions, 48 pronos) |
 | É4 | Comptes et accès | 05/10/2026 | À faire | | |
 | É5 | Back-office | 06/10/2026 | À faire | | |
 | É6 | Parcours joueur | 08/10/2026 | À faire | | |
@@ -17,6 +17,29 @@
 | É9 | Recette et lancement | 13/10/2026 | À faire | | Lancement le 14/10/2026 |
 
 Statuts possibles : À faire · En cours · En attente de validation · Validée.
+
+## Points ouverts pour l'agent suivant
+
+> **À lire avant de commencer l'étape suivante.** Chaque agent met cette liste à jour en fin d'étape : il retire ce qui est réglé et ajoute ce qu'il laisse en suspens. Le détail et l'historique sont dans le journal des décisions.
+
+**Avant l'É4**
+
+1. **Fusion de l'É3 dans `main`** : la branche `etape-03-donnees-regles` est commitée et poussée, mais pas fusionnée. L'utilisateur a demandé « commit et push » sans mentionner la fusion. Lui demander son accord, puis fusionner et pousser `main` : cela déploie la production et applique la migration `0001_schema` sur la base de production (vide). Vérifier ensuite le journal de build Vercel et `/api/health`. Créer la branche `etape-04-comptes` à partir de `main` une fois la fusion faite.
+2. **Données de `dev` à rafraîchir** : le seed du 30/09 a créé les saisons 2024-2025 (proclamée) et 2025-2026, dont les questions ouvertes ferment le 30/09 avant minuit. À partir du 1er octobre, relancer `npm run db:seed -- --yes` (réseau de l'école : `DB_DRIVER=neon-ws` dans `.env.development.local`, déjà en place).
+
+**Pendant l'É4**
+
+3. **`nouveau2@example.test`** : le §9.6 le met sur la liste blanche du seed (`NEW_EMAILS` dans `scripts/lib/seed.ts`), alors que `e2e/auth.spec.ts` prévoit que l'admin l'y ajoute, puis que l'inscription fonctionne. Trancher avec l'utilisateur au début de l'É4 (recommandation : le retirer de la liste blanche du seed et adapter `tests/integration/seed.test.ts`, qui attend 11 adresses).
+4. **Instance `auth` créée à l'import** : `src/lib/auth/auth.ts` fait `export const auth = createAuth(getDb())` (§6.1 ; la CLI de génération a besoin de cet export). Aucune page ne l'importe encore. Dès que la route `api/auth` et `session.ts` l'importeront, vérifier que `next build` pour les tests de bout en bout (`DB_DRIVER=pglite`, `PGLITE_DIR=.pglite-e2e`) n'ouvre pas la base PGlite pendant le build (plusieurs processus sur le même dossier). Si c'est le cas, rendre l'instance paresseuse, en gardant un export `auth` pour la CLI.
+5. **Hook d'inscription (§6.2)** : pas encore écrit. `user.avatar` est obligatoire et n'a pas de valeur par défaut en base : le hook doit le remplir avec `defaultAvatarFor(user.id)` (`src/lib/avatars.ts`). Écrire aussi `createTestAuth(db)` (§9.2) ; `tests/integration/auth-config.test.ts` montre comment brancher `createAuth` sur une base PGlite remplie par le seed.
+6. **Régénérer le schéma Better Auth** si la configuration change : commande en tête de `src/lib/db/schema/auth.ts` et dans le README, puis repasser les `timestamp` en `{ withTimezone: true }` (sinon `schema.test.ts` échoue), et générer la migration.
+
+**Plus tard**
+
+7. **Bordure des champs** (`line-strong`, contraste d'environ 1,9:1) : à traiter à l'É8 (tâche 2), avec l'accord de l'utilisateur.
+8. **Neon Auth** activé par l'intégration Vercel, inutilisé : le laisser ou le désactiver, à la demande de l'utilisateur.
+9. **Jeton GitHub dans l'adresse du dépôt distant** : retrait et révocation recommandés à l'utilisateur, pas encore faits.
+10. **Versions** : ESLint reste en 9 tant que `eslint-config-next` plante avec ESLint 10 ; `pg` 9 changera le sens de `sslmode=require`.
 
 ## Interventions humaines
 
@@ -29,7 +52,7 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 | H-05 | Base de données Neon | É2 | Fait : base créée par l'utilisateur, branche `dev` créée ; variables de `dev` ajoutées par l'agent via les CLI Neon et Vercel (valeurs jamais affichées) | 30/09/2026 |
 | H-06 | Secrets et variables d'application | É2 | Fait par l'agent à la demande de l'utilisateur : `BETTER_AUTH_SECRET` (3 valeurs distinctes, Secret en Production et Preview), `BETTER_AUTH_URL` (Production, Development), `ADMIN_EMAILS` (2 adresses, 3 environnements), sans affichage ; `check:env` tout à OK | 30/09/2026 |
 | H-07 | Ouvrir les aperçus aux collègues | É9 | À faire | |
-| H-08 | Validation de fin d'étape | chaque étape | É1 et É2 faites | voir le tableau des étapes |
+| H-08 | Validation de fin d'étape | chaque étape | É1, É2 et É3 faites | voir le tableau des étapes |
 | H-09 | Compte admin en production | après É4 | À faire | |
 | H-10 | Liste blanche de l'équipe | après H-09 | À faire | |
 | H-11 | Contenu de la campagne | après É5 | À faire | |
@@ -92,3 +115,18 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 | 30/09/2026 | H-08 de l'É2 : l'utilisateur a demandé la fusion dans `main`. Sans réponse sur les trois points ouverts, on garde les choix par défaut : bloc Next conservé dans `CLAUDE.md`, Neon Auth laissé activé (inutilisé), jeton GitHub toujours dans l'adresse du dépôt distant (retrait et révocation recommandés) | utilisateur |
 | 30/09/2026 | Journaux de build de production : Vercel masque (`[REDACTED]`) le nom d'hôte de la base, car les variables de production sont de type Secret. La vérification du marqueur se lit sur la ligne « Base marquée comme base de production » | agent |
 | 30/09/2026 | Point à surveiller : `pg` 8.23 affiche un avertissement sur `sslmode=require` (traité comme `verify-full`, sens qui changera avec `pg` 9). Sans effet aujourd'hui ; à traiter si l'on passe à `pg` 9 | agent (§14) |
+| 30/09/2026 | É3 : versions installées. better-auth 1.7.6. Sa CLI est désormais le paquet `auth` (`npx auth@1.7.6 generate`) ; `@better-auth/cli` s'est arrêté en 1.4. La CLI est lancée avec `DB_DRIVER=pglite` : elle charge `auth.ts` sans jamais toucher à Neon | agent (§14) |
+| 30/09/2026 | Schéma Better Auth : la CLI génère des `timestamp` sans fuseau. Ils sont repassés en `timestamp with time zone` après génération (§4.1), et `schema.test.ts` vérifie que toutes les colonnes de date de la base sont avec fuseau. Commande et étape décrites en tête de `schema/auth.ts` et dans le README | agent |
+| 30/09/2026 | Configuration Better Auth écrite sans le hook d'inscription du §6.2, qui arrive à l'É4 avec les pages (tâche 1 de l'É4). En attendant, aucune inscription n'est possible (pas de route, et `avatar` est obligatoire). Réglages ajoutés : transactions de l'adaptateur Drizzle, télémétrie désactivée explicitement, message de compte désactivé en français, limitation des tentatives active dans tous les environnements | agent (§6.1) |
+| 30/09/2026 | Avatars : `src/lib/avatars.ts` (16 clés `maillot-<couleur>-<uni\|raye>`, avatar par défaut = empreinte FNV-1a de l'identifiant modulo 16) créé dès l'É3, car le seed en a besoin. Les dessins restent à l'É4 | agent (§8.2) |
+| 30/09/2026 | Contraintes en base en plus de celles listées au §4.3 (défense en profondeur des règles du §4.5) : clés étrangères composites qui garantissent qu'une réponse (prono ou bonne réponse) appartient à sa question ; longueurs (énoncé, réponse, annonce, description) ; liste blanche en minuscules sans espaces ; nom de catégorie unique sans tenir compte de la casse (index sur `lower(name)`) ; valeurs positives ; lien BI en http(s) ; Juste Prix réservé aux questions à nombre ; saison obligatoire dès qu'il y a une clôture | agent |
+| 30/09/2026 | `season_standing.mean_error` en `numeric(18, 6)` au lieu de `numeric(10, 6)`. Avec (10, 6), un écart moyen supérieur à 9 999 (prono 10 000 fois trop grand, faute de frappe) ferait échouer la proclamation, qui est irréversible. (18, 6) couvre tous les cas possibles (prono ≤ 999 999 999,99, réel ≥ 0,01). Architecture mise à jour (§4.3) | agent, validé par l'utilisateur (H-08) |
+| 30/09/2026 | Seed : les dates « relatives à now » débordaient sur la saison voisine près du 1er octobre (une question « ouverte, clôture dans 6 jours » créée le 28/09 appartiendrait à la saison suivante). Les écarts du seed sont donc exacts en milieu de saison et resserrés près d'une bascule, pour que toutes les questions de la saison courante y restent. Testé à 30 s après et 30 min avant une bascule. Architecture mise à jour (§9.6) | agent, validé par l'utilisateur (H-08) |
+| 30/09/2026 | Conséquence pour la branche `dev` : le seed du 30/09 a créé les saisons 2024-2025 (proclamée) et 2025-2026, dont les questions ouvertes ferment avant minuit. **Relancer `npm run db:seed -- --yes` à partir du 1er octobre** pour avoir des données de la saison 2026-2027 | agent |
+| 30/09/2026 | Point pour l'É4 : le §9.6 met `nouveau2@example.test` sur la liste blanche du seed, alors que le test `auth.spec.ts` de l'É4 prévoit que l'admin l'y ajoute. À trancher au début de l'É4 (recommandation : le retirer de la liste blanche du seed) | agent |
+| 30/09/2026 | Point pour l'É4 : `auth.ts` crée l'instance `auth = createAuth(getDb())` à l'import, comme le prévoit le §6.1. Aucune page ne l'importe encore. À l'É4, vérifier que le build des tests de bout en bout (PGlite) n'ouvre pas la base e2e pendant le build | agent |
+| 30/09/2026 | Tests : `vitest.setup.ts` force `DB_DRIVER=pglite` (aucun test ne peut atteindre Neon) ; délai de 30 s par test et par hook (`vitest.config.ts`), car démarrer PGlite et migrer prend jusqu'à 8 s quand tous les fichiers tournent en parallèle. Les assertions sont inchangées | agent |
+| 30/09/2026 | `migrations.test.ts` renommé `migrate.test.ts` (§11, É3) ; la logique de `scripts/migrate.ts` est dans `scripts/lib/migrate.ts` (`runMigrations`), pour être testée | agent |
+| 30/09/2026 | Pied de page : la saison vient de `seasonLabelFor(new Date())`. Le layout `(jeu)` appelle `connection()` (Next 16) pour être rendu à chaque requête : sans cela, la saison serait figée au build. `/` est donc dynamique dès l'É3 | agent (§5.1) |
+| 30/09/2026 | Précisions de règles non écrites au §5, choisies par l'agent : `parseNumberInput` renvoie « Format non reconnu. » pour des séparateurs mal placés (« 1,2,3 », « ,5 ») et construit le conseil des milliers à partir de la saisie (« Écris 12500 ou 12 500 … ») ; le compte à rebours arrondit les secondes au-dessus (00:00:00 seulement à la clôture) et n'affiche pas « 0 j » sous une journée ; la saison par défaut du §5.6 est la fonction `defaultSeasonLabel` | agent |
+| 30/09/2026 | H-08 de l'É3 : l'utilisateur valide l'étape et les deux décisions recommandées (écart moyen en `numeric(18, 6)`, dates du seed resserrées près d'une bascule), et demande « commit et push » avant de passer la main à un autre agent. Branche commitée et poussée ; la fusion dans `main` attend son accord explicite. Les points laissés en suspens sont regroupés dans la section « Points ouverts pour l'agent suivant », que `CLAUDE.md` et l'architecture (§0.1) signalent désormais | utilisateur |

@@ -33,7 +33,7 @@
 ### 0.1 À lire avant toute action
 
 1. `CLAUDE.md` (chargé automatiquement).
-2. [avancement.md](avancement.md) : étape en cours, interventions humaines déjà faites, journal des décisions.
+2. [avancement.md](avancement.md) : étape en cours, **points ouverts laissés par l'agent précédent**, interventions humaines déjà faites, journal des décisions.
 3. Ce document : sections 0 à 10 (référence), puis la section de l'étape en cours dans la section 11.
 4. Le cahier des charges, pour toute règle fonctionnelle.
 5. Pour l'interface : la section 8 et la maquette B5.
@@ -337,7 +337,7 @@ Sur Vercel, `build:vercel` applique les migrations en attente **avant** `next bu
 
 ### 4.2 Tables Better Auth
 
-Générées par la CLI de Better Auth (`@better-auth/cli generate`) dans `src/lib/db/schema/auth.ts`, à partir de la configuration du §6.1 :
+Générées par la CLI de Better Auth (paquet `auth` depuis Better Auth 1.7 : `DB_DRIVER=pglite npx auth@<version> generate`, commande exacte en tête du fichier) dans `src/lib/db/schema/auth.ts`, à partir de la configuration du §6.1. Toutes les colonnes de date y sont ensuite passées en `timestamp with time zone` (§4.1), ce que vérifie `tests/integration/schema.test.ts` :
 
 - **`user`** : `id`, `name` (nom affiché), `email` (unique), `email_verified`, `image`, `created_at`, `updated_at`.
   - Ajouts du plugin admin : `role` (`player` ou `admin`), `banned`, `ban_reason`, `ban_expires`.
@@ -485,7 +485,7 @@ Contraintes : `UNIQUE (question_id, user_id)` ; `CHECK ((value_number IS NULL) <
 | `rank` | integer | classement avec ex æquo (1, 1, 3…) |
 | `points` | integer | |
 | `bullseyes` | integer | nombre de « Dans le mille » |
-| `mean_error` | numeric(10,6) | nullable |
+| `mean_error` | numeric(18,6) | nullable ; (18,6) et non (10,6) : un écart supérieur à 9 999 (faute de frappe) ferait échouer la proclamation (décision du 30/09/2026) |
 | `questions_played` | integer | |
 | `name_snapshot` | text | nom affiché au moment de la proclamation |
 
@@ -1318,7 +1318,7 @@ Modes : `dev` (branche Neon `dev`) et `e2e` (PGlite). Le script **efface toutes 
 
 **Garde-fous** : il refuse de s'exécuter si `VERCEL_ENV === 'production'` ou si `app_meta.environment = 'production'` dans la base visée. Il affiche le nom d'hôte de la base (jamais l'URL complète) et demande de taper `oui`, sauf en mode `e2e` ou avec l'option `--yes` (à utiliser par l'agent, dont le terminal n'est pas interactif : `npm run db:seed -- --yes`).
 
-Toutes les dates sont relatives à `now`, pour que le jeu reste cohérent quel que soit le jour.
+Toutes les dates sont relatives à `now`, pour que le jeu reste cohérent quel que soit le jour. Les questions de la saison courante doivent clôturer dans cette saison : les écarts sont exacts en milieu de saison (« il y a 3 jours », « dans 6 jours ») et resserrés près d'une bascule du 1er octobre (décision du 30/09/2026).
 
 | Élément | Contenu |
 |---|---|

@@ -17,7 +17,7 @@ Construction, étape par étape (architecture §11). **Avant de commencer l'éta
 
 ## Règles pour tout agent
 
-1. Lire `avancement.md`, puis les sections 0 à 10 de l'architecture et la section de l'étape en cours, avant toute action.
+1. Lire `avancement.md` (en particulier les **points ouverts laissés par l'agent précédent**), puis les sections 0 à 10 de l'architecture et la section de l'étape en cours, avant toute action. En fin d'étape, mettre à jour ces points ouverts.
 2. Une étape à la fois. Ne pas commencer la suivante tant que les critères de passage ne sont pas tous remplis **et** que l'utilisateur n'a pas validé.
 3. Interventions humaines (H-xx, architecture §12) : s'arrêter, guider l'utilisateur pas à pas, ne jamais lui demander de secret dans le chat, vérifier, puis consigner dans `avancement.md`.
 4. Ne pas s'écarter de l'architecture ni du cahier des charges de sa propre initiative. En cas de doute ou de contradiction : exposer le problème avec deux options et une recommandation, puis consigner la décision dans le journal.
