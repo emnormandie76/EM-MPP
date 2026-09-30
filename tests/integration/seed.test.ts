@@ -54,7 +54,7 @@ describe("seed (scripts/seed.ts)", () => {
 
     expect(summary).toMatchObject({
       users: 10,
-      allowedEmails: 11,
+      allowedEmails: 10,
       categories: 4,
       seasons: { previous: "2025-2026", current: "2026-2027" },
       questions: 13,
@@ -75,8 +75,10 @@ describe("seed (scripts/seed.ts)", () => {
     expect(users.map(({ name }) => name)).toEqual(expect.arrayContaining(["Sarah", "Julien", "Inès", "Camille", "Thomas", "Mehdi", "Léa", "Hugo"]));
 
     const allowed = (await db.select().from(allowedEmail)).map(({ email }) => email);
-    expect(allowed).toHaveLength(11);
-    expect(allowed).toEqual(expect.arrayContaining(["nouveau1@example.test", "nouveau2@example.test", "desactive@example.test"]));
+    expect(allowed).toHaveLength(10);
+    expect(allowed).toEqual(expect.arrayContaining(["nouveau1@example.test", "desactive@example.test"]));
+    // Added by the admin in e2e/auth.spec.ts.
+    expect(allowed).not.toContain("nouveau2@example.test");
     expect(allowed).not.toContain("admin@example.test");
 
     const categories = await db.select().from(category);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
+import { formatCount, formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 
 const NARROW_NBSP = " ";
 
@@ -61,5 +61,15 @@ describe("formatRelative", () => {
   it("gives the Paris date after a week", () => {
     expect(formatRelative(ago(7 * DAY), now)).toBe("le 14 oct.");
     expect(formatRelative(new Date("2026-09-30T22:30:00Z"), now)).toBe("le 1er oct.");
+  });
+});
+
+describe("formatCount", () => {
+  it("uses the plural from 2, as in French", () => {
+    expect(formatCount(0, "invalide")).toBe("0 invalide");
+    expect(formatCount(1, "ajoutée")).toBe("1 ajoutée");
+    expect(formatCount(3, "ajoutée")).toBe("3 ajoutées");
+    expect(formatCount(2, "déjà présente")).toBe("2 déjà présentes");
+    expect(formatCount(2, "œil", "yeux")).toBe("2 yeux");
   });
 });

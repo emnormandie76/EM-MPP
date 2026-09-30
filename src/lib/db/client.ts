@@ -8,7 +8,10 @@ import * as schema from "./schema";
 /** Common base of the node-postgres (Neon), Neon WebSocket (local) and PGlite (tests) databases (§7.2). */
 export type Database = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-let instance: Database | undefined;
+// One instance per process, kept on globalThis: Next.js bundles the route handlers and the pages
+// separately, each with its own copy of this module. Two PGlite instances on the same folder
+// would not see each other's writes (a session created by /api/auth, unknown to the pages).
+const shared = globalThis as typeof globalThis & { leBonChiffreDb?: Database };
 
 /**
  * Singleton database, chosen by `DB_DRIVER`:
@@ -17,8 +20,8 @@ let instance: Database | undefined;
  * - `pglite`: PGlite (tests).
  */
 export function getDb(): Database {
-  instance ??= createDb(process.env.DB_DRIVER);
-  return instance;
+  shared.leBonChiffreDb ??= createDb(process.env.DB_DRIVER);
+  return shared.leBonChiffreDb;
 }
 
 function createDb(driver: string | undefined): Database {

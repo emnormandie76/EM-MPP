@@ -337,7 +337,7 @@ Sur Vercel, `build:vercel` applique les migrations en attente **avant** `next bu
 
 ### 4.2 Tables Better Auth
 
-Générées par la CLI de Better Auth (paquet `auth` depuis Better Auth 1.7 : `DB_DRIVER=pglite npx auth@<version> generate`, commande exacte en tête du fichier) dans `src/lib/db/schema/auth.ts`, à partir de la configuration du §6.1. Toutes les colonnes de date y sont ensuite passées en `timestamp with time zone` (§4.1), ce que vérifie `tests/integration/schema.test.ts` :
+Générées par la CLI de Better Auth (paquet `auth` depuis Better Auth 1.7 : `DB_DRIVER=pglite npx auth@<version> generate --config src/lib/auth/auth-cli.ts`, commande exacte en tête du fichier) dans `src/lib/db/schema/auth.ts`, à partir de la configuration du §6.1. Toutes les colonnes de date y sont ensuite passées en `timestamp with time zone` (§4.1), ce que vérifie `tests/integration/schema.test.ts` :
 
 - **`user`** : `id`, `name` (nom affiché), `email` (unique), `email_verified`, `image`, `created_at`, `updated_at`.
   - Ajouts du plugin admin : `role` (`player` ou `admin`), `banned`, `ban_reason`, `ban_expires`.
@@ -831,14 +831,14 @@ Pour changer un champ verrouillé, l'admin annule la question et en crée une no
 
 ### 6.1 Configuration de Better Auth (`src/lib/auth/auth.ts`)
 
-Fabrique `createAuth(db)` (pour pouvoir brancher la base de test), et instance `auth = createAuth(getDb())`.
+Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement de test), et instance de l'application `getAuth()`, créée au premier usage et non à l'import : `next build` charge le module et ne doit pas ouvrir la base (PGlite des tests de bout en bout). La CLI de génération lit l'instance exportée par `src/lib/auth/auth-cli.ts` (décision du 30/09/2026).
 
 - **Adaptateur** : Drizzle, fournisseur `pg`, avec le schéma de `src/lib/db/schema`.
 - **Email et mot de passe** : activé ; vérification d'email désactivée ; mot de passe de 8 à 128 caractères ; connexion automatique après inscription.
 - **Session** :
   - durée de 400 jours (le maximum qu'acceptent les navigateurs pour un cookie) ;
   - renouvelée à chaque visite (au plus une fois par jour) ;
-  - cache du cookie de session activé (quelques minutes).
+  - cache du cookie de session **désactivé** : chaque page relit la session en base, pour qu'une désactivation, un changement de rôle ou de nom s'applique tout de suite (décision du 30/09/2026 ; la v1.0 prévoyait un cache de quelques minutes).
 - **Plugins** :
   - `admin` : rôle par défaut `player`, rôle admin `admin` ;
   - `nextCookies` : pour que les Server Actions puissent poser les cookies.
@@ -851,14 +851,16 @@ Fabrique `createAuth(db)` (pour pouvoir brancher la base de test), et instance `
 - **Origines de confiance** :
   - `baseURL` = `BETTER_AUTH_URL`, sinon `https://${VERCEL_URL}`, sinon `http://localhost:3000` ;
   - `trustedOrigins` contient `BETTER_AUTH_URL` et les variantes `https://` de `VERCEL_URL`, `VERCEL_BRANCH_URL` et `VERCEL_PROJECT_PRODUCTION_URL` quand elles existent.
-- **Route** : `src/app/api/auth/[...all]/route.ts` expose le gestionnaire Next.js de Better Auth.
-- **Client** : `src/lib/auth/auth-client.ts` crée le client React avec le plugin client admin.
+- **Route** : `src/app/api/auth/[...all]/route.ts` expose le gestionnaire de Better Auth, **limité** aux routes dont l'interface a besoin (`/sign-in/email`, `/sign-up/email`, `/get-session`, liste dans `src/lib/auth/http-paths.ts`). Toutes les autres répondent 404, en particulier celles du plugin admin (`/admin/*`) et `/update-user`, qui contourneraient les règles des services (dernier admin, nom unique, jamais de suppression d'un compte qui a des pronos). Les appels côté serveur (`auth.api.*`) ne sont pas concernés (décision du 30/09/2026).
+- **Connexion et inscription** passent par HTTP (client Better Auth dans le navigateur), pour que la limitation des tentatives s'applique : elle n'agit que sur les requêtes HTTP, pas sur les appels `auth.api.*`. Déconnexion et changement de mot de passe sont des Server Actions.
+- **Client** : `src/lib/auth/auth-client.ts` crée le client React, sans le plugin client admin : les actions d'admin sont des Server Actions (§6.3).
 
 > Les noms exacts d'options de Better Auth peuvent changer d'une version à l'autre (§14). Vérifier dans la documentation de la version installée ; le **comportement** décrit ici est le contrat.
 
 ### 6.2 Inscription, liste blanche et premier admin
 
-- **Hook avant création** : l'email est mis en minuscules et débarrassé de ses espaces.
+- **Hooks** (décision du 30/09/2026) : les contrôles qui lisent la base (liste blanche, compte existant, nom pris) tournent dans un hook `before` de Better Auth sur `/sign-up/email`, avant la transaction d'inscription (une requête hors transaction bloquerait PGlite, qui n'a qu'une connexion). Le hook de base de données `user.create.before` pose ensuite l'identifiant, l'email normalisé, le rôle et l'avatar.
+- **Contrôles** : l'email est mis en minuscules et débarrassé de ses espaces.
   - S'il ne figure ni dans `allowed_email` ni dans `ADMIN_EMAILS`, l'inscription est refusée avec « Cette adresse n'est pas sur la liste des joueurs. Contacte l'admin. »
   - S'il figure dans `ADMIN_EMAILS`, `role = 'admin'`, sinon `player`.
   - `avatar` reçoit la valeur par défaut calculée (§8.2).
@@ -868,10 +870,11 @@ Fabrique `createAuth(db)` (pour pouvoir brancher la base de test), et instance `
 
 ### 6.3 Gestion des comptes (admin)
 
+- **Mise en œuvre** (décision du 30/09/2026) : les services de `src/lib/services/players.ts` écrivent eux-mêmes ce qu'écrirait l'API admin de Better Auth (champs de bannissement, suppression des sessions, mot de passe haché par `better-auth/crypto`). Cette API exige la session HTTP de l'admin, incompatible avec la signature `(db, actor, input, now)` des services (§7.1).
 - **Désactiver** : bannissement Better Auth, sans date de fin, ce qui révoque les sessions. **Réactiver** : levée du bannissement.
 - **Mot de passe provisoire** :
   - 12 caractères aléatoires, alphabet sans caractères ambigus (pas de `0 O o 1 l I`) ;
-  - défini via l'API admin de Better Auth ;
+  - haché comme le fait Better Auth et enregistré sur le compte « credential » du joueur ;
   - affiché une seule fois à l'admin dans une boîte de dialogue, avec « Copier » ;
   - les sessions du joueur sont révoquées ;
   - le joueur le change ensuite dans `/profil`.
@@ -949,7 +952,7 @@ type Result<T = void> =
 
 ### 7.2 Base de données (`src/lib/db/client.ts`)
 
-- `getDb()` renvoie un singleton :
+- `getDb()` renvoie un singleton, **un seul par processus** : il est rangé sur `globalThis`, car Next.js compile les routes et les pages dans des paquets séparés, chacun avec sa copie du module. Deux instances PGlite sur le même dossier ne verraient pas leurs écritures respectives (décision du 30/09/2026) :
   - si `DB_DRIVER === 'pglite'` : `drizzle(new PGlite(PGLITE_DIR))` (chargement dynamique de PGlite) ;
   - si `DB_DRIVER === 'neon-ws'` (local uniquement) : pool WebSocket de `@neondatabase/serverless` (chargement dynamique) ;
   - sinon : `drizzle(new Pool({ connectionString: DATABASE_URL }))` avec node-postgres. Sur Vercel, attacher le pool au cycle de vie des fonctions avec `attachDatabasePool` de `@vercel/functions` si disponible (§14).
@@ -1291,7 +1294,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 - `createTestDb()` : PGlite en mémoire, migrations appliquées.
 - `makeClock(iso)` : fabrique de dates (`at('+2h')`, `at('-1d')`).
 - Fabriques : `createUser(db, { role, email, name })`, `createQuestion(db, overrides)`, `createPrediction(db, overrides)`, avec des valeurs par défaut valides.
-- `createTestAuth(db)` : instance Better Auth branchée sur la base de test, pour les hooks d'inscription.
+- `createTestAuth(db, env)` : instance Better Auth branchée sur la base de test, pour les hooks d'inscription ; `authRequest()` construit une requête HTTP pour tester la limitation des tentatives.
 
 ### 9.3 Tests transverses obligatoires
 
@@ -1305,6 +1308,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 - `scripts/e2e-prepare.ts` supprime `.pglite-e2e/`, applique les migrations, lance le seed en mode `e2e`, puis ferme PGlite **avant** le démarrage du serveur (une seule connexion PGlite à la fois).
 - Un seul worker, tests indépendants entre eux : chaque test qui écrit utilise ses propres comptes et questions du seed.
 - Sélecteurs par rôle et par libellé (`getByRole`, `getByLabel`). `data-testid` seulement pour les zones sans rôle (compte à rebours, graphique).
+- Les tests importent `test` depuis `e2e/fixtures.ts` : chaque test y reçoit sa propre adresse client (`x-forwarded-for`), sinon la limitation des tentatives (5 connexions par minute et par adresse) bloquerait la suite. `signIn()` et `signOut()` passent par l'interface. Un test qui modifie un compte du seed (nom, mot de passe) le remet dans son état initial.
 - Accessibilité : `AxeBuilder` sur `/connexion`, `/`, `/pronos`, `/questions/<résolue>`, `/classement`, `/profil`, `/admin`, `/admin/questions/<id>`. Aucune violation `serious` ni `critical`.
 
 ### 9.5 Seuils de couverture (`npm run test:coverage`)
@@ -1323,7 +1327,7 @@ Toutes les dates sont relatives à `now`, pour que le jeu reste cohérent quel q
 | Élément | Contenu |
 |---|---|
 | Comptes (mot de passe `Test-1234!`) | `admin@example.test` (admin, nom « Admin »), `joueur1@` à `joueur8@example.test` (joueurs : Sarah, Julien, Inès, Camille, Thomas, Mehdi, Léa, Hugo), `desactive@example.test` (désactivé) |
-| Liste blanche sans compte | `nouveau1@example.test`, `nouveau2@example.test` (tests d'inscription) |
+| Liste blanche sans compte | `nouveau1@example.test` (test d'inscription). `nouveau2@example.test` n'y est pas : l'admin l'ajoute dans `e2e/auth.spec.ts` (décision du 30/09/2026) |
 | Catégories | JPO, Candidatures, Intégration, Archivée (archivée) |
 | Saison précédente | proclamée, avec 2 questions résolues et un `season_standing` (palmarès) |
 | Saison courante : programmée | 1 question (ouverture à +2 j) |

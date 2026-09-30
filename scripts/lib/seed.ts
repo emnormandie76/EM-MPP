@@ -66,8 +66,9 @@ const PEOPLE = {
 
 type Person = keyof typeof PEOPLE;
 
-/** On the allow list without an account: for sign-up tests. */
-const NEW_EMAILS = ["nouveau1@example.test", "nouveau2@example.test"];
+/** On the allow list without an account: for the sign-up test. nouveau2@example.test is left out:
+ * the admin adds it in e2e/auth.spec.ts (decision of 30/09/2026). */
+const NEW_EMAILS = ["nouveau1@example.test"];
 
 export type SeedSummary = {
   users: number;

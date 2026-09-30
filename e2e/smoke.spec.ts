@@ -1,7 +1,8 @@
-import { expect, test } from "@playwright/test";
 import { seasonLabelFor } from "../src/lib/game/time";
+import { ACCOUNTS, expect, signIn, test } from "./fixtures";
 
 test("home page answers with the B5 header, in French", async ({ page }) => {
+  await signIn(page, ACCOUNTS.sarah);
   const response = await page.goto("/");
   expect(response?.status()).toBe(200);
   expect(response?.headers()["x-robots-tag"]).toBe("noindex, nofollow");
@@ -16,11 +17,12 @@ test("home page answers with the B5 header, in French", async ({ page }) => {
 });
 
 test("the footer shows the current season, computed on each request", async ({ page }) => {
-  await page.goto("/");
+  await signIn(page, ACCOUNTS.sarah);
   await expect(page.getByRole("contentinfo")).toContainText(`Saison ${seasonLabelFor(new Date())}`);
 });
 
 test("an unknown address shows the French 404 page", async ({ page }) => {
+  await signIn(page, ACCOUNTS.sarah);
   const response = await page.goto("/cette-page-n-existe-pas");
   expect(response?.status()).toBe(404);
   await expect(page.getByRole("heading", { level: 1, name: "Cette page n'existe pas." })).toBeVisible();
@@ -28,6 +30,7 @@ test("an unknown address shows the French 404 page", async ({ page }) => {
 });
 
 test("at 390 px the page does not scroll sideways and the menu opens", async ({ page }) => {
+  await signIn(page, ACCOUNTS.sarah);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -35,4 +38,6 @@ test("at 390 px the page does not scroll sideways and the menu opens", async ({ 
 
   await page.getByText("Menu", { exact: true }).click();
   await expect(page.getByRole("link", { name: "Classement" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Mon profil" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeVisible();
 });

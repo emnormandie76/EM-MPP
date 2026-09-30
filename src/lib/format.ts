@@ -42,3 +42,8 @@ export function formatRelative(date: Date, now: Date): string {
   if (elapsed < WEEK_MS) return `il y a ${Math.floor(elapsed / DAY_MS)} j`;
   return `le ${formatDayMonth(date)}`;
 }
+
+/** "1 ajoutée", "3 ajoutées", "0 invalide": in French, the plural starts at 2. */
+export function formatCount(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count >= 2 ? plural : singular}`;
+}

@@ -34,6 +34,8 @@ describe("getDb", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
+    // The singleton lives on globalThis (see client.ts): each test starts without it.
+    delete (globalThis as { leBonChiffreDb?: unknown }).leBonChiffreDb;
   });
 
   it("uses an in-memory PGlite when DB_DRIVER=pglite, always the same instance", async () => {
@@ -45,6 +47,17 @@ describe("getDb", () => {
     expect(getDb()).toBe(db);
     expect(await selectOne(db)).toEqual([{ one: 1 }]);
     await (db as unknown as { $client: { close(): Promise<void> } }).$client.close();
+  });
+
+  it("shares one instance between two copies of the module, as Next.js bundles routes and pages apart", async () => {
+    vi.stubEnv("DB_DRIVER", "pglite");
+    vi.stubEnv("PGLITE_DIR", "");
+    const first = (await import("@/lib/db/client")).getDb();
+    vi.resetModules();
+    const second = (await import("@/lib/db/client")).getDb();
+
+    expect(second).toBe(first);
+    await (first as unknown as { $client: { close(): Promise<void> } }).$client.close();
   });
 
   it.each(["", "neon-ws"])("refuses to start without DATABASE_URL (DB_DRIVER=%j)", async (driver) => {

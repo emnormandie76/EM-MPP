@@ -40,15 +40,15 @@ npx playwright install chromium
 
 La liste complète se trouve dans l'[architecture, §3.2](docs/architecture/architecture.md#32-scripts-npm).
 
-Comptes du seed (mot de passe `Test-1234!`) : `admin@example.test`, `joueur1@example.test` à `joueur8@example.test`, `desactive@example.test` (compte désactivé).
+Comptes du seed (mot de passe `Test-1234!`) : `admin@example.test` (admin), `joueur1@example.test` à `joueur8@example.test`, `desactive@example.test` (compte désactivé). `nouveau1@example.test` est sur la liste blanche, sans compte : il peut s'inscrire sur `/inscription`.
 
 ## Schéma de la base
 
 - Tables de l'application : `src/lib/db/schema/app.ts`. Après une modification : `npm run db:generate`, relire le SQL produit dans `drizzle/`, puis `npm run db:migrate`.
-- Tables de Better Auth : `src/lib/db/schema/auth.ts`, généré à partir de `src/lib/auth/auth.ts`. Après un changement de configuration qui touche les tables :
+- Tables de Better Auth : `src/lib/db/schema/auth.ts`, généré à partir de la configuration de `src/lib/auth/auth.ts` (la CLI lit l'instance exportée par `src/lib/auth/auth-cli.ts`). Après un changement de configuration qui touche les tables :
 
   ```bash
-  DB_DRIVER=pglite npx auth@1.7.6 generate --config src/lib/auth/auth.ts --output src/lib/db/schema/auth.ts
+  DB_DRIVER=pglite npx auth@1.7.6 generate --config src/lib/auth/auth-cli.ts --output src/lib/db/schema/auth.ts
   ```
 
   puis repasser toutes les colonnes `timestamp(...)` en `{ withTimezone: true }` (un test le vérifie), et générer la migration.

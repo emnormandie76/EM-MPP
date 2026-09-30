@@ -1,5 +1,5 @@
-// Better Auth tables (architecture §4.2). Generated from src/lib/auth/auth.ts with
-//   DB_DRIVER=pglite npx auth@1.7.6 generate --config src/lib/auth/auth.ts --output src/lib/db/schema/auth.ts
+// Better Auth tables (architecture §4.2). Generated from the configuration of src/lib/auth/auth.ts with
+//   DB_DRIVER=pglite npx auth@1.7.6 generate --config src/lib/auth/auth-cli.ts --output src/lib/db/schema/auth.ts
 // then every timestamp switched to `{ withTimezone: true }` (§4.1), which tests/integration/schema.test.ts checks.
 // Do not edit by hand otherwise.
 import { relations } from "drizzle-orm";

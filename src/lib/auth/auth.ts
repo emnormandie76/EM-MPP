@@ -1,13 +1,16 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, generateId } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
+import { AVATAR_KEYS, defaultAvatarFor } from "@/lib/avatars";
 import { type Database, getDb } from "@/lib/db/client";
 import * as schema from "@/lib/db/schema";
+import { normalizeEmail, parseAdminEmails } from "@/lib/validation/account";
+import { checkSignUp } from "./sign-up";
 
-// Better Auth configuration (architecture §6.1). The sign-up hook (allow list, admin role,
-// default avatar, unique name: §6.2) arrives with the pages in step 4. After any change that
-// affects the tables, regenerate src/lib/db/schema/auth.ts (see README).
+// Better Auth configuration (architecture §6.1, §6.2). After any change that affects the tables,
+// regenerate src/lib/db/schema/auth.ts (see README).
 
 const DAY_S = 24 * 60 * 60;
 
@@ -36,11 +39,13 @@ export function authTrustedOrigins(env: Env = process.env): string[] {
   return [...new Set(origins.filter((origin): origin is string => Boolean(origin)))];
 }
 
-export function createAuth(db: Database) {
+export function createAuth(db: Database, env: Env = process.env) {
+  const adminEmails = parseAdminEmails(env.ADMIN_EMAILS);
+
   return betterAuth({
     appName: "Le Bon Chiffre",
-    baseURL: authBaseUrl(),
-    trustedOrigins: authTrustedOrigins(),
+    baseURL: authBaseUrl(env),
+    trustedOrigins: authTrustedOrigins(env),
     database: drizzleAdapter(db, { provider: "pg", schema, transaction: true }),
     emailAndPassword: {
       enabled: true,
@@ -53,14 +58,50 @@ export function createAuth(db: Database) {
       expiresIn: SESSION_EXPIRES_IN_S,
       // Renewed on each visit, at most once a day.
       updateAge: DAY_S,
-      cookieCache: { enabled: true, maxAge: 5 * 60 },
+      // No cookie cache: a disabled account, a role or a name change applies at the next page,
+      // not up to 5 minutes later (decision of 30/09/2026).
+      cookieCache: { enabled: false },
     },
     user: {
       additionalFields: {
-        // Default computed by the sign-up hook (§6.2, §8.2); changed in the profile, never at sign-up.
-        avatar: { type: "string", required: true, input: false },
+        // Set by the hook below (§6.2, §8.2); changed in the profile, never at sign-up. Better Auth
+        // requires a default before the hook runs: this placeholder is always replaced. Being a
+        // function, it adds no database default to the generated schema.
+        avatar: { type: "string", required: true, input: false, defaultValue: () => AVATAR_KEYS[0] },
         lastSeenAt: { type: "date", required: false, input: false },
         previousVisitAt: { type: "date", required: false, input: false },
+      },
+    },
+    hooks: {
+      // Sign-up rules (§6.2). They read the database, so they run before the sign-up
+      // transaction, with French messages the forms show as they are.
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/sign-up/email") return;
+        const body = (ctx.body ?? {}) as Record<string, unknown>;
+        const check = await checkSignUp(db, { email: body.email, name: body.name }, adminEmails);
+        if (!check.ok) throw new APIError("BAD_REQUEST", { code: check.code, message: check.message });
+        return { context: { body: { ...body, email: check.email, name: check.name } } };
+      }),
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          // Every new account: normalized address, role from ADMIN_EMAILS, default avatar.
+          async before(data) {
+            const id = generateId();
+            const email = normalizeEmail(data.email);
+            return {
+              data: {
+                ...data,
+                id,
+                email,
+                name: data.name.trim(),
+                role: adminEmails.includes(email) ? "admin" : "player",
+                avatar: defaultAvatarFor(id),
+              },
+            };
+          },
+        },
       },
     },
     rateLimit: {
@@ -77,6 +118,8 @@ export function createAuth(db: Database) {
     },
     telemetry: { enabled: false },
     plugins: [
+      // Role and ban fields, and the refusal of a disabled account at sign-in. The admin actions
+      // themselves are services (src/lib/services/players.ts); their HTTP routes stay closed.
       admin({
         defaultRole: "player",
         adminRoles: ["admin"],
@@ -90,4 +133,13 @@ export function createAuth(db: Database) {
 
 export type Auth = ReturnType<typeof createAuth>;
 
-export const auth = createAuth(getDb());
+let instance: Auth | undefined;
+
+/**
+ * The application's instance, created on first use rather than at import: `next build` loads
+ * this module, and must not open the database (PGlite in end-to-end tests).
+ */
+export function getAuth(): Auth {
+  instance ??= createAuth(getDb());
+  return instance;
+}
