@@ -26,7 +26,7 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 
 1. **⚠ À faire en premier, dès le 1er octobre 2026 : relancer le seed de la base `dev`.** La base `dev` contient la saison 2025-2026, qui se termine le 30/09 à minuit (heure de Paris) : ses questions « ouvertes » sont alors clôturées et il n'y a plus aucune donnée dans la saison courante (2026-2027). Lancer `npm run db:seed -- --yes` (sur le réseau de l'école, `DB_DRIVER=neon-ws` est déjà dans `.env.development.local`), vérifier que le résumé affiche « saisons 2025-2026 (proclamée) et 2026-2027 », puis consigner la date ici et retirer ce point. Le seed efface la base `dev` : c'est prévu, elle ne contient que des données de test. Demande de l'utilisateur du 30/09/2026.
 2. **Branche de l'É5** : l'É4 est fusionnée dans `main` (30/09). Créer `etape-05-back-office` à partir de `main` au début de l'É5.
-3. **H-09 puis H-10** (l'É4 est en production depuis le 30/09) : l'utilisateur crée son compte admin sur `/inscription` avec une adresse de `ADMIN_EMAILS`, puis saisit la liste blanche de l'équipe dans `/admin/joueurs`. Guider pas à pas (architecture §12).
+3. **H-10 (liste blanche de l'équipe) reportée** : H-09 est faite (compte admin de l'utilisateur en production, 30/09). L'utilisateur préfère n'ajouter l'équipe qu'une fois le site complet, pour que personne ne crée son compte sur un site inachevé. Ne pas la demander avant l'É9 ; la rappeler pendant l'É9, avant la checklist du 13/10 (architecture §13).
 
 **À savoir pour les étapes suivantes**
 
@@ -55,8 +55,8 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 | H-06 | Secrets et variables d'application | É2 | Fait par l'agent à la demande de l'utilisateur : `BETTER_AUTH_SECRET` (3 valeurs distinctes, Secret en Production et Preview), `BETTER_AUTH_URL` (Production, Development), `ADMIN_EMAILS` (2 adresses, 3 environnements), sans affichage ; `check:env` tout à OK | 30/09/2026 |
 | H-07 | Ouvrir les aperçus aux collègues | É9 | À faire | |
 | H-08 | Validation de fin d'étape | chaque étape | É1, É2, É3 et É4 faites | voir le tableau des étapes |
-| H-09 | Compte admin en production | après É4 | À faire | |
-| H-10 | Liste blanche de l'équipe | après H-09 | À faire | |
+| H-09 | Compte admin en production | après É4 | Fait : compte admin créé par l'utilisateur sur `/inscription` (adresse de `ADMIN_EMAILS`), connexion confirmée | 30/09/2026 |
+| H-10 | Liste blanche de l'équipe | après H-09 | Reportée à la demande de l'utilisateur : à faire pendant l'É9, avant la checklist de lancement du 13/10 | |
 | H-11 | Contenu de la campagne | après É5 | À faire | |
 | H-12 | Recette avec des collègues | É9 | À faire | |
 | H-13 | Relecture du règlement et des textes | É9 | À faire | |
@@ -144,3 +144,4 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 | 30/09/2026 | Précisions d'interface choisies par l'agent : un joueur connecté qui ouvre `/connexion` ou `/inscription` est renvoyé à l'accueil ; `/admin` affiche un tableau de bord provisoire (remplacé à l'É5) et la sous-navigation ne contient que « Tableau de bord » et « Joueurs » ; initiales du maillot = premières lettres du premier et du dernier mot du nom (une seule lettre pour un mot) ; mot de passe provisoire créé après une confirmation ; un compte anonymisé prend le rôle joueur et perd ses dates de visite ; `removeAllowedEmail` n'a pas de paramètre `now` (rien à dater) | agent |
 | 30/09/2026 | H-08 de l'É4 : l'utilisateur a fait les vérifications sur son poste (`next dev`, base `dev`), valide l'étape et demande « commit et push », ainsi qu'une note pour les agents suivants : relancer le seed de `dev` dès le 1er octobre (point ouvert n° 1). Branche commitée et poussée ; la fusion dans `main` attend son accord explicite | utilisateur |
 | 30/09/2026 | É4 fusionnée dans `main` à la demande de l'utilisateur. Build de production : 0 migration appliquée (2 au total), marqueur de production présent ; `/api/health` à `ok: true`, `/connexion` répond, `/` redirige un visiteur anonyme, `/api/auth/admin/list-users` répond 404. H-09 proposée à l'utilisateur | utilisateur |
+| 30/09/2026 | H-09 faite : l'utilisateur a créé son compte admin en production et s'y est connecté. H-10 reportée à sa demande (pas de joueurs en production tant que le site n'est pas complet) : à faire pendant l'É9, avant le 13/10. Rien ne l'impose avant : tests et aperçus utilisent les comptes du seed | utilisateur |
