@@ -9,8 +9,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // PGlite (tests only) is loaded from node_modules instead of being bundled.
+  // PGlite (tests only) is loaded from node_modules instead of being bundled,
+  // and left out of the Vercel functions: production never loads it (21 MB).
   serverExternalPackages: ["@electric-sql/pglite"],
+  outputFileTracingExcludes: { "/*": ["./node_modules/@electric-sql/pglite/**/*"] },
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

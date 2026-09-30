@@ -100,6 +100,7 @@ Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tablea
 | Base de données | Neon PostgreSQL (offre gratuite, région Francfort) | stockage |
 | Pilote en production | `pg` (node-postgres) avec `drizzle-orm/node-postgres` | connexion à Neon |
 | Pilote en tests | `@electric-sql/pglite` avec `drizzle-orm/pglite` | PostgreSQL en mémoire, sans réseau ni Docker |
+| Pilote en local sur le réseau de l'école | `@neondatabase/serverless` avec `drizzle-orm/neon-serverless` (`DB_DRIVER=neon-ws`) | connexion à Neon en WebSocket par le port 443, le réseau de l'EM Normandie bloquant le port 5432 (décision du 30/09/2026) |
 | Accès aux données | Drizzle ORM, drizzle-kit (migrations) | schéma typé, migrations SQL |
 | Authentification | Better Auth (email + mot de passe, plugin admin) | comptes, sessions, rôles |
 | Validation | Zod | toutes les entrées de formulaires |
@@ -166,7 +167,8 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 │  ├─ seed.ts                     données de développement (interdit en production)
 │  ├─ check-env.ts                contrôle des variables (noms seulement)
 │  ├─ check-db.ts                 contrôle de connexion (sans afficher l'URL)
-│  └─ e2e-prepare.ts              remet à zéro .pglite-e2e, migre, seed
+│  ├─ e2e-prepare.ts              remet à zéro .pglite-e2e, migre, seed
+│  └─ lib/                        db.ts (ouverture et migration), env-rules.ts, load-env.ts
 ├─ docs/                          cahier des charges, architecture, maquette
 ├─ e2e/                           tests Playwright (*.spec.ts)
 ├─ tests/
@@ -258,7 +260,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 | `BETTER_AUTH_SECRET` | utilisateur (H-06) | tous, **une valeur différente par environnement** | au moins 32 caractères aléatoires |
 | `BETTER_AUTH_URL` | utilisateur (H-06) | Production : URL de production ; Development : `http://localhost:3000` ; Preview : non définie | URL de base de l'application |
 | `ADMIN_EMAILS` | utilisateur (H-06) | tous | adresses admin séparées par des virgules |
-| `DB_DRIVER` | scripts de test | tests et e2e uniquement (`pglite`) | **jamais défini sur Vercel** |
+| `DB_DRIVER` | scripts de test ; `.env.development.local` du poste | tests et e2e (`pglite`) ; développement local sur un réseau qui bloque le port 5432 (`neon-ws`) | **jamais défini sur Vercel** |
 | `PGLITE_DIR` | scripts de test | e2e | dossier de données PGlite |
 | `VERCEL_URL`, `VERCEL_BRANCH_URL`, `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_ENV` | Vercel (automatique) | Preview, Production | origines de confiance pour l'authentification, garde du seed |
 
@@ -949,7 +951,10 @@ type Result<T = void> =
 
 - `getDb()` renvoie un singleton :
   - si `DB_DRIVER === 'pglite'` : `drizzle(new PGlite(PGLITE_DIR))` (chargement dynamique de PGlite) ;
+  - si `DB_DRIVER === 'neon-ws'` (local uniquement) : pool WebSocket de `@neondatabase/serverless` (chargement dynamique) ;
   - sinon : `drizzle(new Pool({ connectionString: DATABASE_URL }))` avec node-postgres. Sur Vercel, attacher le pool au cycle de vie des fonctions avec `attachDatabasePool` de `@vercel/functions` si disponible (§14).
+  - Toute autre valeur de `DB_DRIVER` est refusée.
+- Les scripts (`scripts/lib/db.ts`) suivent le même choix : PGlite, WebSocket ou node-postgres. Ils chargent les fichiers d'environnement comme `next dev` : `.env.development.local`, `.env.local`, `.env`.
 - Type commun : `type Database = PgDatabase<…, typeof schema>` (base commune aux deux pilotes).
 - `tests/helpers/db.ts` expose `createTestDb()` : PGlite en mémoire, migrations appliquées, renvoie `{ db, close }`.
 

@@ -48,3 +48,13 @@ Disponibles à partir de l'étape 1 (liste complète : architecture §3.2).
 | `npm run db:generate` / `npm run db:migrate` | nouvelle migration / application sur la base de `.env.local` |
 | `npm run db:seed -- --yes` | efface et remplit la base de développement (refusé en production) |
 | `npm run check:env` / `npm run db:check` | contrôle des variables / de la connexion à la base |
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

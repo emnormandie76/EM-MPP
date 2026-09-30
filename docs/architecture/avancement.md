@@ -6,8 +6,8 @@
 
 | Étape | Titre | Date cible | Statut | Validée par l'utilisateur le | Notes |
 |---|---|---|---|---|---|
-| É1 | Socle du projet | 30/09/2026 | Validée | 30/09/2026 | Branche `etape-01-socle`. `verify` OK (25 tests unitaires), `test:e2e` OK (5 tests) |
-| É2 | Hébergement et base de données | 01/10/2026 | À faire | | |
+| É1 | Socle du projet | 30/09/2026 | Validée | 30/09/2026 | Branche `etape-01-socle`, fusionnée dans `main` le 30/09. `verify` OK (25 tests unitaires), `test:e2e` OK (5 tests) |
+| É2 | Hébergement et base de données | 01/10/2026 | En cours | | Branche `etape-02-hebergement`, démarrée le 30/09 |
 | É3 | Données et moteur de règles | 02/10/2026 | À faire | | |
 | É4 | Comptes et accès | 05/10/2026 | À faire | | |
 | É5 | Back-office | 06/10/2026 | À faire | | |
@@ -22,12 +22,12 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 
 | ID | Intitulé | Étape | Statut | Date |
 |---|---|---|---|---|
-| H-01 | Node.js et Git | É1 | En cours : Git 2.53 OK ; Node 24.21 installé avec fnm ; reste à retirer Node 25 du PATH utilisateur | 29/09/2026 |
+| H-01 | Node.js et Git | É1 | Fait : Git 2.53 ; Node 24.21 avec fnm, seul Node présent dans le PATH (Node 25 retiré) | 30/09/2026 |
 | H-02 | Feu vert sur le document d'architecture | avant É1 | Fait, avec deux précisions (voir le journal) | 29/09/2026 |
-| H-03 | Compte Vercel et import du dépôt | É2 | À faire | |
-| H-04 | CLI Vercel et liaison du projet | É2 | À faire | |
-| H-05 | Base de données Neon | É2 | À faire | |
-| H-06 | Secrets et variables d'application | É2 | À faire | |
+| H-03 | Compte Vercel et import du dépôt | É2 | Fait : projet `le-bon-chiffre` (équipe `em-normandie1`), la production répond | 30/09/2026 |
+| H-04 | CLI Vercel et liaison du projet | É2 | Fait : CLI 61.1.0 connectée (`emnormandie76`), dépôt lié | 30/09/2026 |
+| H-05 | Base de données Neon | É2 | Fait : base créée par l'utilisateur, branche `dev` créée ; variables de `dev` ajoutées par l'agent via les CLI Neon et Vercel (valeurs jamais affichées) | 30/09/2026 |
+| H-06 | Secrets et variables d'application | É2 | Fait par l'agent à la demande de l'utilisateur : `BETTER_AUTH_SECRET` (3 valeurs distinctes, Secret en Production et Preview), `BETTER_AUTH_URL` (Production, Development), `ADMIN_EMAILS` (2 adresses, 3 environnements), sans affichage ; `check:env` tout à OK | 30/09/2026 |
 | H-07 | Ouvrir les aperçus aux collègues | É9 | À faire | |
 | H-08 | Validation de fin d'étape | chaque étape | — | voir le tableau des étapes |
 | H-09 | Compte admin en production | après É4 | À faire | |
@@ -44,9 +44,11 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 
 | Information | Valeur |
 |---|---|
-| Adresse de production | |
-| Nom du projet Vercel | |
+| Adresse de production | https://le-bon-chiffre.vercel.app |
+| Nom du projet Vercel | `le-bon-chiffre` (équipe `em-normandie1`) |
 | Région de la base Neon | Francfort (eu-central-1) |
+| Projet Neon | `neon-bisque-pillar` (id `gentle-thunder-89807010`), organisation gérée par Vercel « Vercel: EM-Normandie », offre Free, PostgreSQL 18 |
+| Branches Neon | `main` (principale, production) ; `dev` (développement local et aperçus) ; base `neondb`, rôle `neondb_owner` |
 | Heure d'ouverture de la campagne | |
 | Heure de clôture de la campagne | |
 
@@ -71,3 +73,20 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 | 29/09/2026 | Points d'API relevés pour la suite : dans Next 16.3, `error.tsx` reçoit `retry()` (et non plus `reset`) ; dans lucide-react v1, l'icône `Trash2` du §8.1 s'appelle `Trash` | agent (§14) |
 | 30/09/2026 | Bordure des champs trop pâle (`line-strong` sur blanc ≈ 1,9:1, seuil 3:1) : on garde la maquette pour l'instant, à traiter à l'étape 8 (tâche 2 de É8) | agent, validé par l'utilisateur |
 | 29/09/2026 | Tests de bout en bout : jusqu'à l'étape 2, Playwright attend `/` (et non `/api/health`), et `e2e:serve` ne lance pas encore `e2e-prepare.ts` | agent |
+| 30/09/2026 | É1 fusionnée dans `main` avant l'import Vercel (H-03) : sinon, le premier déploiement de production aurait publié la seule documentation | agent, validé par l'utilisateur |
+| 30/09/2026 | Le dépôt distant local est configuré avec un jeton d'accès GitHub dans son adresse. Il est conservé pour l'instant, à revoir en fin d'É2 (recommandation : adresse sans jeton, Git Credential Manager déjà installé, puis révocation du jeton) | utilisateur |
+| 30/09/2026 | CLI Vercel 61 : `vercel link` lie le dépôt entier (`.vercel/repo.json`) au lieu d'un seul dossier (`.vercel/project.json`). Aucune conséquence : `.vercel/` reste ignoré par git et les commandes (`env pull`, `inspect`) fonctionnent | agent (§14) |
+| 30/09/2026 | Neon : la branche principale s'appelle `main` (et non `production` comme au §1.3) ; on ne la renomme pas. Partout où l'architecture dit « branche `production` », lire `main` | agent |
+| 30/09/2026 | H-05 finie par l'agent à la demande de l'utilisateur : chaînes de `dev` lues avec la CLI Neon et envoyées par un tube à `vercel env add` (Preview et Development, type Config car Vercel refuse « Sensitive » en Development), sans jamais être affichées. Contrôles faits : chaîne poolée avec `-pooler`, directe sans, point d'accès distinct de `main`, `sslmode=require` | utilisateur, agent |
+| 30/09/2026 | L'intégration Vercel-Neon a aussi activé Neon Auth (variables `NEON_AUTH_BASE_URL`, `VITE_NEON_AUTH_URL` en Production). Inutilisé : l'application garde son propre Better Auth (§6). À désactiver ou laisser : à décider en fin d'É2 | agent |
+| 30/09/2026 | Outils Neon pour les agents, à la demande de l'utilisateur : skills `neon` et `neon-postgres` (`.claude/skills/`, `skills-lock.json`), CLI `neon` 7.0.1 (installée globalement, connectée), serveur MCP Neon au niveau du projet (`.mcp.json`, OAuth, sans clé). Outils de développement uniquement, sans effet sur l'application | utilisateur |
+| 30/09/2026 | `ADMIN_EMAILS` : deux admins, `aparede@em-normandie.fr` et `lakhsassi@em-normandie.fr` | utilisateur |
+| 30/09/2026 | É2 : versions installées. drizzle-orm 0.45.3, drizzle-kit 0.31.11 (dernières stables ; la 1.0 est encore en bêta), pg 8.23, @electric-sql/pglite 0.5.8, @vercel/functions 3.9.9 (`attachDatabasePool` disponible et utilisé), @next/env 16.3.7, @neondatabase/serverless 1.1.0 | agent |
+| 30/09/2026 | **Le réseau de l'EM Normandie ne laisse sortir que les ports 80 et 443** : le port 5432 de PostgreSQL est bloqué, vers Neon comme vers tout autre serveur. Option retenue : pilote WebSocket officiel de Neon (`@neondatabase/serverless`, port 443) en local uniquement, activé par `DB_DRIVER=neon-ws` dans `.env.development.local` (propre au poste, ignoré par git, non écrasé par `vercel env pull`). Vercel et la production gardent `pg`. Option écartée : garder seulement `pg` et faire les opérations locales sur Neon depuis un autre réseau. Architecture mise à jour (§1.2, §2, §3.1, §7.2) | utilisateur (option recommandée par l'agent) |
+| 30/09/2026 | Première migration « technique » (É2, tâche 5) : la table `app_meta` (§4.3), seule table non métier, nécessaire à `migrate.ts` pour poser le marqueur de production | agent |
+| 30/09/2026 | Code commun des scripts dans `scripts/lib/` (`db.ts` : ouverture, migration, marqueur ; `env-rules.ts` : règles de `check:env`, testées ; `load-env.ts`). `createTestDb()` réutilise `scripts/lib/db.ts` | agent (§2) |
+| 30/09/2026 | `@next/env` est un paquet CommonJS dont Node ne voit pas les exports nommés depuis un module ESM : les scripts passent par son export par défaut. Ils chargent les fichiers comme `next dev` (`.env.development.local`, `.env.local`, `.env`) | agent (§14) |
+| 30/09/2026 | PGlite exclu du paquet des fonctions Vercel (`outputFileTracingExcludes` dans `next.config.ts`) : il représentait 21 Mo sur 23 alors que la production ne le charge jamais. Les pilotes PGlite et WebSocket sont chargés à la demande (`createRequire`) et restent des dépendances de développement | agent (§3.3, §7.2) |
+| 30/09/2026 | Correctif de l'É1 : `README.md` était encore en UTF-16 (y compris dans le commit), converti en UTF-8 et complété avec les commandes de l'É2 | agent |
+| 30/09/2026 | `next dev` (16.3) ajoute à `CLAUDE.md` un bloc « nextjs-agent-rules » qui invite les agents à lire la documentation fournie dans `node_modules/next/dist/docs/`. Conservé (cohérent avec §1.2 et §14) ; on peut le couper avec `agentRules: false` dans `next.config.ts` | agent, à confirmer par l'utilisateur |
+| 30/09/2026 | Point à surveiller : `pg` 8.23 affiche un avertissement sur `sslmode=require` (traité comme `verify-full`, sens qui changera avec `pg` 9). Sans effet aujourd'hui ; à traiter si l'on passe à `pg` 9 | agent (§14) |
