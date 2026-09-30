@@ -1,6 +1,8 @@
 # Cahier des charges — Le Bon Chiffre
 
-> **Version 1.0 du 29/09/2026.** Toutes les décisions sont prises. La section 8 liste les quelques précisions que j'ai ajoutées en rédigeant cette version ; elles restent contestables.
+> **Version 1.1 du 30/09/2026.** Toutes les décisions sont prises. La section 8 liste les quelques précisions que j'ai ajoutées en rédigeant cette version ; elles restent contestables.
+>
+> **Changement de la v1.1** (demandé et validé le 30/09/2026) : les saisons sont créées par l'admin, avec leur nom et leur date de début, au lieu de basculer à date fixe le 30 septembre, parce que les rentrées ne tombent pas toujours le même jour (sections 3, 4.8, 4.9 et 6).
 
 ---
 
@@ -29,7 +31,7 @@ Usage : une semaine intense à la mi-octobre, puis des visites ponctuelles pour 
 
 ## 3. Concepts
 
-- **Saison** : du 1er octobre au 30 septembre, avec une bascule automatique à la fin du 30 septembre. La première saison va du lancement (14 octobre 2026) au 30 septembre 2027. Chaque saison a son classement et ses lots.
+- **Saison** : une période créée par l'admin, avec un nom (par exemple « 2026-2027 ») et une date de début, choisie selon la rentrée. Une saison se termine quand la suivante commence : la bascule est automatique à la date de début de la nouvelle saison, que l'admin crée à l'avance. Tant que la saison suivante n'est pas créée, la saison en cours continue. La première saison est 2026-2027, créée avant le lancement du 14 octobre 2026. Chaque saison a son classement et ses lots.
 - **Catégorie** : un thème créé par l'admin (JPO, Candidatures, Intégration…) pour ranger les questions. Il n'y a pas de classement par catégorie.
 - **Question** : ce qu'il faut pronostiquer. Deux types :
   - **Nombre** : le joueur saisit une valeur (« combien de participants à la JPO du 15 novembre ? »). Variante **Juste Prix** : gagne le plus proche sans dépasser.
@@ -106,7 +108,8 @@ Brouillon ──> Ouverte ──> Clôturée ──────────> Ré
 - Une page règlement expose le barème, les jokers, les dates, les règles de validation et de départage. Dès qu'il y a des lots, elle évite les contestations.
 
 ### 4.8 Saisons et palmarès
-- Bascule automatique au 30 septembre : une nouvelle saison commence et le classement repart de zéro.
+- Bascule automatique à la date de début de la saison suivante, fixée par l'admin : une nouvelle saison commence et le classement repart de zéro.
+- L'admin crée, renomme et supprime les saisons, et peut changer leur date de début. Il ne peut pas supprimer une saison qui contient déjà des questions, ni déplacer une date de début si cela ferait changer de saison une question qui a déjà des pronos (les jokers se comptent par saison).
 - Une question appartient à la saison de sa **date de clôture**. Le classement final d'une saison est proclamé par l'admin quand toutes ses questions sont résolues, même si certains résultats tombent après la bascule.
 - **Palmarès** : une page, visible par tous, affiche le classement final de chaque saison passée.
 - Les données des saisons passées sont conservées. La liste blanche, les comptes et les catégories passent d'une saison à l'autre.
@@ -117,7 +120,7 @@ Brouillon ──> Ouverte ──> Clôturée ──────────> Ré
 - **Pronos** : déverrouiller un prono validé avant la clôture.
 - **Joueurs** : gérer la liste blanche, désactiver un compte, attribuer un mot de passe provisoire, donner le rôle admin.
 - **Catégories** : créer, renommer, archiver.
-- **Saisons** : consulter, saisir les lots, proclamer le classement final.
+- **Saisons** : créer (nom et date de début), renommer, changer la date de début, supprimer une saison sans question, saisir les lots, proclamer le classement final.
 - **Annonces** : publier, modifier, supprimer un message affiché sur l'accueil.
 
 ## 5. Règles du jeu
@@ -176,7 +179,7 @@ Bonne réponse : 50 points. Mauvaise réponse : 0 point. Pas de bonus podium. Po
 | Barème (C2) | Écart relatif par paliers, avec bonus podium |
 | Asymétrie d'information (C3) | Acceptée : ça fait partie du jeu |
 | Classement (C4) | Tout le monde est visible |
-| Saisons (C5) | Bascule automatique au 30 septembre ; une question appartient à la saison de sa clôture |
+| Saisons (C5) | Créées par l'admin (nom, date de début) ; bascule automatique à la date de début de la saison suivante ; une question appartient à la saison de sa clôture (v1.1, 30/09/2026) |
 | Emails (C6, C9) | Aucun email : ni notification, ni code ; connexion par mot de passe sans vérification |
 | Accès (C7) | Liste blanche |
 | Confidentialité (C8) | Accès réservé à la liste blanche : validé |

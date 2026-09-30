@@ -1,12 +1,12 @@
 # Le Bon Chiffre (dépôt EM-MPP)
 
-Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plus). L'admin crée des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les gagnants. Les saisons basculent automatiquement au 30 septembre. Lancement le 14 octobre 2026. Next.js sur Vercel, base Neon. Le site n'envoie aucun email.
+Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plus). L'admin crée des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les gagnants. Les saisons sont créées par l'admin (nom, date de début) et basculent automatiquement à leur date de début (v1.1). Lancement le 14 octobre 2026. Next.js sur Vercel, base Neon. Le site n'envoie aucun email.
 
 ## Documents de référence
 
 | Document | Rôle |
 |---|---|
-| [docs/features/cahier-des-charges.md](docs/features/cahier-des-charges.md) | Règles fonctionnelles (v1.0, validée) : le **quoi** |
+| [docs/features/cahier-des-charges.md](docs/features/cahier-des-charges.md) | Règles fonctionnelles (v1.1, validée : saisons gérées par l'admin) : le **quoi** |
 | [docs/architecture/architecture.md](docs/architecture/architecture.md) | Référence technique et plan de construction par étapes : le **comment** |
 | [docs/architecture/avancement.md](docs/architecture/avancement.md) | Étape en cours, interventions humaines faites, journal des décisions |
 | [docs/design/maquette-b5/](docs/design/maquette-b5/) | Maquette visuelle retenue (style B5 « Jour de match ») |

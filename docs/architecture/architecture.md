@@ -1,8 +1,9 @@
 # Architecture et plan de construction — Le Bon Chiffre
 
-> **Version 1.0 du 29/09/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
+> **Version 1.1 du 30/09/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
-> - Règles fonctionnelles : [cahier des charges v1.0](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
+> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16).
+> - Règles fonctionnelles : [cahier des charges v1.1](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
 
@@ -51,7 +52,7 @@
 
 ### 0.3 Protocole des interventions humaines
 
-Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tableaux de bord, secrets, contenu, validation). Elles sont numérotées H-01 à H-15 et détaillées en section 12. Quand une étape en atteint une :
+Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tableaux de bord, secrets, contenu, validation). Elles sont numérotées H-01 à H-16 et détaillées en section 12. Quand une étape en atteint une :
 
 1. S'arrêter et afficher : `⏸ Intervention humaine H-xx : <titre>`, avec la raison et une durée estimée.
 2. Donner les étapes numérotées de la section 12, une par ligne, avec les libellés exacts à cliquer. Si l'interface d'un service a changé par rapport à la description, le dire et adapter.
@@ -222,7 +223,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
    └─ lib/
       ├─ game/                    règles pures (§5), aucune dépendance à Next ou à la base
       │  ├─ constants.ts
-      │  ├─ time.ts               fuseau, saisons, conversions
+      │  ├─ time.ts               fuseau, conversions, saison d'une date (§5.1)
       │  ├─ number-input.ts       lecture des nombres saisis
       │  ├─ question-status.ts
       │  ├─ prediction-state.ts
@@ -366,16 +367,17 @@ Seule clé utilisée : `environment`, qui vaut `production` sur la base de produ
 | `created_at` | timestamptz | défaut `now()` |
 | `created_by` | text | → `user.id`, nullable |
 
-**`season`** : une ligne par saison, créée au premier besoin.
+**`season`** : une ligne par saison, **créée par l'admin** (v1.1, §5.13).
 
 | Colonne | Type | Contraintes |
 |---|---|---|
 | `id` | integer identity | PK |
-| `label` | text | unique, format `AAAA-AAAA` (ex. `2026-2027`) |
-| `starts_at` | timestamptz | 1er octobre 00:00, heure de Paris |
-| `ends_at` | timestamptz | 1er octobre suivant 00:00, heure de Paris (exclusif) |
+| `label` | text | nom affiché, 2 à 40 caractères (ex. `2026-2027`) ; unique sans tenir compte de la casse (index sur `lower(label)`) |
+| `starts_at` | timestamptz | début, un jour à 00:00 heure de Paris ; unique |
 | `proclaimed_at` | timestamptz | nullable |
 | `created_at` | timestamptz | défaut `now()` |
+
+Une saison n'a pas de date de fin enregistrée : elle se termine au début de la saison suivante (§5.1). La colonne `ends_at` de la v1.0 est supprimée par la migration de l'É5b, avec la contrainte de format du libellé ; la colonne `label` garde son nom (un renommage serait une migration destructive, §0.4).
 
 **`category`**
 
@@ -391,7 +393,7 @@ Seule clé utilisée : `environment`, qui vaut `production` sur la base de produ
 | Colonne | Type | Contraintes |
 |---|---|---|
 | `id` | integer identity | PK |
-| `season_id` | integer | → `season.id`, nullable tant que `closes_at` est nul |
+| `season_id` | integer | → `season.id`, nullable tant que la question n'est pas publiée (pas de clôture, ou clôture avant la première saison) |
 | `category_id` | integer | → `category.id`, non nul |
 | `type` | enum `question_type` (`number`, `choice`) | non nul |
 | `price_is_right` | boolean | défaut `false` ; seulement si `type = number` |
@@ -416,7 +418,7 @@ Seule clé utilisée : `environment`, qui vaut `production` sur la base de produ
 | `created_by` | text | → `user.id` |
 | `created_at`, `updated_at` | timestamptz | |
 
-Contraintes : `CHECK (opens_at IS NULL OR closes_at IS NULL OR opens_at < closes_at)` ; `CHECK (status <> 'published' OR (opens_at IS NOT NULL AND closes_at IS NOT NULL AND season_id IS NOT NULL))`.
+Contraintes : `CHECK (opens_at IS NULL OR closes_at IS NULL OR opens_at < closes_at)` ; `CHECK (status <> 'published' OR (opens_at IS NOT NULL AND closes_at IS NOT NULL AND season_id IS NOT NULL))`. La contrainte `question_season_of_closing` ajoutée à l'É3 (saison obligatoire dès qu'il y a une clôture) est supprimée à l'É5b : un brouillon peut clôturer à une date qu'aucune saison ne couvre encore.
 
 **`question_option`** : réponses possibles d'une question à choix.
 
@@ -499,7 +501,7 @@ Clé primaire `(season_id, user_id)`.
 
 ### 4.5 Règles d'intégrité tenues par les services
 
-- `question.season_id` est recalculé à chaque changement de `closes_at` (§5.1).
+- `question.season_id` est recalculé à chaque changement de `closes_at`, et à chaque création, changement de date de début ou suppression d'une saison (§5.1, §5.13). Une question qui a des pronos ne change jamais de saison : ses jokers restent comptés dans la bonne saison.
 - `result_option_id` et `option_id` appartiennent toujours à la question concernée.
 - `price_is_right` et `unit` n'ont de sens que pour `type = number`. `question_option` n'existe que pour `type = choice` (au moins 2 options).
 - On ne supprime jamais un utilisateur ayant des pronos : on l'anonymise (§6.3).
@@ -515,21 +517,28 @@ Chaque sous-section se traduit par un module de `src/lib/game/` et un fichier de
 - Toutes les dates sont stockées en UTC. Tout affichage et toute saisie se font en heure de Paris (`TIME_ZONE = 'Europe/Paris'`), quel que soit le fuseau du serveur.
 - `parisLocalToUtc(value: string): Date` convertit la valeur d'un `<input type="datetime-local">` (`AAAA-MM-JJTHH:mm`), lue comme une heure de Paris.
 - `utcToParisLocalInput(date: Date): string` fait l'inverse, pour préremplir les champs.
-- Une saison va du **1er octobre 00:00** au **1er octobre suivant 00:00** (exclusif), heure de Paris. Libellé : `AAAA-AAAA`.
-- `seasonLabelFor(date: Date): string` : si le mois (à Paris) est octobre ou après, alors `année-(année+1)`, sinon `(année-1)-année`.
-- `seasonBounds(label: string): { startsAt: Date; endsAt: Date }`.
-- La saison d'une question est celle de sa date de clôture.
+- **Saisons gérées par l'admin (v1.1)** : une saison a un nom et une date de début (un jour, à 00:00 heure de Paris). Les saisons se suivent sans trou ni chevauchement : chacune se termine au début de la suivante (exclu). La dernière n'a pas de fin tant que la suivante n'est pas créée : si l'admin oublie de créer la nouvelle saison, l'ancienne continue, et rien ne se bloque.
+- La saison d'une date est celle dont le début est le plus récent parmi ceux qui ne la dépassent pas. Avant le début de la première saison, une date n'a pas de saison.
+- **La saison d'une question est celle de sa date de clôture.** Une question sans saison (pas de clôture, ou clôture avant la première saison) peut rester en brouillon, mais ne peut pas être publiée.
+- **Bascule** : la saison courante est la saison de `now`. Elle change toute seule à la date de début de la saison suivante, que l'admin crée à l'avance, par exemple le jour de la rentrée (§5.13). Aucune tâche planifiée (§1.1).
+- Fonctions pures de `time.ts`, qui reçoivent la liste des saisons (lue en base par l'appelant) :
+  - `seasonStartFromLocalDate(value: string): Date` : la valeur d'un `<input type="date">` (`AAAA-MM-JJ`), lue comme 00:00 à Paris ;
+  - `seasonAt<S extends { startsAt: Date }>(seasons: S[], date: Date): S | null` ;
+  - `seasonEnd(seasons, season): Date | null` : le début de la saison suivante, ou `null` ;
+  - `previousSeason(seasons, season)` : la saison qui la précède, ou `null`.
+- `seasonLabelFor` et `seasonBounds` (v1.0, saisons fixes du 1er octobre) sont supprimées à l'É5b. `suggestedSeasonLabel(startsAt)` propose seulement un nom par défaut (`AAAA-AAAA` d'après l'année de début) dans le formulaire de création.
 
 | Vecteur | Entrée | Attendu |
 |---|---|---|
 | T1 | `parisLocalToUtc('2026-10-21T18:00')` | `2026-10-21T16:00:00.000Z` (heure d'été, UTC+2) |
 | T2 | `parisLocalToUtc('2026-11-15T18:00')` | `2026-11-15T17:00:00.000Z` (heure d'hiver, UTC+1) |
 | T3 | `utcToParisLocalInput(2026-10-21T16:00:00Z)` | `'2026-10-21T18:00'` |
-| T4 | `seasonLabelFor(2026-09-30T21:59:59Z)` | `'2025-2026'` (23:59:59 à Paris le 30/09) |
-| T5 | `seasonLabelFor(2026-09-30T22:00:00Z)` | `'2026-2027'` (00:00 à Paris le 01/10) |
-| T6 | `seasonLabelFor(2027-05-31T10:00:00Z)` | `'2026-2027'` |
-| T7 | `seasonBounds('2026-2027')` | `startsAt = 2026-09-30T22:00:00Z`, `endsAt = 2027-09-30T22:00:00Z` |
+| T4 | saisons A (début `seasonStartFromLocalDate('2025-09-29')`) et B (`'2026-10-01'`) ; `seasonAt(…, 2026-09-30T21:59:59Z)` | A (23:59:59 à Paris le 30/09) |
+| T5 | mêmes saisons ; `seasonAt(…, 2026-09-30T22:00:00Z)` | B (00:00 à Paris le 01/10) |
+| T6 | mêmes saisons ; `seasonAt(…, 2025-09-28T12:00:00Z)` | `null` (avant la première saison) |
+| T7 | mêmes saisons ; `seasonAt(…, 2031-01-01T00:00:00Z)` et `seasonEnd(…, B)` | B, et `null` (la dernière saison n'a pas de fin) |
 | T8 | les tests tournent avec `TZ=UTC` | aucun résultat ne dépend du fuseau de la machine |
+| T9 | `seasonStartFromLocalDate('2027-03-29')` (lendemain du passage à l'heure d'été) | `2027-03-28T22:00:00.000Z` |
 
 ### 5.2 Statut d'une question (`question-status.ts`)
 
@@ -724,7 +733,7 @@ La page règlement affiche ces mêmes constantes : règlement et calcul ne peuve
 | C5 | une seule question résolue | tous les `delta` valent `null` |
 | C6 | joueur actif sans prono | présent avec 0 point |
 
-**Saison affichée par défaut** (classement et accueil) : la saison qui contient `now`. Si elle n'a encore aucune question résolue, que la précédente a au moins une question publiée et qu'elle n'est pas proclamée, on affiche la précédente. Un sélecteur liste les saisons ayant au moins une question publiée.
+**Saison affichée par défaut** (classement et accueil) : la saison qui contient `now` (`seasonAt`, §5.1). Si elle n'a encore aucune question résolue, que la précédente a au moins une question publiée et qu'elle n'est pas proclamée, on affiche la précédente. S'il n'existe encore aucune saison (ou si `now` précède la première), on affiche l'état vide. Un sélecteur liste les saisons ayant au moins une question publiée.
 
 ### 5.7 Sagesse de la foule et graphiques (`crowd.ts`, `chart.ts`)
 
@@ -814,7 +823,7 @@ Pour changer un champ verrouillé, l'admin annule la question et en crée une no
 - Question à choix : une réponse de la question.
 - Première saisie : `resolved_at = now`. Saisies suivantes : `corrected_at = now`, et la page de la question affiche « Résultat corrigé le … ».
 
-**Saison** : à chaque enregistrement de `closes_at`, `season_id = ensureSeason(seasonLabelFor(closes_at))`. La saison est créée si elle n'existe pas.
+**Saison** : à chaque enregistrement de `closes_at`, `season_id` devient l'identifiant de la saison de cette date (§5.1), ou `null` si aucune saison ne la couvre. Les services ne créent plus de saison (v1.1 : `ensureSeason` disparaît). La publication (et les dates en série sur une question publiée) exige une saison : « Aucune saison ne couvre cette date de clôture : crée d'abord la saison dans Saisons et lots. » Une question qui a des pronos ne peut pas changer de saison (décision du 30/09/2026).
 
 **Duplication** : copie catégorie, type, Juste Prix, énoncé, description, unité, source, aide, coefficient et réponses, en brouillon sans dates, avec `duplicated_from_id`. Si l'originale est résolue, `help_last_year` est prérempli avec son résultat formaté (nombre + unité, ou libellé de la bonne réponse).
 
@@ -824,6 +833,35 @@ Pour changer un champ verrouillé, l'admin annule la question et en crée une no
 - **Effet**, en une transaction : calcul du classement (§5.6), puis insertion dans `season_standing` (rang, points, « Dans le mille », écart moyen, questions jouées, nom affiché à cet instant), puis `proclaimed_at = now`.
 - **Irréversible** : aucune action d'annulation. Une correction de résultat ultérieure ne modifie pas le palmarès.
 - Le palmarès (`/palmares`) lit uniquement `season_standing`, jamais un recalcul.
+
+### 5.13 Saisons : règles du back-office (v1.1)
+
+Les rentrées ne tombent pas toujours le même jour : l'admin crée chaque saison avec sa date de début, de préférence à l'avance. Services de `src/lib/services/seasons.ts`, chacun en une transaction.
+
+- **Nom** : 2 à 40 caractères après retrait des espaces, unique sans tenir compte de la casse (« Cette saison existe déjà. »). Modifiable à tout moment, même après la proclamation.
+- **Date de début** : un jour, à 00:00 heure de Paris (`<input type="date">`, `seasonStartFromLocalDate`). Deux saisons ne commencent pas le même jour.
+- **Créer** (`createSeason` : nom, date de début) : la nouvelle saison prend sa place dans la suite et reprend, dans la saison qui la précède, les questions dont la clôture tombe à partir de son début. Refusé :
+  - si l'une de ces questions a des pronos : « Des questions avec des pronos clôturent après cette date : elles changeraient de saison. » ;
+  - si la saison qui la précède est proclamée.
+- **Modifier** (`updateSeason` : nom, date de début) : la date de début reste strictement entre celle de la saison précédente et celle de la suivante (on ne réordonne pas les saisons). Les questions qui changent de saison sont recalculées. Refusé :
+  - si l'une d'elles a des pronos ;
+  - si la saison, ou celle qui la précède, est proclamée (le changement de date seulement ; le nom reste modifiable) ;
+  - si une question publiée se retrouverait sans saison (début de la première saison repoussé après sa clôture).
+- **Supprimer** (`deleteSeason`) : seulement si aucune question n'y est rattachée (brouillons compris) et si elle n'est pas proclamée ; ses lots sont supprimés avec elle, après confirmation. Refus : « Des questions sont rattachées à cette saison : elle ne peut pas être supprimée. »
+- **Aucune saison** : tant qu'aucune saison n'existe, les brouillons s'enregistrent mais rien ne peut être publié ; `/admin/saisons` et le formulaire de question invitent à créer la première saison.
+- **Rappel** : quand la saison courante est la dernière créée, `/admin/saisons` rappelle de créer la suivante avant la prochaine rentrée.
+- **Lots** (`upsertPrizes`) : ceux d'une saison existante non proclamée (la v1.0 créait la saison courante au besoin : ce n'est plus le cas).
+
+| # | Cas | Attendu |
+|---|---|---|
+| SA1 | saisons A (29/09/2025) et B (01/10/2026) ; créer C au 06/09/2027 | acceptée ; une question sans prono qui clôture le 10/09/2027 passe de B à C |
+| SA2 | idem, mais la question du 10/09/2027 a un prono | refusée, rien ne change |
+| SA3 | déplacer le début de B du 01/10/2026 au 28/09/2026 | les questions sans prono qui clôturent les 28, 29 ou 30/09 passent de A à B |
+| SA4 | déplacer le début de B avant celui de A | refusé |
+| SA5 | supprimer une saison qui a un brouillon rattaché | refusé |
+| SA6 | supprimer une saison vide qui a des lots | acceptée, lots supprimés |
+| SA7 | publier une question qui clôture avant la première saison | refusé, message ci-dessus |
+| SA8 | saison proclamée : changer sa date de début ; la renommer | refusé ; accepté |
 
 ---
 
@@ -968,7 +1006,7 @@ type Result<T = void> =
 | `predictions.ts` | `savePrediction`, `validatePrediction`, `setJoker`, `unlockPrediction` |
 | `questions.ts` | `createQuestion`, `updateQuestion`, `deleteDraftQuestion`, `publishQuestions`, `setQuestionDates`, `duplicateQuestion`, `cancelQuestion`, `resolveQuestion` |
 | `categories.ts` | `createCategory`, `renameCategory`, `archiveCategory`, `unarchiveCategory` |
-| `seasons.ts` | `ensureSeason`, `proclaimSeason`, `upsertPrizes` |
+| `seasons.ts` | `createSeason`, `updateSeason`, `deleteSeason`, `upsertPrizes`, `proclaimSeason` (v1.1 : `ensureSeason` disparaît, §5.13) |
 | `announcements.ts` | `createAnnouncement`, `updateAnnouncement`, `deleteAnnouncement` |
 | `players.ts` | `addAllowedEmails`, `removeAllowedEmail`, `setRole`, `disableUser`, `enableUser`, `setTemporaryPassword`, `anonymizeUser` |
 | `profile.ts` | `updateDisplayName`, `updateAvatar`, `recordVisit` (le changement de mot de passe passe par Better Auth) |
@@ -982,7 +1020,7 @@ type Result<T = void> =
 | `standings.ts` | `getStandings(seasonLabel?)`, `getAvailableSeasons` |
 | `players.ts` | `getPlayerProfile`, `getAllowedEmails`, `getAccounts` |
 | `admin.ts` | `getAdminDashboard`, `getAdminQuestion`, `getAdminQuestionsList(filters)`, `getSeasonsAdmin` |
-| `content.ts` | `getAnnouncements`, `getPrizes(seasonId)`, `getPalmares` |
+| `content.ts` | `getAnnouncements`, `getPrizes(seasonId)`, `getPalmares`, `getCurrentSeason` (pied de page, `/lots`) |
 
 ---
 
@@ -1124,7 +1162,7 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 - **Field** : libellé au-dessus, champ de 44 px, bordure `line-strong` passant à `accent` au focus, message d'erreur en `hot` sous le champ (`aria-describedby`).
 - **Tabs** : liens avec le compteur (« À FAIRE (3) »).
 - **EmptyState** : icône, phrase, action éventuelle.
-- **Footer** : « Le Bon Chiffre · Saison 2026-2027 » et liens Règlement, Lots, Palmarès.
+- **Footer** : « Le Bon Chiffre · Saison 2026-2027 » (nom de la saison courante, rien s'il n'y en a pas) et liens Règlement, Lots, Palmarès.
 
 ### 8.3 Écrans
 
@@ -1235,7 +1273,9 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 **`/admin/categories`** : liste, ajout, renommage, archivage (une catégorie archivée disparaît des choix mais reste sur ses questions).
 
 **`/admin/saisons`**
-- Pour chaque saison : dates, nombre de questions (résolues / total), état de la proclamation.
+- Formulaire « Nouvelle saison » : nom (prérempli par `suggestedSeasonLabel`) et date de début, avec la mention « à 0 h, heure de Paris » (v1.1, §5.13).
+- Pour chaque saison, de la plus récente à la plus ancienne : nom, dates (« du 28 sept. 2026 au 5 sept. 2027 », ou « depuis le … » pour la dernière), « En cours » pour la saison courante, nombre de questions (résolues / total), état de la proclamation ; boutons Modifier (nom, date de début) et Supprimer (confirmation), avec la raison quand ils sont refusés.
+- Rappel de créer la saison suivante (§5.13) ; invitation à créer la première saison s'il n'y en a aucune.
 - Éditeur de lots (rang et description, ordre).
 - Bouton « Proclamer le classement final », actif seulement si les conditions sont remplies (sinon, la raison est affichée), avec une confirmation qui rappelle que l'action est irréversible.
 
@@ -1324,6 +1364,8 @@ Modes : `dev` (branche Neon `dev`) et `e2e` (PGlite). Le script **efface toutes 
 
 Toutes les dates sont relatives à `now`, pour que le jeu reste cohérent quel que soit le jour. Les questions de la saison courante doivent clôturer dans cette saison : les écarts sont exacts en milieu de saison (« il y a 3 jours », « dans 6 jours ») et resserrés près d'une bascule du 1er octobre (décision du 30/09/2026).
 
+Saisons (v1.1) : le seed crée lui-même deux saisons, la précédente et la courante, qui commencent le 1er octobre (la courante est celle qui contient `now`) et portent les noms `AAAA-AAAA`. Il ne crée pas la saison suivante : la saison courante n'a pas de fin, comme en production tant que l'admin n'a pas créé la suivante.
+
 | Élément | Contenu |
 |---|---|
 | Comptes (mot de passe `Test-1234!`) | `admin@example.test` (admin, nom « Admin »), `joueur1@` à `joueur8@example.test` (joueurs : Sarah, Julien, Inès, Camille, Thomas, Mehdi, Léa, Hugo), `desactive@example.test` (désactivé) |
@@ -1375,9 +1417,11 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 | É3 | Données et moteur de règles | 02/10 |
 | É4 | Comptes et accès | 05/10 |
 | É5 | Back-office | 06/10 |
+| É5b | Saisons gérées par l'admin (v1.1) | 02/10 |
 | É6 | Parcours joueur | 08/10 |
 | É7 | Résultats, classement, palmarès | 10/10 |
 | É8 | Finitions et qualité | 12/10 |
+| É8b | Changement du nom du site (v1.1) | 12/10, dès que le nouveau nom est choisi, et avant H-10 |
 | É9 | Recette et lancement | 13/10, lancement le 14/10 |
 
 ### É1 — Socle du projet
@@ -1556,11 +1600,42 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 
 **Interventions humaines** : H-08. Après la mise en production : H-11 (saisie du contenu de la campagne), qui peut commencer pendant les étapes 6 à 8.
 
+### É5b — Saisons gérées par l'admin (v1.1)
+
+**Objectif** : l'admin crée, modifie et supprime les saisons (nom et date de début), parce que les rentrées ne tombent pas toujours le même jour. La saison d'une question et la bascule découlent de ces saisons, et non plus du 1er octobre (§5.1, §5.13).
+
+**Prérequis** : É5 validée ; v1.1 du cahier des charges et de ce document validée par l'utilisateur, y compris la suppression de la colonne `season.ends_at` (migration destructive, §0.4).
+
+**Branche** : `etape-05b-saisons`.
+
+**Tâches**
+1. **Avant toute chose**, lire ce que contient la table `season` sur `dev` et en production (nombre de lignes, libellés, questions rattachées), sans rien modifier, et le consigner : les saisons créées automatiquement par l'É5 doivent survivre à la migration.
+2. Schéma et migration (§4.3), SQL relu avant application :
+   - supprimer `season.ends_at` et les contraintes `season_label_format`, `season_bounds_order` et `question_season_of_closing` ;
+   - ajouter l'unicité de `season.starts_at`, l'unicité de `lower(season.label)` et la longueur du libellé (2 à 40).
+3. `time.ts`, **tests d'abord** (T4 à T9) : `seasonStartFromLocalDate`, `seasonAt`, `seasonEnd`, `previousSeason`, `suggestedSeasonLabel`. Retirer `seasonLabelFor` et `seasonBounds` et tous leurs usages (pied de page, services, lectures, seed, fabriques de test, tests existants).
+4. Services (§5.13) : `createSeason`, `updateSeason`, `deleteSeason` ; `upsertPrizes` par identifiant de saison. `questions.ts` : la saison d'une question vient de `seasonAt` (plus d'`ensureSeason`), publication refusée sans saison (§5.11).
+5. Lectures : `getSeasonsAdmin` (fin = début de la suivante, rappel, saison courante), `getCurrentSeason` (pied de page).
+6. `/admin/saisons` (§8.3) : création, modification, suppression, rappel ; message du formulaire de question quand aucune saison ne couvre la clôture.
+7. Seed (§9.6).
+8. Documents : retirer les dernières mentions d'une bascule fixe au 30 septembre (`README.md`, `CLAUDE.md`, §12, §13).
+
+**Tests à écrire**
+- `tests/unit/game/time.test.ts` : T1 à T9.
+- `tests/integration/seasons.test.ts` : SA1 à SA8 ; matrice d'autorisation des trois nouveaux services ; nom unique sans tenir compte de la casse ; deux saisons le même jour refusées ; lots d'une saison proclamée refusés.
+- `tests/integration/questions.test.ts` : les tests de saison se font autour d'une date de début choisie (et plus seulement du 30 septembre) ; publication refusée sans saison ; une question avec pronos ne change pas de saison.
+- `tests/integration/migrate.test.ts` : la migration passe sur une base qui contient déjà des saisons et des questions, et les conserve.
+- `e2e/admin-seasons.spec.ts` : l'admin crée une saison qui commence dans le futur, la renomme, change sa date de début, puis la supprime ; une question qui clôture après ce début affiche la nouvelle saison dans `/admin/questions`.
+
+**Critères de passage** : porte commune, plus la migration appliquée sur `dev` puis en production sans perte (saisons et questions existantes conservées).
+
+**Interventions humaines** : H-08. Après la mise en production, et **avant H-11** : l'admin crée la saison 2026-2027 avec la date de début voulue, ou ajuste celle que l'É5 aurait créée.
+
 ### É6 — Parcours joueur
 
 **Objectif** : un joueur voit ses questions, enregistre, valide et pose ses jokers. L'accueil est complet, sauf le dernier résultat.
 
-**Prérequis** : É5 validée.
+**Prérequis** : É5b validée.
 
 **Branche** : `etape-06-parcours-joueur`.
 
@@ -1665,11 +1740,43 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 
 **Interventions humaines** : H-08 (relecture visuelle sur ordinateur et sur téléphone).
 
+### É8b — Changement du nom du site (v1.1)
+
+**Objectif** : le site porte son nouveau nom partout (interface, titres d'onglet, textes, tests, documents) et, si l'utilisateur le veut, une nouvelle adresse de production. **Il n'est pas nécessaire de recréer le projet Vercel** : on le renomme et on lui ajoute une adresse (H-16) ; la base, les comptes et les données ne bougent pas.
+
+**Prérequis** : É8 validée ; le nouveau nom choisi par l'utilisateur.
+
+**Quand** : avant H-10 (création des comptes de l'équipe) et avant l'annonce H-15. La session de connexion est liée à l'adresse du site : changer d'adresse après coup obligerait tout le monde à se reconnecter, et le lien annoncé ne marcherait plus. Si l'utilisateur n'a pas de nouveau nom au moment de l'É9, l'étape est sautée et le nom actuel reste.
+
+**Branche** : `etape-08b-nom`.
+
+**Tâches**
+1. **Au début de l'étape**, redemander à l'utilisateur le nouveau nom exact (majuscules, accents, espaces) et s'il veut aussi une nouvelle adresse `<nom>.vercel.app`, puis lui réexpliquer le déroulé : inventaire, remplacement, H-16, vérifications.
+2. **Inventaire complet, présenté à l'utilisateur avant toute modification.** Rechercher dans tout le dépôt (hors `node_modules`, `.next`, `playwright-report`, `test-results`) toutes les formes du nom actuel : « Le Bon Chiffre », « LE BON CHIFFRE », « Bon Chiffre », `le-bon-chiffre`, `leBonChiffre`, `le_bon_chiffre`, et les variantes sans accent ou en capitales. Au 30/09/2026, on les trouve au moins dans :
+   - l'interface : `src/components/layout/Logo.tsx` (logo), `src/components/layout/Footer.tsx`, `src/app/layout.tsx` (titre des onglets et gabarit « %s · … »), `src/app/(public)/layout.tsx`, la page d'accueil, et les pages ajoutées aux É6 à É8 (règlement, lots…) ;
+   - la configuration : `appName` de Better Auth (`src/lib/auth/auth.ts`), `name` dans `package.json` et `package-lock.json`, la clé `leBonChiffreDb` de `src/lib/db/client.ts` (nom technique, à renommer ou non) ;
+   - les tests : `e2e/smoke.spec.ts` (logo « LE BON CHIFFRE ») et les autres specs ;
+   - les documents : `CLAUDE.md`, `README.md`, cahier des charges, architecture (titre, message de H-15), `avancement.md` (table « Informations de projet » ; le journal n'est pas réécrit) ;
+   - hors du code, sans modification par l'agent : les contenus saisis en production (annonces, questions, lots) qui citeraient le nom (l'admin les corrige dans le back-office), le projet Vercel (H-16), le projet Neon et le dépôt GitHub `EM-MPP` (noms invisibles des joueurs : à renommer seulement si l'utilisateur le demande).
+3. Regrouper le nom affiché dans une seule constante (par exemple `APP_NAME` dans `src/lib/app.ts`), utilisée par tous les composants, les métadonnées et Better Auth. Le logo garde sa mise en forme.
+4. Remplacer le nom partout (inventaire de la tâche 2), mettre à jour les tests et les documents.
+5. Si une nouvelle adresse est voulue : H-16 ; l'agent met ensuite à jour `BETTER_AUTH_URL` en production (sans l'afficher) et relance un déploiement. Vérifier la connexion et l'inscription sur la nouvelle adresse, et la redirection de l'ancienne.
+6. Mettre à jour `avancement.md` (adresse de production, nom du projet Vercel).
+
+**Tests à écrire**
+- `tests/unit/app-name.test.ts` : aucune forme de l'ancien nom dans `src/`, `e2e/` et `tests/` (hors ce test lui-même).
+- `e2e/smoke.spec.ts` adapté : le logo et le titre de l'onglet affichent le nouveau nom.
+- Fumée en production (`e2e/prod-smoke.spec.ts`) sur la nouvelle adresse, si elle change.
+
+**Critères de passage** : porte commune ; l'inventaire ne trouve plus l'ancien nom (hors journal d'avancement) ; connexion vérifiée en production sur l'adresse finale.
+
+**Interventions humaines** : choix du nom (avant l'étape), H-16 si l'adresse change, H-08.
+
 ### É9 — Recette et lancement
 
 **Objectif** : des collègues testent, on corrige, la production est remplie et vérifiée, on lance le 14 octobre.
 
-**Prérequis** : É8 validée et fusionnée dans `main`.
+**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change.
 
 **Branche** : `etape-09-recette` pour les corrections.
 
@@ -1761,7 +1868,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 3. Vérifier le bilan affiché.
 - **Vérification** : le nombre d'adresses correspond à l'équipe.
 
-### H-11 — Contenu de la campagne (dès la mise en production de É5)
+### H-11 — Contenu de la campagne (dès la mise en production de É5b)
 1. Préparer les questions avec le gabarit de l'annexe B, par exemple dans un tableur.
 2. Dans `/admin/categories` : créer les catégories.
 3. Dans `/admin/questions` : créer chaque question.
@@ -1770,7 +1877,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
    - clôture le **21/10/2026**, à l'heure choisie (par exemple 18 h) ;
    - résultat prévu, question par question si besoin ;
    - puis « Publier ».
-5. Dans `/admin/saisons` : saisir les lots de 2026-2027.
+5. Dans `/admin/saisons` : créer la saison 2026-2027 avec sa date de début (ou ajuster la sienne), puis saisir ses lots. **À faire avant l'étape 4** : sans saison, les questions ne peuvent pas être publiées (v1.1).
 6. Dans `/admin/annonces` : écrire le message de bienvenue.
 - **Vérification** : `/admin/questions` affiche les questions en « programmée », avec les bonnes dates en heure de Paris.
 
@@ -1788,7 +1895,16 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 
 ### H-15 — Annonce du lancement (14/10)
 - Envoyer à l'équipe (Teams ou oral) l'adresse de production, la façon de créer son compte, la date de clôture et les lots.
-- Proposition de message, fournie par l'agent : « Le Bon Chiffre est ouvert ! Crée ton compte sur <adresse>/inscription avec ton email pro. Tu as jusqu'au mercredi 21 octobre à 18 h pour valider tes pronos. À gagner : <lots>. »
+- Proposition de message, fournie par l'agent : « Le Bon Chiffre est ouvert ! Crée ton compte sur <adresse>/inscription avec ton email pro. Tu as jusqu'au mercredi 21 octobre à 18 h pour valider tes pronos. À gagner : <lots>. » (avec le nom et l'adresse définitifs si l'É8b les a changés)
+
+### H-16 — Nouvelle adresse de production (É8b, facultatif)
+- **Pourquoi** : l'adresse `*.vercel.app` suit le nom choisi. Il n'est pas nécessaire de recréer le projet Vercel : on le renomme et on lui ajoute une adresse ; la base, les variables et les déploiements restent.
+- **Étapes** (libellés à vérifier au moment de l'étape, l'interface de Vercel change souvent) :
+  1. Vercel → projet `le-bon-chiffre` → « Settings » → « General » → « Project Name » : saisir le nouveau nom, enregistrer.
+  2. « Settings » → « Domains » → « Add Domain » : `<nouveau-nom>.vercel.app` (s'il est libre), pour la production.
+  3. Sur l'ancienne adresse `le-bon-chiffre.vercel.app` : choisir une redirection vers la nouvelle, pour que les anciens liens continuent de marcher.
+  4. Prévenir l'agent, qui met à jour `BETTER_AUTH_URL` en production (sans l'afficher) et relance un déploiement de production.
+- **Vérification** : la nouvelle adresse affiche `/connexion`, la connexion admin fonctionne, l'ancienne adresse redirige vers la nouvelle.
 
 ---
 
@@ -1802,7 +1918,8 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 - [ ] La liste blanche contient toute l'équipe (H-10).
 - [ ] Les catégories sont créées.
 - [ ] Toutes les questions de la campagne sont **programmées** : ouverture le 14/10, clôture le 21/10, heures vérifiées en heure de Paris, source et aide remplies (H-11).
-- [ ] Les lots 2026-2027 sont saisis. L'annonce de bienvenue est prête.
+- [ ] La saison 2026-2027 existe avec la bonne date de début, ses lots sont saisis. L'annonce de bienvenue est prête.
+- [ ] Le nom et l'adresse du site sont définitifs (É8b faite, ou écartée par l'utilisateur).
 - [ ] `/reglement` a été relu (H-13).
 - [ ] Test sur téléphone et sur ordinateur avec le compte admin : l'accueil s'affiche et le compte à rebours de l'ouverture est cohérent.
 - [ ] La fumée en production est au vert.
@@ -1812,7 +1929,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 - Relancer à la main les retardataires grâce au suivi de `/admin`.
 - Saisir chaque résultat dès qu'il est connu.
 - Proclamer la saison une fois toutes les questions résolues.
-- Le 1er octobre 2027, la saison 2027-2028 commence seule. Dupliquer alors les questions récurrentes.
+- Avant la rentrée 2027 : créer la saison 2027-2028 avec sa date de début dans `/admin/saisons` ; elle commencera seule ce jour-là. Dupliquer alors les questions récurrentes.
 
 ---
 
