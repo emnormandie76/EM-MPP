@@ -1,9 +1,10 @@
 import "server-only";
-import { asc, count, eq, inArray, sql } from "drizzle-orm";
+import { asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Viewer } from "@/lib/auth/session";
 import { type AvatarKey, isAvatarKey } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
-import { category, prediction, question, questionOption, season, user } from "@/lib/db/schema";
+import { category, prediction, predictionEvent, question, questionOption, season, user } from "@/lib/db/schema";
 import { type PredictionState, predictionState } from "@/lib/game/prediction-state";
 import { type QuestionStatus, questionStatus } from "@/lib/game/question-status";
 import { seasonAt, seasonEnd, seasonStartFromLocalDate, suggestedSeasonLabel, utcToParisLocalDate } from "@/lib/game/time";
@@ -216,6 +217,8 @@ export async function getAdminQuestionsList(
 // One question
 
 export type TrackingRow = {
+  /** Null while the player has no prediction. */
+  predictionId: number | null;
   userId: string;
   name: string;
   avatar: AvatarKey;
@@ -277,6 +280,7 @@ export async function getAdminQuestion(db: Database, viewer: ViewerRole, questio
       ...players.map(
         (player): TrackingRow =>
           byUser.get(player.id) ?? {
+            predictionId: null,
             userId: player.id,
             name: player.name,
             avatar: player.avatar,
@@ -309,6 +313,78 @@ export async function getAdminQuestion(db: Database, viewer: ViewerRole, questio
     seasonsExist,
     tracking,
   };
+}
+
+export type HistoryEventType = (typeof predictionEvent.$inferSelect)["type"];
+
+export type HistoryEvent = {
+  id: number;
+  type: HistoryEventType;
+  createdAt: Date;
+  ownerName: string;
+  /** Who acted, when it is not the owner: the admin who unlocked. */
+  actorName: string | null;
+  /** The value at the time of the event: only after the closing (§6.6). */
+  answer: PredictionAnswer | null;
+};
+
+/**
+ * History of the predictions of a question, newest first (§8.3). Before the closing (and on a
+ * cancelled question), types and times only: no value column is selected.
+ */
+export async function getQuestionHistory(db: Database, viewer: ViewerRole, questionId: number, now: Date): Promise<HistoryEvent[]> {
+  assertAdmin(viewer);
+  const [row] = await db
+    .select({ status: question.status, opensAt: question.opensAt, closesAt: question.closesAt, resolvedAt: question.resolvedAt })
+    .from(question)
+    .where(eq(question.id, questionId));
+  if (!row) return [];
+  const status = questionStatus(row, now);
+  const revealed = status === "closed" || status === "resolved";
+
+  const owner = alias(user, "owner");
+  const actor = alias(user, "actor");
+  const who = (event: { ownerId: string; actorId: string; ownerName: string; actorName: string }) => ({
+    ownerName: event.ownerName,
+    actorName: event.actorId === event.ownerId ? null : event.actorName,
+  });
+  const columns = {
+    id: predictionEvent.id,
+    type: predictionEvent.type,
+    createdAt: predictionEvent.createdAt,
+    ownerId: predictionEvent.ownerId,
+    actorId: predictionEvent.actorId,
+    ownerName: owner.name,
+    actorName: actor.name,
+  };
+  const ofQuestion = eq(predictionEvent.questionId, questionId);
+  const order = [desc(predictionEvent.createdAt), desc(predictionEvent.id)];
+
+  if (!revealed) {
+    // Types and times only: no value column is selected.
+    const rows = await db
+      .select(columns)
+      .from(predictionEvent)
+      .innerJoin(owner, eq(owner.id, predictionEvent.ownerId))
+      .innerJoin(actor, eq(actor.id, predictionEvent.actorId))
+      .where(ofQuestion)
+      .orderBy(...order);
+    return rows.map((event) => ({ id: event.id, type: event.type, createdAt: event.createdAt, ...who(event), answer: null }));
+  }
+  const rows = await db
+    .select({ ...columns, valueNumber: predictionEvent.valueNumber, optionId: predictionEvent.optionId, joker: predictionEvent.joker })
+    .from(predictionEvent)
+    .innerJoin(owner, eq(owner.id, predictionEvent.ownerId))
+    .innerJoin(actor, eq(actor.id, predictionEvent.actorId))
+    .where(ofQuestion)
+    .orderBy(...order);
+  return rows.map((event) => ({
+    id: event.id,
+    type: event.type,
+    createdAt: event.createdAt,
+    ...who(event),
+    answer: { valueNumber: event.valueNumber, optionId: event.optionId, joker: event.joker },
+  }));
 }
 
 async function anySeason(db: Database): Promise<boolean> {

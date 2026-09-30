@@ -2,7 +2,7 @@
 
 > **Version 1.1 du 30/09/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
-> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6).
+> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3).
 > - Règles fonctionnelles : [cahier des charges v1.1](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
@@ -608,7 +608,9 @@ L'ouverture est **incluse** (`now = opens_at` → ouverte), la clôture **exclue
 
 **Joker** `setJoker(db, actor, { questionId, enabled }, now)`
 - Conditions : question `open` ; prono existant et non validé (sinon « Enregistre d'abord ton prono. ») ; pour activer, moins de `JOKERS_PER_SEASON` (2) jokers déjà posés par le joueur sur les questions **non annulées de la même saison** (celle de la question).
-- Le comptage et l'écriture se font dans une transaction qui verrouille la ligne `user` du joueur (`SELECT … FOR UPDATE`), pour qu'un double clic ne dépasse pas la limite.
+- Le comptage et l'écriture se font dans une transaction qui verrouille la ligne `user` du joueur (`SELECT … FOR NO KEY UPDATE`), pour qu'un double clic ne dépasse pas la limite.
+
+**Verrous** (décision du 30/09/2026) : les quatre services prennent leurs verrous dans le même ordre, en une transaction : la question (`FOR SHARE` : ni l'admin ni une saison ne la modifie pendant qu'un prono arrive), puis la ligne `user` du propriétaire du prono (`FOR NO KEY UPDATE` : les écritures d'un même joueur passent l'une après l'autre), puis le prono (`FOR UPDATE`). `NO KEY UPDATE` plutôt que `UPDATE` : ce verrou ne bloque pas les contrôles de clé étrangère des événements écrits au même moment pour ce joueur, ce qui évite un interblocage avec un déverrouillage. Une question inconnue ou qui n'est pas ouverte renvoie `QUESTION_NOT_OPEN`, sans révéler si elle existe.
 - Un joker posé sur une question ensuite annulée n'est plus compté : il est rendu automatiquement.
 - Événement `joker_on` ou `joker_off`.
 
@@ -773,7 +775,7 @@ Sortie : `{ key, count, lastEarnedAt }[]`. Le profil affiche les 6 badges : obte
 - `NEW_VISIT_GAP_MS = 30 minutes`.
 - `newReference(user, now)` : si `last_seen_at` est nul → `null` (pas de pastille). Si `now − last_seen_at > 30 min`, c'est une nouvelle visite → référence = `last_seen_at`. Sinon, on est dans la même visite → référence = `previous_visit_at`.
 - Une question ouverte porte la pastille si `opens_at > référence`.
-- `recordVisit(db, userId, now)`, appelée par le composant client `VisitTracker` après l'affichage : si `now − last_seen_at > 30 min`, alors `previous_visit_at = last_seen_at` ; puis toujours `last_seen_at = now`. Écrire après l'affichage évite que la pastille disparaisse avant d'avoir été vue.
+- `recordVisit(db, actor, now)` (service de `profile.ts`, avec le contrôle d'accès commun : l'acteur est le compte qui visite ; décision du 30/09/2026), appelée à chaque page vue par le composant client `VisitTracker`, monté dans l'enveloppe commune des pages connectées (pages de l'admin comprises), après l'affichage : si `now − last_seen_at > 30 min`, alors `previous_visit_at = last_seen_at` ; puis toujours `last_seen_at = now`. Écrire après l'affichage évite que la pastille disparaisse avant d'avoir été vue.
 
 | # | Données | Attendu |
 |---|---|---|
@@ -854,7 +856,7 @@ Les rentrées ne tombent pas toujours le même jour : l'admin crée chaque saiso
 - **Aucune saison** : tant qu'aucune saison n'existe, les brouillons s'enregistrent mais rien ne peut être publié ; `/admin/saisons` et le formulaire de question invitent à créer la première saison.
 - **Rappel** : quand la saison courante est la dernière créée, `/admin/saisons` rappelle de créer la suivante avant la prochaine rentrée.
 - **Lots** (`upsertPrizes`) : ceux d'une saison existante non proclamée (la v1.0 créait la saison courante au besoin : ce n'est plus le cas).
-- **Verrous** : `createSeason`, `updateSeason` et `deleteSeason` verrouillent la table `season` (`LOCK TABLE … IN EXCLUSIVE MODE`), puis les questions qui ont une clôture (`FOR UPDATE`) avant de compter leurs pronos. Les services de questions qui fixent une saison lisent les saisons avec `FOR SHARE` (`seasonsForQuestions`) **avant** de verrouiller leur question : une question ne reçoit jamais sa saison d'une liste en cours de modification, et les verrous sont toujours pris dans le même ordre (pas d'interblocage). À l'É6, `savePrediction` prend `FOR SHARE` sur la ligne de la question : un prono ne peut pas arriver pendant qu'une question change de saison.
+- **Verrous** : `createSeason`, `updateSeason` et `deleteSeason` verrouillent la table `season` (`LOCK TABLE … IN EXCLUSIVE MODE`), puis les questions qui ont une clôture (`FOR UPDATE`) avant de compter leurs pronos. Les services de questions qui fixent une saison lisent les saisons avec `FOR SHARE` (`seasonsForQuestions`) **avant** de verrouiller leur question : une question ne reçoit jamais sa saison d'une liste en cours de modification, et les verrous sont toujours pris dans le même ordre (pas d'interblocage). Les services de pronos (É6, §5.4) prennent `FOR SHARE` sur la ligne de la question, sans lire les saisons : un prono ne peut pas arriver pendant qu'une question change de saison.
 
 | # | Cas | Attendu |
 |---|---|---|
@@ -1127,7 +1129,7 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
   - **nombre** : champ de 62 px de haut, bordure de 2 px `accent`, fond `bg`, valeur en display 36 px, unité en suffixe `muted` ;
   - **choix** : tuiles-boutons radio (bordure `line-strong`, sélection : bordure de 2 px `accent` et fond `accent-soft`) ; le oui/non affiche deux grandes tuiles ;
   - **Juste Prix** : étiquette « JUSTE PRIX » et rappel « Le plus proche sans dépasser » ;
-  - **joker** : case dans un encadré en pointillés, « JOKER ×2 » en `accent-text`, suivi de « n restant(s) cette saison » ; désactivé s'il n'en reste plus ;
+  - **joker** : case dans un encadré en pointillés, « JOKER ×2 » en `accent-text`, suivi de « n restant(s) cette saison » ; désactivé s'il n'en reste plus ; la case pose ou retire le joker aussitôt (`setJoker`), et reste grisée avec « Enregistre d'abord ton prono. » tant qu'aucun prono n'est enregistré (décision du 30/09/2026) ;
   - boutons « ENREGISTRER » (secondaire) et « VALIDER » (principal) ;
   - note « Enregistré le … Une fois validé, ton prono est définitif. » ;
   - une fois validé : champ en lecture seule, statut Validé, plus de boutons.
@@ -1195,13 +1197,13 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 4. « DERNIER RÉSULTAT » : ResultPanel compact de la dernière question résolue. Si aucune : EmptyState « Premier résultat attendu en novembre ».
 
 **`/pronos` Mes pronos**
-- Titre « MES PRONOS » et onglets « À faire (n) », « Enregistrés (n) », « Validés (n) », « Tous », calculés sur les questions ouvertes.
+- Titre « MES PRONOS » et onglets « À faire (n) », « Enregistrés (n) », « Validés (n) », « Tous », calculés sur les questions ouvertes. « Tous » s'ouvre par défaut : une question enregistrée ne disparaît pas de l'écran pendant la saisie (décision du 30/09/2026).
 - Une ligne par question, dans l'ordre des clôtures : catégorie, titre, compte à rebours compact, PredictionForm en ligne, et un bouton « Pour t'aider » qui déplie le HelpPanel.
 - Bandeau fixe en bas : « n / m validés ».
 - EmptyState si aucune question n'est ouverte.
 
 **`/questions` Questions**
-- Onglets : Ouvertes, En attente du résultat, Résolues, Annulées.
+- Onglets : Ouvertes, En attente du résultat, Résolues, Annulées. Une question annulée avant son ouverture n'a jamais été vue des joueurs : elle reste invisible, comme une question programmée (404, absente de « Annulées » ; décision du 30/09/2026).
 - Cartes avec statut, date de clôture ou de résultat, et mes points une fois la question résolue.
 
 **`/questions/[id]` Détail**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, formatDate, formatDateTime, formatNumber, formatRelative } from "@/lib/format";
+import { formatCount, formatDate, formatDateTime, formatNumber, formatRelative, rankSuffix } from "@/lib/format";
 
 const NARROW_NBSP = " ";
 
@@ -79,5 +79,11 @@ describe("formatCount", () => {
     expect(formatCount(3, "ajoutée")).toBe("3 ajoutées");
     expect(formatCount(2, "déjà présente")).toBe("2 déjà présentes");
     expect(formatCount(2, "œil", "yeux")).toBe("2 yeux");
+  });
+});
+
+describe("rankSuffix", () => {
+  it("writes 1er, then 2e, 3e…", () => {
+    expect([1, 2, 3, 10, 21].map((rank) => `${rank}${rankSuffix(rank)}`)).toEqual(["1er", "2e", "3e", "10e", "21e"]);
   });
 });

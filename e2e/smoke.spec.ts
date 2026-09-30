@@ -37,7 +37,7 @@ test("at 390 px the page does not scroll sideways and the menu opens", async ({ 
   expect(scrollWidth).toBeLessThanOrEqual(390);
 
   await page.getByText("Menu", { exact: true }).click();
-  await expect(page.getByRole("link", { name: "Classement" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Classement", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Mon profil" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeVisible();
 });

@@ -8,6 +8,9 @@ export const ACCOUNTS = {
   admin: "admin@example.test",
   sarah: "joueur1@example.test",
   julien: "joueur2@example.test",
+  camille: "joueur4@example.test",
+  mehdi: "joueur6@example.test",
+  lea: "joueur7@example.test",
   hugo: "joueur8@example.test",
   disabled: "desactive@example.test",
 } as const;
@@ -36,7 +39,7 @@ export async function signIn(page: Page, email: string, password = SEED_PASSWORD
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter" }).click();
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Bonjour");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Salut");
 }
 
 /** Opens the account menu (from 1 024 px) and signs out. */

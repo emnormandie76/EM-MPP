@@ -21,7 +21,7 @@ test("sign-up is refused to an address outside the allow list", async ({ page })
 test("nouveau1@example.test signs up and lands on the home page", async ({ page }) => {
   await fillSignUp(page, "Nouveau1@Example.test", "Nina");
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Bonjour Nina" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Salut Nina" })).toBeVisible();
   await expect(page.getByRole("banner")).toContainText("Nina");
 });
 
@@ -45,7 +45,7 @@ test("a wrong password shows a message", async ({ page }) => {
 
 test("a player signs in and sees the header, without the admin link", async ({ page }) => {
   await signIn(page, ACCOUNTS.sarah);
-  await expect(page.getByRole("heading", { level: 1, name: "Bonjour Sarah" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Salut Sarah" })).toBeVisible();
   await expect(page.getByRole("banner")).toContainText("Sarah");
   await expect(page.getByRole("banner").getByRole("link", { name: "Admin" })).toHaveCount(0);
 });
@@ -92,7 +92,7 @@ test("the admin adds nouveau2@example.test, who can then sign up", async ({ page
   await signOut(page);
   await fillSignUp(page, "nouveau2@example.test", "Noé");
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Bonjour Noé" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Salut Noé" })).toBeVisible();
 });
 
 test("a disabled account cannot sign in", async ({ page }) => {
@@ -115,7 +115,7 @@ test("a new display name shows in the header", async ({ page }) => {
   };
   await rename("Thomas R.");
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Bonjour Thomas R." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Salut Thomas R." })).toBeVisible();
   // Back to the seeded name, for the other tests.
   await rename("Thomas");
 });
@@ -151,7 +151,7 @@ test("a temporary password lets the player in, who then changes it in the profil
   await expect(page.getByText("Mot de passe changé.")).toBeVisible();
   // The current session is kept, the other one is closed.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Bonjour Hugo" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Salut Hugo" })).toBeVisible();
   await otherPage.goto("/");
   await expect(otherPage).toHaveURL("/connexion");
   await other.close();

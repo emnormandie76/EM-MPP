@@ -18,13 +18,22 @@ for (const url of ["/connexion", "/inscription"]) {
   });
 }
 
-for (const url of ["/", "/profil", "/cette-page-n-existe-pas"]) {
+for (const url of ["/", "/pronos", "/questions", "/questions?onglet=annulees", "/profil", "/cette-page-n-existe-pas"]) {
   test(`${url} (player) has no serious or critical accessibility violation`, async ({ page }) => {
     await signIn(page, ACCOUNTS.julien);
     await page.goto(url);
     expect(await blockingViolations(page)).toEqual([]);
   });
 }
+
+// §9.4: the page of an open question, with its form and its help.
+test("/questions/<id> (open, player) has no serious or critical accessibility violation", async ({ page }) => {
+  await signIn(page, ACCOUNTS.julien);
+  await page.goto("/pronos");
+  await page.getByRole("link", { name: "Combien de participants à la JPO du 15 novembre ?" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Combien de participants à la JPO du 15 novembre ?");
+  expect(await blockingViolations(page)).toEqual([]);
+});
 
 const ADMIN_PAGES = [
   "/admin",

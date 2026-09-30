@@ -7,11 +7,12 @@ import { QuestionActions } from "@/components/admin/QuestionActions";
 import { QuestionForm, type QuestionFormLocks } from "@/components/admin/QuestionForm";
 import { QuestionStatusChip } from "@/components/admin/QuestionStatusChip";
 import { ResultForm } from "@/components/admin/ResultForm";
+import { UnlockButton } from "@/components/admin/UnlockButton";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { requireAdmin } from "@/lib/auth/session";
-import { type AdminQuestion, getAdminQuestion, type TrackingRow } from "@/lib/data/admin";
+import { type AdminQuestion, getAdminQuestion, getQuestionHistory, type HistoryEvent, type HistoryEventType, type TrackingRow } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
 import { formatCount, formatDateTime, formatNumber } from "@/lib/format";
 import { ERROR_MESSAGES } from "@/lib/services/result";
@@ -77,9 +78,9 @@ function StateLabel({ state }: { state: PredictionState }) {
   );
 }
 
-function answerText(row: TrackingRow, detail: AdminQuestion): string {
-  if (!row.answer) return "—";
-  const { valueNumber, optionId } = row.answer;
+function answerText(answer: TrackingRow["answer"], detail: AdminQuestion): string {
+  if (!answer) return "—";
+  const { valueNumber, optionId } = answer;
   if (valueNumber !== null) {
     const unit = detail.question.unit;
     return unit ? `${formatNumber(valueNumber)} ${unit}` : formatNumber(valueNumber);
@@ -89,6 +90,8 @@ function answerText(row: TrackingRow, detail: AdminQuestion): string {
 
 function Tracking({ detail, rows }: { detail: AdminQuestion; rows: TrackingRow[] }) {
   const revealed = rows.some(({ answer }) => answer !== null);
+  // Unlocking is possible while the question is open, on a validated prediction (§5.4).
+  const canUnlock = detail.question.computedStatus === "open";
   const active = rows.filter(({ inactive }) => !inactive);
   const validated = active.filter(({ state }) => state === "validated").length;
   return (
@@ -114,6 +117,11 @@ function Tracking({ detail, rows }: { detail: AdminQuestion; rows: TrackingRow[]
               <th scope="col" className={TH}>Joueur</th>
               <th scope="col" className={TH}>État</th>
               <th scope="col" className={TH}>Validé le</th>
+              {canUnlock ? (
+                <th scope="col" className={TH}>
+                  <span className="sr-only">Action</span>
+                </th>
+              ) : null}
               {revealed ? (
                 <>
                   <th scope="col" className={TH}>Prono</th>
@@ -136,9 +144,16 @@ function Tracking({ detail, rows }: { detail: AdminQuestion; rows: TrackingRow[]
                   <StateLabel state={row.state} />
                 </td>
                 <td className={`${TD} whitespace-nowrap text-muted`}>{row.validatedAt ? formatDateTime(row.validatedAt) : "—"}</td>
+                {canUnlock ? (
+                  <td className={TD}>
+                    {row.state === "validated" && row.predictionId !== null ? (
+                      <UnlockButton predictionId={row.predictionId} playerName={row.name} />
+                    ) : null}
+                  </td>
+                ) : null}
                 {revealed ? (
                   <>
-                    <td className={`${TD} whitespace-nowrap tabular-nums`}>{answerText(row, detail)}</td>
+                    <td className={`${TD} whitespace-nowrap tabular-nums`}>{answerText(row.answer, detail)}</td>
                     <td className={TD}>{row.answer?.joker ? "Joker" : "—"}</td>
                   </>
                 ) : null}
@@ -147,6 +162,64 @@ function Tracking({ detail, rows }: { detail: AdminQuestion; rows: TrackingRow[]
           </tbody>
         </table>
       </div>
+    </Card>
+  );
+}
+
+const EVENT_LABELS: Record<HistoryEventType, string> = {
+  saved: "Enregistré",
+  validated: "Validé",
+  unlocked: "Déverrouillé",
+  joker_on: "Joker posé",
+  joker_off: "Joker retiré",
+};
+
+/** History of the predictions (§8.3): without values before the closing (§6.6). */
+function History({ detail, events }: { detail: AdminQuestion; events: HistoryEvent[] }) {
+  const revealed = events.some(({ answer }) => answer !== null);
+  return (
+    <Card as="section" className="flex flex-col gap-4">
+      <h2 id="historique" className={SECTION_TITLE}>
+        Historique
+      </h2>
+      {events.length === 0 ? (
+        <p className="text-[15px] text-ink-2">Aucun prono pour l&apos;instant.</p>
+      ) : (
+        <>
+          {!revealed ? <p className="text-[15px] text-ink-2">Avant la clôture, l&apos;historique ne montre ni les valeurs ni les réponses.</p> : null}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-140 text-left text-[15px]">
+              <caption className="sr-only">Historique des pronos</caption>
+              <thead>
+                <tr className="border-b border-line">
+                  <th scope="col" className={TH}>Date</th>
+                  <th scope="col" className={TH}>Joueur</th>
+                  <th scope="col" className={TH}>Événement</th>
+                  {revealed ? <th scope="col" className={TH}>Prono</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => (
+                  <tr key={event.id} className="border-b border-line last:border-b-0">
+                    <td className={`${TD} whitespace-nowrap text-muted`}>{formatDateTime(event.createdAt)}</td>
+                    <td className={`${TD} font-semibold`}>{event.ownerName}</td>
+                    <td className={TD}>
+                      {EVENT_LABELS[event.type]}
+                      {event.actorName ? <span className="text-muted"> par {event.actorName}</span> : null}
+                    </td>
+                    {revealed ? (
+                      <td className={`${TD} whitespace-nowrap tabular-nums`}>
+                        {answerText(event.answer, detail)}
+                        {event.answer?.joker ? <span className="text-muted"> · joker</span> : null}
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </Card>
   );
 }
@@ -162,8 +235,10 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
   const { id } = await params;
   const questionId = Number(id);
   if (!Number.isInteger(questionId) || questionId <= 0) notFound();
-  const detail = await getAdminQuestion(getDb(), viewer, questionId, new Date());
+  const now = new Date();
+  const detail = await getAdminQuestion(getDb(), viewer, questionId, now);
   if (!detail) notFound();
+  const history = detail.question.status === "draft" ? null : await getQuestionHistory(getDb(), viewer, questionId, now);
 
   const query = await searchParams;
   const notice = Object.keys(NOTICES).find((key) => query[key] !== undefined);
@@ -233,6 +308,7 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
       ) : null}
 
       {detail.tracking ? <Tracking detail={detail} rows={detail.tracking} /> : null}
+      {history ? <History detail={detail} events={history} /> : null}
 
       <QuestionForm
         key={q.id}

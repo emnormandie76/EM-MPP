@@ -1,3 +1,5 @@
+import { JOKERS_PER_SEASON } from "@/lib/game/constants";
+
 // Shared types of the write services (architecture §7.1). Services never throw for an expected
 // refusal: they return a Result whose message is shown as is in the interface.
 
@@ -39,6 +41,12 @@ export const ERROR_MESSAGES = {
   SEASON_ORDER: "La date de début doit rester entre celle de la saison précédente et celle de la suivante.",
   SEASON_CHANGE_REFUSED: "Des questions changeraient de saison alors qu'elles ne le peuvent plus.",
   SEASON_HAS_QUESTIONS: "Des questions sont rattachées à cette saison : elle ne peut pas être supprimée.",
+  // Predictions (§5.4, step 6).
+  QUESTION_NOT_OPEN: "Cette question n'est pas ouverte aux pronos.",
+  ALREADY_VALIDATED: "Ton prono est validé : il ne peut plus être modifié.",
+  NO_PREDICTION: "Enregistre d'abord ton prono.",
+  NO_JOKER_LEFT: `Tu as déjà utilisé tes ${JOKERS_PER_SEASON} jokers cette saison.`,
+  NOT_VALIDATED: "Ce prono n'est pas validé.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

@@ -52,3 +52,8 @@ export function formatRelative(date: Date, now: Date): string {
 export function formatCount(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count >= 2 ? plural : singular}`;
 }
+
+/** Suffix of a rank: "1er", "2e", "10e". */
+export function rankSuffix(rank: number): string {
+  return rank === 1 ? "er" : "e";
+}
