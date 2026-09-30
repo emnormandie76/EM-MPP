@@ -69,4 +69,5 @@ Statuts possibles : À faire · En cours · En attente de validation · Validée
 | 29/09/2026 | Palette Tailwind par défaut retirée (`--color-*: initial`) : seules les couleurs B5 existent, ce qui empêche d'utiliser une couleur hors maquette | agent (§8.1) |
 | 29/09/2026 | Le groupe de routes `(jeu)` est créé dès É1 (en-tête et pied de page) ; l'étape 4 y ajoutera `requireUser()`. Saison du pied de page provisoirement fixée à 2026-2027, remplacée par `seasonLabelFor(now)` à l'étape 3 | agent |
 | 29/09/2026 | Points d'API relevés pour la suite : dans Next 16.3, `error.tsx` reçoit `retry()` (et non plus `reset`) ; dans lucide-react v1, l'icône `Trash2` du §8.1 s'appelle `Trash` | agent (§14) |
+| 30/09/2026 | Bordure des champs trop pâle (`line-strong` sur blanc ≈ 1,9:1, seuil 3:1) : on garde la maquette pour l'instant, à traiter à l'étape 8 (tâche 2 de É8) | agent, validé par l'utilisateur |
 | 29/09/2026 | Tests de bout en bout : jusqu'à l'étape 2, Playwright attend `/` (et non `/api/health`), et `e2e:serve` ne lance pas encore `e2e-prepare.ts` | agent |

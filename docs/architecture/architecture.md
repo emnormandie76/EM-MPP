@@ -1641,6 +1641,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 **Tâches**
 1. Responsive (§8.4), `loading.tsx`, états vides, pages d'erreur.
 2. Accessibilité (§8.5) : corriger tout ce que signale axe.
+   - **Point connu (relevé en É1)** : la bordure des champs et des boutons secondaires (`line-strong`, `#B5BCC8`) n'offre qu'un contraste d'environ 1,9:1 sur `surface`, sous le seuil de 3:1 des composants d'interface (WCAG 1.4.11). axe ne le détecte pas. Proposer à l'utilisateur une teinte plus foncée, avec une capture avant et après, puis modifier le jeton seulement après son accord.
 3. Relecture de tous les textes (§8.6).
 4. Revue de sécurité : chaque action et chaque service passe le contrôle des droits ; en-têtes HTTP ; `noindex`.
 5. Relancer toute la suite et corriger les éventuels tests instables.
