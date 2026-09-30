@@ -32,6 +32,13 @@ export const ERROR_MESSAGES = {
   INVALID_VALUE: "Saisis un nombre.",
   INVALID_OPTION: "Réponse inconnue.",
   SEASON_PROCLAIMED: "Cette saison est proclamée : ses lots ne peuvent plus changer.",
+  // Seasons created by the admin (§5.13, step 5b).
+  NO_SEASON: "Aucune saison ne couvre cette date de clôture : crée d'abord la saison dans Saisons et lots.",
+  SEASON_NAME_TAKEN: "Cette saison existe déjà.",
+  SEASON_START_TAKEN: "Une saison commence déjà ce jour-là.",
+  SEASON_ORDER: "La date de début doit rester entre celle de la saison précédente et celle de la suivante.",
+  SEASON_CHANGE_REFUSED: "Des questions changeraient de saison alors qu'elles ne le peuvent plus.",
+  SEASON_HAS_QUESTIONS: "Des questions sont rattachées à cette saison : elle ne peut pas être supprimée.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

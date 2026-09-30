@@ -60,22 +60,24 @@ export const allowedEmail = pgTable(
   (t) => [check("allowed_email_normalized", sql`${t.email} = lower(btrim(${t.email}))`)],
 );
 
-/** One row per season, created when first needed (§5.1). */
+/**
+ * One row per season, created by the admin (v1.1, §5.13). A season has no stored end: it ends where
+ * the next one starts, and the last one goes on until the next one is created (§5.1).
+ */
 export const season = pgTable(
   "season",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-    label: text("label").notNull().unique(),
-    /** 1 October 00:00, Paris time. */
-    startsAt: timestamptz("starts_at").notNull(),
-    /** Next 1 October 00:00, Paris time (exclusive). */
-    endsAt: timestamptz("ends_at").notNull(),
+    /** Display name ("2026-2027"), unique whatever the case. */
+    label: text("label").notNull(),
+    /** 00:00 on its start day, Paris time; two seasons never start the same day. */
+    startsAt: timestamptz("starts_at").notNull().unique(),
     proclaimedAt: timestamptz("proclaimed_at"),
     createdAt: createdAt(),
   },
   (t) => [
-    check("season_label_format", sql`${t.label} ~ '^[0-9]{4}-[0-9]{4}$'`),
-    check("season_bounds_order", sql`${t.startsAt} < ${t.endsAt}`),
+    uniqueIndex("season_label_lower_unique").on(sql`lower(${t.label})`),
+    check("season_label_length", sql`char_length(${t.label}) between 2 and 40`),
   ],
 );
 
@@ -95,7 +97,10 @@ export const question = pgTable(
   "question",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-    /** Season of `closes_at`, recomputed whenever it changes; null while there is no closing date. */
+    /**
+     * Season of `closes_at`, recomputed whenever it or the seasons change (§4.5); null without a
+     * closing date or when no season covers it (a draft only).
+     */
     seasonId: integer("season_id").references(() => season.id),
     categoryId: integer("category_id")
       .notNull()
@@ -136,7 +141,6 @@ export const question = pgTable(
       "question_published_complete",
       sql`${t.status} <> 'published' or (${t.opensAt} is not null and ${t.closesAt} is not null and ${t.seasonId} is not null)`,
     ),
-    check("question_season_of_closing", sql`${t.closesAt} is null or ${t.seasonId} is not null`),
     check("question_title_length", sql`char_length(${t.title}) between 5 and 200`),
     check("question_description_length", sql`char_length(${t.description}) <= 2000`),
     check("question_price_is_right_number", sql`not ${t.priceIsRight} or ${t.type} = 'number'`),

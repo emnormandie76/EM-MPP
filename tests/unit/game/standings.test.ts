@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeStandings,
-  defaultSeasonLabel,
+  defaultSeason,
   rankStandings,
   type SeasonSummary,
   type StandingsInput,
@@ -11,6 +11,7 @@ import {
   type StandingTotals,
   withMovement,
 } from "@/lib/game/standings";
+import { seasonStartFromLocalDate } from "@/lib/game/time";
 
 const day = (n: number) => new Date(Date.UTC(2026, 10, n, 10));
 
@@ -247,41 +248,66 @@ describe("withMovement: arrows since the previous result", () => {
   });
 });
 
-describe("defaultSeasonLabel", () => {
-  const season = (label: string, overrides: Partial<SeasonSummary> = {}): SeasonSummary => ({
-    label,
+describe("defaultSeason", () => {
+  // Seasons named after their start day, Paris time: "2026-10-01" starts on 1 October 2026 at 00:00.
+  const season = (start: string, overrides: Partial<SeasonSummary> = {}) => ({
+    name: start,
+    startsAt: seasonStartFromLocalDate(start),
     publishedCount: 0,
     resolvedCount: 0,
     proclaimed: false,
     ...overrides,
   });
+  const shown = (now: string, seasons: ReturnType<typeof season>[]) => defaultSeason(new Date(now), seasons)?.name ?? null;
 
-  it("at launch, shows the current season even with no result yet (the previous one does not exist)", () => {
-    expect(defaultSeasonLabel(new Date("2026-10-14T07:00:00Z"), [season("2026-2027", { publishedCount: 20 })])).toBe("2026-2027");
+  it("at launch, shows the current season even with no result yet (there is no previous one)", () => {
+    expect(shown("2026-10-14T07:00:00Z", [season("2026-10-01", { publishedCount: 20 })])).toBe("2026-10-01");
   });
 
-  it("switches to the new season at 00:00 on 1 October, Paris time", () => {
-    const seasons = [season("2025-2026", { publishedCount: 3, resolvedCount: 3, proclaimed: true })];
-    expect(defaultSeasonLabel(new Date("2026-09-30T21:59:59Z"), seasons)).toBe("2025-2026");
-    expect(defaultSeasonLabel(new Date("2026-09-30T22:00:00Z"), seasons)).toBe("2026-2027");
+  it("shows nothing while no season exists, or before the first one", () => {
+    expect(shown("2026-10-14T07:00:00Z", [])).toBeNull();
+    expect(shown("2026-09-30T21:59:59Z", [season("2026-10-01", { publishedCount: 20 })])).toBeNull();
+  });
+
+  it("switches to the new season at 00:00 on its start day, Paris time", () => {
+    const seasons = [
+      season("2025-09-29", { publishedCount: 3, resolvedCount: 3, proclaimed: true }),
+      season("2026-10-01"),
+    ];
+    expect(shown("2026-09-30T21:59:59Z", seasons)).toBe("2025-09-29");
+    expect(shown("2026-09-30T22:00:00Z", seasons)).toBe("2026-10-01");
+  });
+
+  it("stays on the last season while the next one is not created", () => {
+    expect(shown("2027-11-05T10:00:00Z", [season("2026-10-01", { publishedCount: 20, resolvedCount: 20, proclaimed: true })])).toBe(
+      "2026-10-01",
+    );
   });
 
   it("keeps the previous season while the new one has no result and the previous one is not proclaimed", () => {
-    const seasons = [season("2026-2027", { publishedCount: 20, resolvedCount: 18 }), season("2027-2028", { publishedCount: 2 })];
-    expect(defaultSeasonLabel(new Date("2027-10-05T10:00:00Z"), seasons)).toBe("2026-2027");
+    const seasons = [season("2026-10-01", { publishedCount: 20, resolvedCount: 18 }), season("2027-09-06", { publishedCount: 2 })];
+    expect(shown("2027-10-05T10:00:00Z", seasons)).toBe("2026-10-01");
   });
 
   it("shows the current season once the previous one is proclaimed", () => {
-    const seasons = [season("2026-2027", { publishedCount: 20, resolvedCount: 20, proclaimed: true })];
-    expect(defaultSeasonLabel(new Date("2027-10-05T10:00:00Z"), seasons)).toBe("2027-2028");
+    const seasons = [season("2026-10-01", { publishedCount: 20, resolvedCount: 20, proclaimed: true }), season("2027-09-06")];
+    expect(shown("2027-10-05T10:00:00Z", seasons)).toBe("2027-09-06");
   });
 
   it("shows the current season as soon as it has a result", () => {
-    const seasons = [season("2026-2027", { publishedCount: 20, resolvedCount: 18 }), season("2027-2028", { publishedCount: 5, resolvedCount: 1 })];
-    expect(defaultSeasonLabel(new Date("2027-11-05T10:00:00Z"), seasons)).toBe("2027-2028");
+    const seasons = [
+      season("2026-10-01", { publishedCount: 20, resolvedCount: 18 }),
+      season("2027-09-06", { publishedCount: 5, resolvedCount: 1 }),
+    ];
+    expect(shown("2027-11-05T10:00:00Z", seasons)).toBe("2027-09-06");
   });
 
   it("ignores a previous season without any published question", () => {
-    expect(defaultSeasonLabel(new Date("2027-10-05T10:00:00Z"), [season("2026-2027")])).toBe("2027-2028");
+    expect(shown("2027-10-05T10:00:00Z", [season("2026-10-01"), season("2027-09-06")])).toBe("2027-09-06");
+  });
+
+  it("only looks at the season just before the current one", () => {
+    const seasons = [season("2025-09-29", { publishedCount: 4 }), season("2026-10-01"), season("2027-09-06")];
+    expect(shown("2027-10-05T10:00:00Z", seasons)).toBe("2027-09-06");
   });
 });

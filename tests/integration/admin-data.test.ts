@@ -128,38 +128,74 @@ describe("getCategoriesAdmin", () => {
 });
 
 describe("getSeasonsAdmin", () => {
-  it("lists the seasons newest first, the current one even before its first question", async () => {
-    const previous = await ensureTestSeason(db, "2025-2026");
+  it("without any season: nothing current, the form offers today", async () => {
+    expect(await getSeasonsAdmin(db, viewer, now)).toEqual({
+      seasons: [],
+      current: null,
+      remindNext: false,
+      suggestedStart: "2026-10-05",
+      suggestedLabel: "2026-2027",
+    });
+  });
+
+  it("lists the seasons latest start first, with their end, questions and prizes; reminds to create the next one", async () => {
+    const previous = await ensureTestSeason(db, "2025-2026", "2025-09-29");
     await db.update(season).set({ proclaimedAt: clock.at("-10d") }).where(eq(season.id, previous.id));
     await db.insert(prize).values({ seasonId: previous.id, rankLabel: "1er", description: "Un mug", position: 1 });
+    const current = await ensureTestSeason(db, "Saison 2026", "2026-09-28");
     const categoryId = (await createCategory(db, "JPO")).id;
     const closed = { status: "published" as const, opensAt: new Date("2026-09-01T08:00:00Z"), closesAt: new Date("2026-09-10T16:00:00Z") };
     await createQuestion(db, { categoryId, ...closed, resultNumber: 250, resolvedAt: new Date("2026-09-20T08:00:00Z") });
     await createQuestion(db, { categoryId, ...closed });
     await createQuestion(db, { categoryId, ...closed, status: "cancelled" });
+    await createQuestion(db, { categoryId, closesAt: new Date("2026-11-10T16:00:00Z") });
 
-    const seasons = await getSeasonsAdmin(db, viewer, now);
-    expect(seasons).toEqual([
+    const view = await getSeasonsAdmin(db, viewer, now);
+    expect(view.seasons).toEqual([
       {
-        id: null,
-        label: "2026-2027",
-        startsAt: new Date("2026-09-30T22:00:00Z"),
-        endsAt: new Date("2027-09-30T22:00:00Z"),
+        id: current.id,
+        label: "Saison 2026",
+        startsAt: new Date("2026-09-27T22:00:00Z"),
+        endsAt: null,
         proclaimedAt: null,
         isCurrent: true,
         questionsTotal: 0,
         questionsResolved: 0,
+        questionsAttached: 1,
         prizes: [],
       },
-      expect.objectContaining({
+      {
         id: previous.id,
         label: "2025-2026",
+        startsAt: new Date("2025-09-28T22:00:00Z"),
+        endsAt: new Date("2026-09-27T22:00:00Z"),
         proclaimedAt: clock.at("-10d"),
         isCurrent: false,
         questionsTotal: 2,
         questionsResolved: 1,
+        questionsAttached: 3,
         prizes: [expect.objectContaining({ rankLabel: "1er", description: "Un mug" })],
-      }),
+      },
     ]);
+    expect(view.current?.id).toBe(current.id);
+    expect(view.remindNext).toBe(true);
+    // A year after the latest start.
+    expect([view.suggestedStart, view.suggestedLabel]).toEqual(["2027-09-28", "2027-2028"]);
+  });
+
+  it("no longer reminds once the next season exists, and knows when no season has started yet", async () => {
+    const current = await ensureTestSeason(db, "2026-2027", "2026-09-28");
+    const next = await ensureTestSeason(db, "2027-2028", "2027-09-06");
+    let view = await getSeasonsAdmin(db, viewer, now);
+    expect(view.seasons.map(({ id, isCurrent, endsAt }) => [id, isCurrent, endsAt])).toEqual([
+      [next.id, false, null],
+      [current.id, true, next.startsAt],
+    ]);
+    expect(view.remindNext).toBe(false);
+    expect(view.suggestedStart).toBe("2028-09-06");
+
+    view = await getSeasonsAdmin(db, viewer, new Date("2026-09-01T10:00:00Z"));
+    expect(view.current).toBeNull();
+    expect(view.remindNext).toBe(false);
   });
 });

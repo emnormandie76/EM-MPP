@@ -6,11 +6,11 @@ import { getDb } from "@/lib/db/client";
 import { createAnnouncement, deleteAnnouncement, updateAnnouncement } from "@/lib/services/announcements";
 import { archiveCategory, createCategory, renameCategory, unarchiveCategory } from "@/lib/services/categories";
 import type { Result } from "@/lib/services/result";
-import { type PrizeInput, upsertPrizes } from "@/lib/services/seasons";
+import { createSeason, deleteSeason, type PrizeInput, updateSeason, upsertPrizes } from "@/lib/services/seasons";
 import type { FormState } from "./form-state";
 
 // Server Actions of /admin/categories, /admin/saisons and /admin/annonces (architecture §7.1).
-// Categories, prizes and announcements show on player pages, hence the layout revalidation.
+// Categories, seasons, prizes and announcements show on player pages, hence the layout revalidation.
 
 function refresh() {
   revalidatePath("/", "layout");
@@ -46,10 +46,34 @@ export async function unarchiveCategoryAction(categoryId: number): Promise<Resul
   return result;
 }
 
-// Prizes
+// Seasons and prizes
 
-export async function savePrizesAction(seasonLabel: string, prizes: PrizeInput[]): Promise<FormState> {
-  const result = await upsertPrizes(getDb(), await getActor(), { seasonLabel, prizes }, new Date());
+/** "Saison créée. 2 questions y sont passées." */
+function seasonMessage(done: string, moved: number): string {
+  if (moved === 0) return done;
+  return `${done} ${moved === 1 ? "1 question a changé de saison." : `${moved} questions ont changé de saison.`}`;
+}
+
+export async function createSeasonAction(_: FormState, formData: FormData): Promise<FormState> {
+  const input = { label: formData.get("label"), startsOn: formData.get("startsOn") };
+  const result = await createSeason(getDb(), await getActor(), input, new Date());
+  return toFormState(result, seasonMessage("Saison créée.", result.ok ? result.data.moved : 0));
+}
+
+export async function updateSeasonAction(_: FormState, formData: FormData): Promise<FormState> {
+  const input = { seasonId: formData.get("seasonId"), label: formData.get("label"), startsOn: formData.get("startsOn") };
+  const result = await updateSeason(getDb(), await getActor(), input, new Date());
+  return toFormState(result, seasonMessage("Saison modifiée.", result.ok ? result.data.moved : 0));
+}
+
+export async function deleteSeasonAction(seasonId: number): Promise<Result> {
+  const result = await deleteSeason(getDb(), await getActor(), { seasonId });
+  if (result.ok) refresh();
+  return result;
+}
+
+export async function savePrizesAction(seasonId: number, prizes: PrizeInput[]): Promise<FormState> {
+  const result = await upsertPrizes(getDb(), await getActor(), { seasonId, prizes });
   return toFormState(result, "Lots enregistrés.");
 }
 

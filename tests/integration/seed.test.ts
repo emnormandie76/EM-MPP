@@ -16,7 +16,7 @@ import {
 } from "@/lib/db/schema";
 import { JOKERS_PER_SEASON } from "@/lib/game/constants";
 import { questionStatus } from "@/lib/game/question-status";
-import { seasonLabelFor } from "@/lib/game/time";
+import { seasonAt, seasonStartFromLocalDate } from "@/lib/game/time";
 import { isNew, newReference } from "@/lib/game/visits";
 import { markAsProduction, openPglite, type ScriptDb } from "../../scripts/lib/db";
 import { SEED_PASSWORD, SeedRefusedError, seedDatabase, WITNESS_VALUE } from "../../scripts/lib/seed";
@@ -109,10 +109,10 @@ describe("seed (scripts/seed.ts)", () => {
     const { db } = target;
     await seedDatabase(db, { now: MID_SEASON, env: {} });
 
-    const seasons = await db.select().from(season).orderBy(season.label);
-    expect(seasons.map(({ label, proclaimedAt }) => [label, proclaimedAt !== null])).toEqual([
-      ["2025-2026", true],
-      ["2026-2027", false],
+    const seasons = await db.select().from(season).orderBy(season.startsAt);
+    expect(seasons.map(({ label, startsAt, proclaimedAt }) => [label, startsAt, proclaimedAt !== null])).toEqual([
+      ["2025-2026", seasonStartFromLocalDate("2025-10-01"), true],
+      ["2026-2027", seasonStartFromLocalDate("2026-10-01"), false],
     ]);
     const previousQuestions = await db.select().from(question).where(eq(question.seasonId, seasons[0].id));
     expect(previousQuestions).toHaveLength(2);
@@ -213,25 +213,32 @@ describe("seed (scripts/seed.ts)", () => {
   });
 
   it.each([
-    ["30 seconds after the start of a season", "2026-09-30T22:00:30Z"],
-    ["on 1 October at noon", "2026-10-01T10:00:00Z"],
-    ["30 minutes before the end of a season", "2026-09-30T21:30:00Z"],
-    ["today, 30 September 2026, in the morning", "2026-09-30T08:00:00Z"],
-  ])("stays consistent %s: every question of the current season closes inside it", async (_, iso) => {
+    ["30 seconds after the start of a season", "2026-09-30T22:00:30Z", "2026-2027"],
+    ["on 1 October at noon", "2026-10-01T10:00:00Z", "2026-2027"],
+    ["30 minutes before 1 October", "2026-09-30T21:30:00Z", "2025-2026"],
+    ["on 30 September 2026, in the morning", "2026-09-30T08:00:00Z", "2025-2026"],
+    ["in winter", "2027-01-15T12:00:00Z", "2026-2027"],
+  ])("stays consistent %s: every question of the current season closes inside it", async (_, iso, currentLabel) => {
     const now = new Date(iso);
     target = await migratedDb();
     const { db } = target;
     const summary = await seedDatabase(db, { now, env: {} });
 
-    expect(summary.seasons.current).toBe(seasonLabelFor(now));
+    expect(summary.seasons.current).toBe(currentLabel);
     expect(await statusCounts(target, now)).toEqual({ draft: 1, scheduled: 1, open: 4, closed: 1, resolved: 5, cancelled: 1 });
 
-    const [current] = await db.select().from(season).where(eq(season.label, summary.seasons.current));
+    // Two seasons, the current one containing now and without a next one.
+    const seasons = await db.select().from(season);
+    expect(seasons).toHaveLength(2);
+    const current = seasonAt(seasons, now)!;
+    expect(current.label).toBe(currentLabel);
+    expect(seasons.every(({ startsAt }) => startsAt <= current.startsAt)).toBe(true);
+
     const questions = await db.select().from(question).where(isNotNull(question.closesAt));
     const currentQuestions = questions.filter(({ seasonId }) => seasonId === current.id);
     expect(currentQuestions).toHaveLength(10);
     for (const row of questions) {
-      expect(seasonLabelFor(row.closesAt!)).toBe(row.seasonId === current.id ? current.label : summary.seasons.previous);
+      expect(row.seasonId).toBe(seasonAt(seasons, row.closesAt!)?.id);
       if (row.resolvedAt) expect(row.resolvedAt.getTime()).toBeLessThanOrEqual(now.getTime());
     }
     const predictions = await db.select().from(prediction).innerJoin(question, eq(prediction.questionId, question.id));

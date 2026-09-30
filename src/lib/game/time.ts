@@ -1,15 +1,12 @@
 import { TZDate } from "@date-fns/tz";
 
-// Time zone, seasons and date conversions (architecture §5.1). Dates are stored in UTC;
+// Time zone, date conversions and seasons (architecture §5.1). Dates are stored in UTC;
 // every display and every input uses Paris time, whatever the server's time zone.
 
 export const TIME_ZONE = "Europe/Paris";
 
 const LOCAL_INPUT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
-const SEASON_LABEL = /^(\d{4})-(\d{4})$/;
-
-/** First month of a season (October), zero-based as in `Date`. */
-const SEASON_START_MONTH = 9;
+const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -39,32 +36,55 @@ export function utcToParisLocalInput(date: Date): string {
   return `${day}T${pad(paris.getHours())}:${pad(paris.getMinutes())}`;
 }
 
-/** Season of `date`, `YYYY-YYYY`: it starts on 1 October at 00:00, Paris time. */
-export function seasonLabelFor(date: Date): string {
-  const paris = new TZDate(date.getTime(), TIME_ZONE);
-  const startYear = paris.getMonth() >= SEASON_START_MONTH ? paris.getFullYear() : paris.getFullYear() - 1;
-  return `${startYear}-${startYear + 1}`;
+/** The Paris day of `date`, `YYYY-MM-DD`, to prefill an `<input type="date">`. */
+export function utcToParisLocalDate(date: Date): string {
+  return utcToParisLocalInput(date).slice(0, 10);
 }
 
-function seasonStartYear(label: string): number {
-  const match = SEASON_LABEL.exec(label);
-  if (!match || Number(match[2]) !== Number(match[1]) + 1) {
-    throw new RangeError(`Invalid season label: ${JSON.stringify(label)}`);
+// Seasons (v1.1): created by the admin with a name and a start day. They follow one another with
+// no gap and no overlap: each one ends where the next one starts (exclusive), and the last one has
+// no end until the next one is created. The functions receive the seasons read by the caller, in
+// any order.
+
+type SeasonStart = { startsAt: Date };
+
+/** Reads an `<input type="date">` value (`YYYY-MM-DD`) as 00:00 that day, Paris time: a season start. */
+export function seasonStartFromLocalDate(value: string): Date {
+  const match = LOCAL_DATE.exec(value);
+  if (!match) throw new RangeError(`Invalid local date: ${JSON.stringify(value)}`);
+  return parisLocalToUtc(`${value}T00:00`);
+}
+
+/** The season of `date`: the latest start not after it; null before the first season. */
+export function seasonAt<S extends SeasonStart>(seasons: readonly S[], date: Date): S | null {
+  let found: S | null = null;
+  for (const season of seasons) {
+    const start = season.startsAt.getTime();
+    if (start <= date.getTime() && (found === null || start > found.startsAt.getTime())) found = season;
   }
-  return Number(match[1]);
+  return found;
 }
 
-function seasonStart(year: number): Date {
-  return new Date(new TZDate(year, SEASON_START_MONTH, 1, 0, 0, TIME_ZONE).getTime());
+/** The end of `season` (exclusive): the start of the next season, or null for the last one. */
+export function seasonEnd<S extends SeasonStart>(seasons: readonly S[], season: S): Date | null {
+  let end: Date | null = null;
+  for (const other of seasons) {
+    const start = other.startsAt.getTime();
+    if (start > season.startsAt.getTime() && (end === null || start < end.getTime())) end = other.startsAt;
+  }
+  return end;
 }
 
-/** From 1 October 00:00 (inclusive) to the next 1 October 00:00 (exclusive), Paris time. */
-export function seasonBounds(label: string): { startsAt: Date; endsAt: Date } {
-  const year = seasonStartYear(label);
-  return { startsAt: seasonStart(year), endsAt: seasonStart(year + 1) };
+/** The season just before `season`, or null for the first one. */
+export function previousSeason<S extends SeasonStart>(seasons: readonly S[], season: S): S | null {
+  return seasonAt(
+    seasons.filter((other) => other.startsAt.getTime() < season.startsAt.getTime()),
+    season.startsAt,
+  );
 }
 
-export function previousSeasonLabel(label: string): string {
-  const year = seasonStartYear(label);
-  return `${year - 1}-${year}`;
+/** Default name offered by the creation form: `YYYY-YYYY` after the Paris year of the start. */
+export function suggestedSeasonLabel(startsAt: Date): string {
+  const year = new TZDate(startsAt.getTime(), TIME_ZONE).getFullYear();
+  return `${year}-${year + 1}`;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, Plus, Trash } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -158,6 +159,7 @@ export function QuestionForm({
   locks = NO_LOCKS,
   canPublish = false,
   readOnly = false,
+  seasonNotice = null,
 }: {
   /** Absent: creation of a draft. */
   questionId?: number;
@@ -168,6 +170,8 @@ export function QuestionForm({
   canPublish?: boolean;
   /** A cancelled question: nothing can change. */
   readOnly?: boolean;
+  /** Why the question cannot be published for lack of a season (§5.13), shown with the dates. */
+  seasonNotice?: string | null;
 }) {
   const [state, onSubmit, pending] = useFormAction<FormState>(saveQuestionAction, null);
   const [kind, setKind] = useState<QuestionKind>(initial.kind);
@@ -337,6 +341,14 @@ export function QuestionForm({
         <p className="text-[15px] text-ink-2">
           Toutes les dates sont en <strong>heure de Paris</strong>. La saison de la question est celle de sa clôture.
         </p>
+        {seasonNotice ? (
+          <p className="rounded-field bg-raised px-3 py-2 text-sm text-ink-2">
+            {seasonNotice}{" "}
+            <Link href="/admin/saisons" className="font-semibold text-accent-text hover:underline">
+              Ouvrir Saisons et lots
+            </Link>
+          </p>
+        ) : null}
         <div className="grid gap-4 lg:grid-cols-3">
           <Field
             name="opensAt"

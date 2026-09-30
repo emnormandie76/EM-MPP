@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   parisLocalToUtc,
-  previousSeasonLabel,
-  seasonBounds,
-  seasonLabelFor,
+  previousSeason,
+  seasonAt,
+  seasonEnd,
+  seasonStartFromLocalDate,
+  suggestedSeasonLabel,
   TIME_ZONE,
+  utcToParisLocalDate,
   utcToParisLocalInput,
 } from "@/lib/game/time";
 
@@ -25,7 +28,7 @@ describe("parisLocalToUtc", () => {
     expect(parisLocalToUtc("2026-10-26T12:00").toISOString()).toBe("2026-10-26T11:00:00.000Z");
   });
 
-  it("reads midnight on 1 October as the start of the season", () => {
+  it("reads midnight on 1 October", () => {
     expect(parisLocalToUtc("2026-10-01T00:00").toISOString()).toBe("2026-09-30T22:00:00.000Z");
   });
 
@@ -53,52 +56,82 @@ describe("utcToParisLocalInput", () => {
   });
 });
 
-describe("seasonLabelFor", () => {
+describe("seasons created by the admin (v1.1)", () => {
+  // Vectors T4 to T7: season A starts on 29 September 2025, season B on 1 October 2026.
+  const A = { name: "A", startsAt: seasonStartFromLocalDate("2025-09-29") };
+  const B = { name: "B", startsAt: seasonStartFromLocalDate("2026-10-01") };
+  // Deliberately out of order: the functions do not rely on the order of the list.
+  const seasons = [B, A];
+
   it("T4: 23:59:59 in Paris on 30 September belongs to the ending season", () => {
-    expect(seasonLabelFor(utc("2026-09-30T21:59:59Z"))).toBe("2025-2026");
+    expect(seasonAt(seasons, utc("2026-09-30T21:59:59Z"))).toBe(A);
   });
 
-  it("T5: 00:00 in Paris on 1 October starts the new season", () => {
-    expect(seasonLabelFor(utc("2026-09-30T22:00:00Z"))).toBe("2026-2027");
+  it("T5: 00:00 in Paris on the start day begins the new season", () => {
+    expect(seasonAt(seasons, utc("2026-09-30T22:00:00Z"))).toBe(B);
   });
 
-  it("T6: a date in spring belongs to the season that started the previous October", () => {
-    expect(seasonLabelFor(utc("2027-05-31T10:00:00Z"))).toBe("2026-2027");
+  it("T6: a date before the first season has no season", () => {
+    expect(seasonAt(seasons, utc("2025-09-28T12:00:00Z"))).toBeNull();
+    expect(seasonAt(seasons, utc("2025-09-28T21:59:59.999Z"))).toBeNull();
+    expect(seasonAt(seasons, utc("2025-09-28T22:00:00Z"))).toBe(A);
   });
 
-  it("uses Paris time in winter too (31 December and 1 January)", () => {
-    expect(seasonLabelFor(utc("2026-12-31T22:59:59Z"))).toBe("2026-2027");
-    expect(seasonLabelFor(utc("2026-12-31T23:00:00Z"))).toBe("2026-2027");
-    expect(seasonLabelFor(utc("2027-01-15T12:00:00Z"))).toBe("2026-2027");
-  });
-});
-
-describe("seasonBounds", () => {
-  it("T7: runs from 1 October 00:00 to the next 1 October 00:00, Paris time", () => {
-    const { startsAt, endsAt } = seasonBounds("2026-2027");
-    expect(startsAt.toISOString()).toBe("2026-09-30T22:00:00.000Z");
-    expect(endsAt.toISOString()).toBe("2027-09-30T22:00:00.000Z");
+  it("T7: the last season has no end: it goes on until the next one is created", () => {
+    expect(seasonAt(seasons, utc("2031-01-01T00:00:00Z"))).toBe(B);
+    expect(seasonEnd(seasons, B)).toBeNull();
+    expect(seasonEnd(seasons, A)).toEqual(B.startsAt);
   });
 
-  it("is consistent with seasonLabelFor at both ends", () => {
-    const { startsAt, endsAt } = seasonBounds("2026-2027");
-    expect(seasonLabelFor(startsAt)).toBe("2026-2027");
-    expect(seasonLabelFor(new Date(endsAt.getTime() - 1))).toBe("2026-2027");
-    expect(seasonLabelFor(endsAt)).toBe("2027-2028");
+  it("finds no season in an empty list", () => {
+    expect(seasonAt([], utc("2026-10-14T07:00:00Z"))).toBeNull();
   });
 
-  it.each(["2026", "2026-2028", "2026-2025", "26-27", " 2026-2027", "abcd-efgh"])("rejects the label %j", (label) => {
-    expect(() => seasonBounds(label)).toThrow(RangeError);
+  it("gives the previous season, or null for the first one", () => {
+    expect(previousSeason(seasons, B)).toBe(A);
+    expect(previousSeason(seasons, A)).toBeNull();
+    const C = { name: "C", startsAt: seasonStartFromLocalDate("2027-09-06") };
+    expect(previousSeason([C, A, B], C)).toBe(B);
+    expect(seasonEnd([C, A, B], B)).toEqual(C.startsAt);
+    expect(seasonAt([C, A, B], utc("2027-09-05T21:59:59Z"))).toBe(B);
+    expect(seasonAt([C, A, B], utc("2027-09-05T22:00:00Z"))).toBe(C);
   });
 });
 
-describe("previousSeasonLabel", () => {
-  it("gives the season before", () => {
-    expect(previousSeasonLabel("2026-2027")).toBe("2025-2026");
+describe("seasonStartFromLocalDate", () => {
+  it("reads the day as 00:00 in Paris, in summer and in winter", () => {
+    expect(seasonStartFromLocalDate("2026-10-01").toISOString()).toBe("2026-09-30T22:00:00.000Z");
+    expect(seasonStartFromLocalDate("2027-01-04").toISOString()).toBe("2027-01-03T23:00:00.000Z");
   });
 
-  it("rejects an invalid label", () => {
-    expect(() => previousSeasonLabel("2026")).toThrow(RangeError);
+  it("T9: the day after the switch to summer time starts at 22:00 UTC", () => {
+    expect(seasonStartFromLocalDate("2027-03-29").toISOString()).toBe("2027-03-28T22:00:00.000Z");
+  });
+
+  it("round-trips with utcToParisLocalDate", () => {
+    for (const value of ["2026-10-01", "2027-03-28", "2027-03-29", "2027-10-31", "2028-02-29"]) {
+      expect(utcToParisLocalDate(seasonStartFromLocalDate(value))).toBe(value);
+    }
+  });
+
+  it.each(["", "2026-10-01T00:00", "01/10/2026", "2026-13-01", "2026-02-30", "2027-02-29", " 2026-10-01"])("rejects %j", (value) => {
+    expect(() => seasonStartFromLocalDate(value)).toThrow(RangeError);
+  });
+});
+
+describe("utcToParisLocalDate", () => {
+  it("gives the Paris day, not the UTC day, around midnight", () => {
+    expect(utcToParisLocalDate(utc("2026-09-30T21:59:59Z"))).toBe("2026-09-30");
+    expect(utcToParisLocalDate(utc("2026-09-30T22:00:00Z"))).toBe("2026-10-01");
+  });
+});
+
+describe("suggestedSeasonLabel", () => {
+  it("names the season after the Paris year of its start", () => {
+    expect(suggestedSeasonLabel(seasonStartFromLocalDate("2026-10-01"))).toBe("2026-2027");
+    expect(suggestedSeasonLabel(seasonStartFromLocalDate("2027-09-06"))).toBe("2027-2028");
+    // 1 January 2027 at 00:00 in Paris is still 31 December 2026 in UTC.
+    expect(suggestedSeasonLabel(seasonStartFromLocalDate("2027-01-01"))).toBe("2027-2028");
   });
 });
 

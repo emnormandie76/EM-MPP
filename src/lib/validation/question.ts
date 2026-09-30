@@ -33,6 +33,10 @@ export const QUESTION_KIND_LABELS: Record<QuestionKind, string> = {
 /** Answers created by the yes/no template (§5.11). */
 export const YES_NO_OPTIONS = ["Oui", "Non"] as const;
 
+/** Shown by the question form while the admin has not created any season (§5.13). */
+export const NO_SEASON_YET =
+  "Aucune saison n'existe encore : la question peut être enregistrée en brouillon, mais elle ne pourra être publiée qu'une fois la première saison créée.";
+
 const L = QUESTION_LIMITS;
 
 export const QUESTION_MESSAGES = {

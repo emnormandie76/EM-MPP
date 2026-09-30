@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { defaultAvatarFor } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
 import { category, prediction, question, questionOption, season, user } from "@/lib/db/schema";
-import { seasonBounds, seasonLabelFor } from "@/lib/game/time";
+import { seasonAt, seasonStartFromLocalDate, utcToParisLocalDate } from "@/lib/game/time";
 
 // Test data factories (architecture §9.2), with valid default values.
 
@@ -28,12 +28,27 @@ export async function createCategory(db: Database, name = `Catégorie ${next()}`
   return row;
 }
 
-/** The season row of `label`, created if needed. */
-export async function ensureTestSeason(db: Database, label: string) {
+/**
+ * The season row of `label`, created if needed. By default a season "2026-2027" starts on
+ * 1 October 2026, like the seed's; `startsOn` (`YYYY-MM-DD`) sets another start day.
+ */
+export async function ensureTestSeason(db: Database, label: string, startsOn = `${label.slice(0, 4)}-10-01`) {
   const [existing] = await db.select().from(season).where(eq(season.label, label));
   if (existing) return existing;
-  const [row] = await db.insert(season).values({ label, ...seasonBounds(label) }).returning();
+  const [row] = await db.insert(season).values({ label, startsAt: seasonStartFromLocalDate(startsOn) }).returning();
   return row;
+}
+
+/**
+ * The season of `closesAt` among the existing ones (§5.1). Before the first season, the 1 October
+ * season containing it is created, so that tests need not create their seasons by hand.
+ */
+async function seasonOfClosing(db: Database, closesAt: Date) {
+  const found = seasonAt(await db.select().from(season), closesAt);
+  if (found) return found;
+  const day = utcToParisLocalDate(closesAt);
+  const year = Number(day.slice(0, 4)) - (day.slice(5) >= "10-01" ? 0 : 1);
+  return ensureTestSeason(db, `${year}-${year + 1}`);
 }
 
 /**
@@ -48,7 +63,7 @@ export async function createQuestion(db: Database, overrides: Partial<QuestionIn
   const seasonId =
     "seasonId" in values || !values.closesAt
       ? values.seasonId
-      : (await ensureTestSeason(db, seasonLabelFor(values.closesAt))).id;
+      : (await seasonOfClosing(db, values.closesAt)).id;
   const [row] = await db
     .insert(question)
     .values({

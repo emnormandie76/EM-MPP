@@ -14,6 +14,8 @@ import { requireAdmin } from "@/lib/auth/session";
 import { type AdminQuestion, getAdminQuestion, type TrackingRow } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
 import { formatCount, formatDateTime, formatNumber } from "@/lib/format";
+import { ERROR_MESSAGES } from "@/lib/services/result";
+import { NO_SEASON_YET } from "@/lib/validation/question";
 import type { PredictionState } from "@/lib/game/prediction-state";
 import { utcToParisLocalInput } from "@/lib/game/time";
 import { QUESTION_KIND_LABELS } from "@/lib/validation/question";
@@ -51,6 +53,13 @@ function formLocks({ rules }: AdminQuestion): QuestionFormLocks {
 }
 
 const localInput = (date: Date | null) => (date ? utcToParisLocalInput(date) : "");
+
+/** Why the question cannot be published for lack of a season (§5.13), or null. */
+function seasonNotice({ question: q, seasonsExist }: AdminQuestion): string | null {
+  if (q.status === "cancelled") return null;
+  if (!seasonsExist) return NO_SEASON_YET;
+  return q.closesAt && q.seasonLabel === null ? ERROR_MESSAGES.NO_SEASON : null;
+}
 
 const STATE_LABELS: Record<PredictionState, { text: string; className: string }> = {
   todo: { text: "À faire", className: "text-hot" },
@@ -177,7 +186,8 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
         </div>
         <h1 className="font-display text-[32px] font-extrabold uppercase leading-tight">{q.title}</h1>
         <p className="text-[15px] text-muted">
-          {QUESTION_KIND_LABELS[q.kind]} · {q.seasonLabel ? `saison ${q.seasonLabel}` : "sans saison tant qu'il n'y a pas de clôture"} ·{" "}
+          {QUESTION_KIND_LABELS[q.kind]} ·{" "}
+          {q.seasonLabel ? `saison ${q.seasonLabel}` : q.closesAt ? "aucune saison ne couvre sa clôture" : "sans saison tant qu'il n'y a pas de clôture"} ·{" "}
           {formatCount(predictionCount, "prono")}
           {q.duplicatedFrom ? (
             <>
@@ -231,6 +241,7 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
         locks={formLocks(detail)}
         canPublish={q.status === "draft"}
         readOnly={q.status === "cancelled"}
+        seasonNotice={seasonNotice(detail)}
         initial={{
           kind: q.kind,
           categoryId: q.categoryId,

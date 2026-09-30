@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db/client";
-import { allowedEmail, category, prediction, question, questionOption } from "@/lib/db/schema";
+import { allowedEmail, category, prediction, question, questionOption, season } from "@/lib/db/schema";
 import { createTestDb } from "../helpers/db";
 import { createCategory, createPrediction, createQuestion, createUser } from "../helpers/factories";
 
@@ -94,8 +94,12 @@ describe("database schema", () => {
       expect(await refusal(createQuestion(db, { opensAt: closesAt, closesAt }))).toContain("question_dates_order");
     });
 
-    it("refuses a closing date without a season", async () => {
-      expect(await refusal(createQuestion(db, { closesAt, seasonId: null }))).toContain("question_season_of_closing");
+    it("accepts a draft closing where no season exists yet, not a published question (v1.1)", async () => {
+      expect((await createQuestion(db, { closesAt, seasonId: null })).seasonId).toBeNull();
+      const opensAt = new Date(closesAt.getTime() - 86_400_000);
+      expect(await refusal(createQuestion(db, { status: "published", opensAt, closesAt, seasonId: null }))).toContain(
+        "question_published_complete",
+      );
     });
 
     it("refuses Juste Prix on a choice question", async () => {
@@ -147,6 +151,34 @@ describe("database schema", () => {
       expect(await refusal(db.insert(allowedEmail).values({ email: "Sarah@Example.test" }))).toContain("allowed_email_normalized");
       expect(await refusal(db.insert(allowedEmail).values({ email: " sarah@example.test" }))).toContain("allowed_email_normalized");
       await db.insert(allowedEmail).values({ email: "sarah@example.test" });
+    });
+  });
+
+  describe("seasons (v1.1)", () => {
+    const startsAt = new Date("2030-09-01T22:00:00Z");
+
+    it("has no end date any more: a season ends where the next one starts", async () => {
+      const result = (await db.execute(sql`
+        select column_name from information_schema.columns where table_schema = 'public' and table_name = 'season'
+      `)) as unknown as { rows: { column_name: string }[] };
+      expect(result.rows.map(({ column_name }) => column_name).sort()).toEqual(["created_at", "id", "label", "proclaimed_at", "starts_at"]);
+    });
+
+    it("keeps names unique whatever the case, between 2 and 40 characters, with any format", async () => {
+      await db.insert(season).values({ label: "Saison des tests", startsAt });
+      expect(await refusal(db.insert(season).values({ label: "SAISON DES TESTS", startsAt: new Date("2031-09-01T22:00:00Z") }))).toContain(
+        "season_label_lower_unique",
+      );
+      expect(await refusal(db.insert(season).values({ label: "x", startsAt: new Date("2032-09-01T22:00:00Z") }))).toContain(
+        "season_label_length",
+      );
+      expect(await refusal(db.insert(season).values({ label: "x".repeat(41), startsAt: new Date("2032-09-01T22:00:00Z") }))).toContain(
+        "season_label_length",
+      );
+    });
+
+    it("refuses two seasons starting at the same time", async () => {
+      expect(await refusal(db.insert(season).values({ label: "Doublon", startsAt }))).toContain("season_starts_at_unique");
     });
   });
 

@@ -15,17 +15,17 @@ type Row = { key: number; rankLabel: string; description: string };
 
 /** Prizes of a season: rank and description, in display order (§8.3 /admin/saisons). */
 export function PrizesEditor({
-  seasonLabel,
+  seasonId,
   initial,
 }: {
-  seasonLabel: string;
+  seasonId: number;
   initial: { rankLabel: string; description: string }[];
 }) {
   const [rows, setRows] = useState<Row[]>(() => initial.map((prize, key) => ({ key, ...prize })));
   const [nextKey, setNextKey] = useState(initial.length);
   const [state, setState] = useState<FormState>(null);
   const [pending, startTransition] = useTransition();
-  const idOf = (row: Row, field: string) => `prize-${seasonLabel}-${row.key}-${field}`;
+  const idOf = (row: Row, field: string) => `prize-${seasonId}-${row.key}-${field}`;
 
   function update(key: number, patch: Partial<Row>) {
     setRows(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -46,7 +46,7 @@ export function PrizesEditor({
   function save() {
     const prizes = rows.map(({ rankLabel, description }) => ({ rankLabel, description }));
     startTransition(async () => {
-      setState(await savePrizesAction(seasonLabel, prizes));
+      setState(await savePrizesAction(seasonId, prizes));
     });
   }
 

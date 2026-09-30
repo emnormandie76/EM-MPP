@@ -18,9 +18,11 @@ import {
 import type { Actor } from "@/lib/services/result";
 import { makeClock } from "../helpers/clock";
 import { createTestDb } from "../helpers/db";
-import { createCategory, createPrediction, createQuestion as insertQuestion, createUser } from "../helpers/factories";
+import { createCategory, createPrediction, createQuestion as insertQuestion, createUser, ensureTestSeason } from "../helpers/factories";
 
-// Back-office questions (architecture §5.11, §11 É5). Dates are typed in Paris time.
+// Back-office questions (architecture §5.11, §11 É5). Dates are typed in Paris time. The admin has
+// created two seasons: 2025-2026 from 29 September 2025, and 2026-2027 from 28 September 2026 (a
+// start day other than 1 October, as the admin chooses it: v1.1).
 
 const clock = makeClock("2026-10-05T10:00:00Z");
 const now = clock.now;
@@ -35,6 +37,8 @@ beforeEach(async () => {
   const row = await createUser(db, { role: "admin" });
   admin = { id: row.id, role: "admin", banned: false };
   categoryId = (await createCategory(db, "JPO")).id;
+  await ensureTestSeason(db, "2025-2026", "2025-09-29");
+  await ensureTestSeason(db, "2026-2027", "2026-09-28");
 });
 
 afterEach(async () => {
@@ -225,18 +229,26 @@ describe("creation (§5.11)", () => {
 });
 
 describe("season of a question (§5.1, vectors T4 and T5)", () => {
-  it("is the season of the closing date, around 30 September at midnight, Paris time", async () => {
-    const before = await created({ closesAt: "2026-09-30T23:59" });
-    const after = await created({ closesAt: "2026-10-01T00:00" });
-    expect(before.closesAt).toEqual(new Date("2026-09-30T21:59:00Z"));
+  it("is the season of the closing date, around midnight on the start day of a season, Paris time", async () => {
+    const before = await created({ closesAt: "2026-09-27T23:59" });
+    const after = await created({ closesAt: "2026-09-28T00:00" });
+    const lastDayOfSeptember = await created({ closesAt: "2026-09-30T23:59" });
+    expect(before.closesAt).toEqual(new Date("2026-09-27T21:59:00Z"));
     expect(await seasonLabelOf(before.seasonId)).toBe("2025-2026");
-    expect(after.closesAt).toEqual(new Date("2026-09-30T22:00:00Z"));
+    expect(after.closesAt).toEqual(new Date("2026-09-27T22:00:00Z"));
     expect(await seasonLabelOf(after.seasonId)).toBe("2026-2027");
+    // No more fixed switch on 1 October.
+    expect(await seasonLabelOf(lastDayOfSeptember.seasonId)).toBe("2026-2027");
+  });
+
+  it("is the last season for any later date, and none before the first season (a draft only)", async () => {
+    expect(await seasonLabelOf((await created({ closesAt: "2031-06-01T18:00" })).seasonId)).toBe("2026-2027");
+    expect((await created({ closesAt: "2025-09-28T23:59" })).seasonId).toBeNull();
   });
 
   it("follows every change of the closing date, and is cleared with it on a draft", async () => {
-    const q = await created({ closesAt: "2026-09-30T23:59" });
-    expect(await updateQuestion(db, admin, { questionId: q.id, closesAt: "2026-10-01T00:00" }, now)).toMatchObject({ ok: true });
+    const q = await created({ closesAt: "2026-09-27T23:59" });
+    expect(await updateQuestion(db, admin, { questionId: q.id, closesAt: "2026-09-28T00:00" }, now)).toMatchObject({ ok: true });
     expect(await seasonLabelOf((await load(q.id)).seasonId)).toBe("2026-2027");
     expect(await updateQuestion(db, admin, { questionId: q.id, closesAt: "" }, now)).toMatchObject({ ok: true });
     expect((await load(q.id)).seasonId).toBeNull();
@@ -245,7 +257,7 @@ describe("season of a question (§5.1, vectors T4 and T5)", () => {
     const report = await setQuestionDates(
       db,
       admin,
-      { questionIds: [q.id], opensAt: "2026-09-25T09:00", closesAt: "2026-09-30T23:59" },
+      { questionIds: [q.id], opensAt: "2026-09-25T09:00", closesAt: "2026-09-27T23:59" },
       late,
     );
     expect(report).toMatchObject({ ok: true, data: { succeeded: [{ id: q.id }] } });
@@ -285,7 +297,7 @@ describe("publication (§5.11)", () => {
   });
 
   it("is refused when the opening is not before the closing (the database already forbids storing it)", () => {
-    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1 };
+    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: 1 };
     expect(publicationProblems({ ...rules, opensAt: clock.at("+2d"), closesAt: clock.at("+2d") }, [], now)).toEqual([
       "La clôture doit être après l'ouverture.",
     ]);
@@ -295,6 +307,17 @@ describe("publication (§5.11)", () => {
     expect(publicationProblems({ ...rules, opensAt: clock.at("+1d"), closesAt: clock.at("+2d") }, [], now)).toEqual([]);
     expect(publicationProblems({ ...rules, type: "choice", opensAt: clock.at("+1d"), closesAt: clock.at("+2d") }, ["Seule"], now)).toEqual([
       "Une question à choix a de 2 à 10 réponses.",
+    ]);
+  });
+
+  it("is refused while no season covers the closing date (v1.1)", () => {
+    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: null };
+    expect(publicationProblems({ ...rules, opensAt: clock.at("+1d"), closesAt: clock.at("+2d") }, [], now)).toEqual([
+      "Aucune saison ne couvre cette date de clôture : crée d'abord la saison dans Saisons et lots.",
+    ]);
+    expect(publicationProblems({ ...rules, opensAt: null, closesAt: null }, [], now)).toEqual([
+      "Il manque la date d'ouverture.",
+      "Il manque la date de clôture.",
     ]);
   });
 
@@ -472,13 +495,17 @@ describe("editing locks (§5.11)", () => {
   });
 
   it("with a prediction, the closing cannot move to another season", async () => {
-    const lateSeason = makeClock("2026-09-25T10:00:00Z");
+    const lateSeason = makeClock("2026-09-24T10:00:00Z");
     const q = await openQuestionWithPrediction({ opensAt: lateSeason.at("-1d"), closesAt: lateSeason.at("+2d") });
-    expect(await updateQuestion(db, admin, { questionId: q.id, closesAt: "2026-10-02T18:00" }, lateSeason.now)).toMatchObject({
-      ok: false,
-      fieldErrors: { closesAt: "Des pronos existent : la clôture ne peut pas passer sur une autre saison." },
-    });
-    expect(await updateQuestion(db, admin, { questionId: q.id, closesAt: "2026-09-30T20:00" }, lateSeason.now)).toMatchObject({ ok: true });
+    expect(await seasonLabelOf(q.seasonId)).toBe("2025-2026");
+    for (const closesAt of ["2026-09-28T00:00", "2026-10-02T18:00"]) {
+      expect(await updateQuestion(db, admin, { questionId: q.id, closesAt }, lateSeason.now)).toMatchObject({
+        ok: false,
+        fieldErrors: { closesAt: "Des pronos existent : la clôture ne peut pas passer sur une autre saison." },
+      });
+    }
+    expect(await updateQuestion(db, admin, { questionId: q.id, closesAt: "2026-09-27T23:59" }, lateSeason.now)).toMatchObject({ ok: true });
+    expect(await seasonLabelOf((await load(q.id)).seasonId)).toBe("2025-2026");
   });
 
   it("a published question keeps future dates", async () => {

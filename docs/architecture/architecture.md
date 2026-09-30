@@ -2,7 +2,7 @@
 
 > **Version 1.1 du 30/09/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
-> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16).
+> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6).
 > - Règles fonctionnelles : [cahier des charges v1.1](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
@@ -169,7 +169,8 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 │  ├─ check-env.ts                contrôle des variables (noms seulement)
 │  ├─ check-db.ts                 contrôle de connexion (sans afficher l'URL)
 │  ├─ e2e-prepare.ts              remet à zéro .pglite-e2e, migre, seed
-│  └─ lib/                        db.ts (ouverture et migration), env-rules.ts, load-env.ts
+│  └─ lib/                        db.ts (ouverture et migration), env-rules.ts, load-env.ts, seed.ts,
+│                                  seed-seasons.ts (saisons du seed, lues aussi par les tests de bout en bout)
 ├─ docs/                          cahier des charges, architecture, maquette
 ├─ e2e/                           tests Playwright (*.spec.ts)
 ├─ tests/
@@ -733,7 +734,7 @@ La page règlement affiche ces mêmes constantes : règlement et calcul ne peuve
 | C5 | une seule question résolue | tous les `delta` valent `null` |
 | C6 | joueur actif sans prono | présent avec 0 point |
 
-**Saison affichée par défaut** (classement et accueil) : la saison qui contient `now` (`seasonAt`, §5.1). Si elle n'a encore aucune question résolue, que la précédente a au moins une question publiée et qu'elle n'est pas proclamée, on affiche la précédente. S'il n'existe encore aucune saison (ou si `now` précède la première), on affiche l'état vide. Un sélecteur liste les saisons ayant au moins une question publiée.
+**Saison affichée par défaut** (classement et accueil), fonction `defaultSeason(now, seasons)` qui renvoie une saison ou `null` : la saison qui contient `now` (`seasonAt`, §5.1). Si elle n'a encore aucune question résolue, que la précédente a au moins une question publiée et qu'elle n'est pas proclamée, on affiche la précédente. S'il n'existe encore aucune saison (ou si `now` précède la première), on affiche l'état vide. Un sélecteur liste les saisons ayant au moins une question publiée.
 
 ### 5.7 Sagesse de la foule et graphiques (`crowd.ts`, `chart.ts`)
 
@@ -842,15 +843,18 @@ Les rentrées ne tombent pas toujours le même jour : l'admin crée chaque saiso
 - **Date de début** : un jour, à 00:00 heure de Paris (`<input type="date">`, `seasonStartFromLocalDate`). Deux saisons ne commencent pas le même jour.
 - **Créer** (`createSeason` : nom, date de début) : la nouvelle saison prend sa place dans la suite et reprend, dans la saison qui la précède, les questions dont la clôture tombe à partir de son début. Refusé :
   - si l'une de ces questions a des pronos : « Des questions avec des pronos clôturent après cette date : elles changeraient de saison. » ;
-  - si la saison qui la précède est proclamée.
+  - si une question publiée ou annulée sortirait d'une saison proclamée (règle des saisons proclamées, ci-dessous).
 - **Modifier** (`updateSeason` : nom, date de début) : la date de début reste strictement entre celle de la saison précédente et celle de la suivante (on ne réordonne pas les saisons). Les questions qui changent de saison sont recalculées. Refusé :
   - si l'une d'elles a des pronos ;
-  - si la saison, ou celle qui la précède, est proclamée (le changement de date seulement ; le nom reste modifiable) ;
-  - si une question publiée se retrouverait sans saison (début de la première saison repoussé après sa clôture).
+  - si la saison est proclamée (le changement de date seulement ; le nom reste modifiable) ;
+  - si une question publiée ou annulée entrerait dans une saison proclamée ou en sortirait ;
+  - si une question publiée ou annulée se retrouverait sans saison (début de la première saison repoussé après sa clôture) ; un brouillon, lui, perd simplement sa saison.
+- **Saisons proclamées** (décision du 30/09/2026, qui remplace « refusé si la saison qui la précède est proclamée ») : une création, un changement de date ou une suppression n'est refusé que si une question publiée ou annulée entrerait dans une saison proclamée ou en sortirait. Les brouillons suivent leur date. La date de début d'une saison proclamée reste figée (SA8). Sans cela, proclamer 2026-2027 avant d'avoir créé 2027-2028 aurait empêché pour toujours de créer 2027-2028.
 - **Supprimer** (`deleteSeason`) : seulement si aucune question n'y est rattachée (brouillons compris) et si elle n'est pas proclamée ; ses lots sont supprimés avec elle, après confirmation. Refus : « Des questions sont rattachées à cette saison : elle ne peut pas être supprimée. »
 - **Aucune saison** : tant qu'aucune saison n'existe, les brouillons s'enregistrent mais rien ne peut être publié ; `/admin/saisons` et le formulaire de question invitent à créer la première saison.
 - **Rappel** : quand la saison courante est la dernière créée, `/admin/saisons` rappelle de créer la suivante avant la prochaine rentrée.
 - **Lots** (`upsertPrizes`) : ceux d'une saison existante non proclamée (la v1.0 créait la saison courante au besoin : ce n'est plus le cas).
+- **Verrous** : `createSeason`, `updateSeason` et `deleteSeason` verrouillent la table `season` (`LOCK TABLE … IN EXCLUSIVE MODE`), puis les questions qui ont une clôture (`FOR UPDATE`) avant de compter leurs pronos. Les services de questions qui fixent une saison lisent les saisons avec `FOR SHARE` (`seasonsForQuestions`) **avant** de verrouiller leur question : une question ne reçoit jamais sa saison d'une liste en cours de modification, et les verrous sont toujours pris dans le même ordre (pas d'interblocage). À l'É6, `savePrediction` prend `FOR SHARE` sur la ligne de la question : un prono ne peut pas arriver pendant qu'une question change de saison.
 
 | # | Cas | Attendu |
 |---|---|---|
@@ -1019,7 +1023,7 @@ type Result<T = void> =
 | `questions.ts` | `getOpenQuestionsForViewer`, `getQuestionsList(tab)`, `getQuestionDetail`, `getQuestionPredictionsForViewer` |
 | `standings.ts` | `getStandings(seasonLabel?)`, `getAvailableSeasons` |
 | `players.ts` | `getPlayerProfile`, `getAllowedEmails`, `getAccounts` |
-| `admin.ts` | `getAdminDashboard`, `getAdminQuestion`, `getAdminQuestionsList(filters)`, `getSeasonsAdmin` |
+| `admin.ts` | `getAdminDashboard`, `getAdminQuestion`, `getAdminQuestionsList(filters)`, `getSeasonsAdmin`, `hasSeasons` (formulaire de question, §5.13) |
 | `content.ts` | `getAnnouncements`, `getPrizes(seasonId)`, `getPalmares`, `getCurrentSeason` (pied de page, `/lots`) |
 
 ---
@@ -1362,7 +1366,7 @@ Modes : `dev` (branche Neon `dev`) et `e2e` (PGlite). Le script **efface toutes 
 
 **Garde-fous** : il refuse de s'exécuter si `VERCEL_ENV === 'production'` ou si `app_meta.environment = 'production'` dans la base visée. Il affiche le nom d'hôte de la base (jamais l'URL complète) et demande de taper `oui`, sauf en mode `e2e` ou avec l'option `--yes` (à utiliser par l'agent, dont le terminal n'est pas interactif : `npm run db:seed -- --yes`).
 
-Toutes les dates sont relatives à `now`, pour que le jeu reste cohérent quel que soit le jour. Les questions de la saison courante doivent clôturer dans cette saison : les écarts sont exacts en milieu de saison (« il y a 3 jours », « dans 6 jours ») et resserrés près d'une bascule du 1er octobre (décision du 30/09/2026).
+Toutes les dates sont relatives à `now`, pour que le jeu reste cohérent quel que soit le jour. Les questions passées de la saison courante doivent clôturer après son début : les écarts passés sont exacts (« il y a 3 jours ») sauf juste après le 1er octobre, où ils sont resserrés (décision du 30/09/2026). Les dates futures (« dans 6 jours ») sont toujours exactes, puisque la saison courante n'a pas de fin (v1.1).
 
 Saisons (v1.1) : le seed crée lui-même deux saisons, la précédente et la courante, qui commencent le 1er octobre (la courante est celle qui contient `now`) et portent les noms `AAAA-AAAA`. Il ne crée pas la saison suivante : la saison courante n'a pas de fin, comme en production tant que l'admin n'a pas créé la suivante.
 

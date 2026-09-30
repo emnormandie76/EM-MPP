@@ -99,7 +99,7 @@ export default async function QuestionsAdminPage({ searchParams }: PageProps<"/a
                 {label}
               </option>
             ))}
-            <option value="sans">Sans date de clôture</option>
+            <option value="sans">Sans saison</option>
           </SelectField>
           <SelectField name="categorie" label="Catégorie" defaultValue={filters.categoryId ?? ""} className="w-56">
             <option value="">Toutes</option>

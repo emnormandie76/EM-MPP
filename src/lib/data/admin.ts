@@ -6,7 +6,7 @@ import type { Database } from "@/lib/db/client";
 import { category, prediction, question, questionOption, season, user } from "@/lib/db/schema";
 import { type PredictionState, predictionState } from "@/lib/game/prediction-state";
 import { type QuestionStatus, questionStatus } from "@/lib/game/question-status";
-import { seasonBounds, seasonLabelFor } from "@/lib/game/time";
+import { seasonAt, seasonEnd, seasonStartFromLocalDate, suggestedSeasonLabel, utcToParisLocalDate } from "@/lib/game/time";
 import { type EditRules, editRules } from "@/lib/services/questions";
 import { type QuestionKind, kindOf } from "@/lib/validation/question";
 import { getPrizes, type PrizeView } from "./content";
@@ -134,7 +134,7 @@ export const QUESTION_STATUSES: readonly QuestionStatus[] = ["draft", "scheduled
 
 export type AdminQuestionFilters = {
   status?: QuestionStatus;
-  /** A season label, or "none" for the questions without a closing date. */
+  /** A season label, or "none" for the questions without a season (no closing date, or none covering it). */
   season?: string;
   categoryId?: number;
 };
@@ -157,7 +157,7 @@ export type CategoryChoice = { id: number; name: string; archived: boolean };
 
 export type AdminQuestionsList = {
   rows: AdminQuestionRow[];
-  /** Seasons that have at least one question, newest first. */
+  /** Names of the seasons that have at least one question, latest start first. */
   seasons: string[];
   categories: CategoryChoice[];
 };
@@ -178,7 +178,7 @@ export async function getAdminQuestionsList(
 ): Promise<AdminQuestionsList> {
   assertAdmin(viewer);
   const rows = await db
-    .select({ question, categoryName: category.name, seasonLabel: season.label })
+    .select({ question, categoryName: category.name, seasonLabel: season.label, seasonStartsAt: season.startsAt })
     .from(question)
     .innerJoin(category, eq(category.id, question.categoryId))
     .leftJoin(season, eq(season.id, question.seasonId));
@@ -206,8 +206,10 @@ export async function getAdminQuestionsList(
     .filter((row) => !filters.categoryId || categoryIdOf.get(row.id) === filters.categoryId)
     .sort((a, b) => b.id - a.id);
 
-  const seasons = [...new Set(all.map(({ seasonLabel }) => seasonLabel).filter((label): label is string => label !== null))];
-  return { rows: filtered, seasons: seasons.sort().reverse(), categories: await categoryChoices(db) };
+  const starts = new Map<string, number>();
+  for (const { seasonLabel, seasonStartsAt } of rows) if (seasonLabel && seasonStartsAt) starts.set(seasonLabel, seasonStartsAt.getTime());
+  const seasons = [...starts.keys()].sort((a, b) => starts.get(b)! - starts.get(a)!);
+  return { rows: filtered, seasons, categories: await categoryChoices(db) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -237,6 +239,8 @@ export type AdminQuestion = {
   rules: EditRules;
   /** Active categories, plus the question's own if it is archived. */
   categories: CategoryChoice[];
+  /** False while the admin has not created any season: nothing can be published (§5.13). */
+  seasonsExist: boolean;
   /** Follow-up of the players (§8.3), once the question is published; null for a draft. */
   tracking: TrackingRow[] | null;
 };
@@ -288,6 +292,7 @@ export async function getAdminQuestion(db: Database, viewer: ViewerRole, questio
   }
 
   const categories = (await categoryChoices(db)).filter((choice) => !choice.archived || choice.id === q.categoryId);
+  const seasonsExist = await anySeason(db);
   return {
     question: {
       ...q,
@@ -301,8 +306,20 @@ export async function getAdminQuestion(db: Database, viewer: ViewerRole, questio
     predictionCount,
     rules: editRules(status, predictionCount),
     categories,
+    seasonsExist,
     tracking,
   };
+}
+
+async function anySeason(db: Database): Promise<boolean> {
+  const rows = await db.select({ id: season.id }).from(season).limit(1);
+  return rows.length > 0;
+}
+
+/** Whether the admin has created a season yet: the creation form invites to create the first one. */
+export async function hasSeasons(db: Database, viewer: ViewerRole): Promise<boolean> {
+  assertAdmin(viewer);
+  return anySeason(db);
 }
 
 /** Categories offered by the creation form: the active ones. */
@@ -330,60 +347,78 @@ export async function getCategoriesAdmin(db: Database, viewer: ViewerRole): Prom
 }
 
 export type AdminSeason = {
-  /** Null for the current season while it has no row yet (created by its first question or prize). */
-  id: number | null;
+  id: number;
   label: string;
   startsAt: Date;
-  endsAt: Date;
+  /** Start of the next season (exclusive), or null for the last one, which goes on (§5.1). */
+  endsAt: Date | null;
   proclaimedAt: Date | null;
   isCurrent: boolean;
   /** Published questions that are not cancelled. */
   questionsTotal: number;
   questionsResolved: number;
+  /** Every question attached, drafts and cancelled ones included: then the season cannot be deleted. */
+  questionsAttached: number;
   prizes: PrizeView[];
 };
 
-/** Every season, the current one included, newest first. */
-export async function getSeasonsAdmin(db: Database, viewer: ViewerRole, now: Date): Promise<AdminSeason[]> {
+export type SeasonsAdmin = {
+  /** Latest start first. */
+  seasons: AdminSeason[];
+  /** The season containing `now`, or null (no season yet, or before the first one). */
+  current: AdminSeason | null;
+  /** The current season is the last one created: time to create the next one (§5.13). */
+  remindNext: boolean;
+  /** Prefill of the creation form: a year after the latest start, or today (Paris day, `YYYY-MM-DD`). */
+  suggestedStart: string;
+  suggestedLabel: string;
+};
+
+/** Same day a year later; 29 February becomes 28 February. */
+function nextYearDay(day: string): string {
+  const [year, month, date] = day.split("-");
+  return `${Number(year) + 1}-${month}-${month === "02" && date === "29" ? "28" : date}`;
+}
+
+/** Every season, latest start first, with its end, its questions and its prizes (§8.3 /admin/saisons). */
+export async function getSeasonsAdmin(db: Database, viewer: ViewerRole, now: Date): Promise<SeasonsAdmin> {
   assertAdmin(viewer);
   const rows = await db.select().from(season);
   const counts = await db
     .select({
       seasonId: question.seasonId,
-      total: count(),
-      resolved: sql<number>`count(${question.resolvedAt})`.mapWith(Number),
+      attached: count(),
+      total: sql<number>`count(*) filter (where ${question.status} = 'published')`.mapWith(Number),
+      resolved: sql<number>`count(${question.resolvedAt}) filter (where ${question.status} = 'published')`.mapWith(Number),
     })
     .from(question)
-    .where(eq(question.status, "published"))
     .groupBy(question.seasonId);
-  const countsOf = new Map(counts.map(({ seasonId, total, resolved }) => [seasonId, { total, resolved }]));
+  const countsOf = new Map(counts.map(({ seasonId, ...values }) => [seasonId, values]));
 
-  const currentLabel = seasonLabelFor(now);
+  const current = seasonAt(rows, now);
   const seasons: AdminSeason[] = [];
-  for (const row of rows) {
+  for (const row of [...rows].sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())) {
     seasons.push({
       id: row.id,
       label: row.label,
       startsAt: row.startsAt,
-      endsAt: row.endsAt,
+      endsAt: seasonEnd(rows, row),
       proclaimedAt: row.proclaimedAt,
-      isCurrent: row.label === currentLabel,
+      isCurrent: row.id === current?.id,
       questionsTotal: countsOf.get(row.id)?.total ?? 0,
       questionsResolved: countsOf.get(row.id)?.resolved ?? 0,
+      questionsAttached: countsOf.get(row.id)?.attached ?? 0,
       prizes: await getPrizes(db, viewer, row.id),
     });
   }
-  if (!rows.some(({ label }) => label === currentLabel)) {
-    seasons.push({
-      id: null,
-      label: currentLabel,
-      ...seasonBounds(currentLabel),
-      proclaimedAt: null,
-      isCurrent: true,
-      questionsTotal: 0,
-      questionsResolved: 0,
-      prizes: [],
-    });
-  }
-  return seasons.sort((a, b) => b.label.localeCompare(a.label));
+
+  const latest = seasons.at(0);
+  const suggestedStart = latest ? nextYearDay(utcToParisLocalDate(latest.startsAt)) : utcToParisLocalDate(now);
+  return {
+    seasons,
+    current: seasons.find(({ isCurrent }) => isCurrent) ?? null,
+    remindNext: latest?.isCurrent === true,
+    suggestedStart,
+    suggestedLabel: suggestedSeasonLabel(seasonStartFromLocalDate(suggestedStart)),
+  };
 }

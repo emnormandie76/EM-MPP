@@ -1,5 +1,5 @@
 import { scoreQuestion, type ScoringPrediction, type ScoringQuestion } from "./scoring";
-import { previousSeasonLabel, seasonLabelFor } from "./time";
+import { previousSeason, seasonAt } from "./time";
 
 // Season standings (architecture §5.6), recomputed on every read from predictions and results.
 
@@ -36,7 +36,8 @@ export type StandingRow = StandingTotals & { rank: number };
 export type StandingRowWithMovement = StandingRow & { delta: number | null };
 
 export type SeasonSummary = {
-  label: string;
+  /** 00:00 on its start day, Paris time (§5.1). */
+  startsAt: Date;
   /** Published questions, cancelled ones excluded. */
   publishedCount: number;
   resolvedCount: number;
@@ -129,11 +130,11 @@ export function withMovement(input: StandingsInput): StandingRowWithMovement[] {
 /**
  * Season shown by default on the home page and the standings (§5.6): the one containing `now`,
  * unless it has no result yet while the previous one, with published questions, is not proclaimed.
+ * Null while no season contains `now` (none created yet, or before the first one): empty state.
  */
-export function defaultSeasonLabel(now: Date, seasons: readonly SeasonSummary[]): string {
-  const current = seasonLabelFor(now);
-  const find = (label: string) => seasons.find((season) => season.label === label);
-  if ((find(current)?.resolvedCount ?? 0) > 0) return current;
-  const previous = find(previousSeasonLabel(current));
-  return previous && previous.publishedCount > 0 && !previous.proclaimed ? previous.label : current;
+export function defaultSeason<S extends SeasonSummary>(now: Date, seasons: readonly S[]): S | null {
+  const current = seasonAt(seasons, now);
+  if (!current || current.resolvedCount > 0) return current;
+  const previous = previousSeason(seasons, current);
+  return previous && previous.publishedCount > 0 && !previous.proclaimed ? previous : current;
 }

@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { QuestionForm } from "@/components/admin/QuestionForm";
 import { requireAdmin } from "@/lib/auth/session";
-import { getActiveCategories } from "@/lib/data/admin";
+import { getActiveCategories, hasSeasons } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
+import { NO_SEASON_YET } from "@/lib/validation/question";
 
 export const metadata: Metadata = { title: "Nouvelle question" };
 
@@ -11,6 +12,7 @@ export const metadata: Metadata = { title: "Nouvelle question" };
 export default async function NewQuestionPage() {
   const viewer = await requireAdmin();
   const categories = await getActiveCategories(getDb(), viewer);
+  const seasonsExist = await hasSeasons(getDb(), viewer);
 
   return (
     <>
@@ -23,6 +25,7 @@ export default async function NewQuestionPage() {
       </p>
       <QuestionForm
         categories={categories}
+        seasonNotice={seasonsExist ? null : NO_SEASON_YET}
         initial={{
           kind: "number",
           categoryId: null,

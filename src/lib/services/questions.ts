@@ -6,7 +6,7 @@ import { formatNumber } from "@/lib/format";
 import { COEFFICIENTS } from "@/lib/game/constants";
 import { parseNumberInput } from "@/lib/game/number-input";
 import { type QuestionStatus, questionStatus } from "@/lib/game/question-status";
-import { seasonLabelFor } from "@/lib/game/time";
+import { seasonAt } from "@/lib/game/time";
 import {
   createQuestionSchema,
   dateErrors,
@@ -29,10 +29,12 @@ import {
   ok,
   type Result,
 } from "./result";
-import { ensureSeason } from "./seasons";
+import { seasonsForQuestions } from "./seasons";
 
 // Questions of the back office (architecture §5.11, §7.3). Statuses are computed from the dates
-// (§5.2): nothing is written at opening or closing time.
+// (§5.2): nothing is written at opening or closing time. The season of a question is the one of
+// its closing date among the seasons created by the admin (§5.1), read before the question is
+// locked (lock order of services/seasons.ts).
 
 type QuestionRow = typeof question.$inferSelect;
 
@@ -73,7 +75,7 @@ export function editRules(status: QuestionStatus, predictionCount: number): Edit
 
 /** Why a question cannot be published (§5.11), or an empty list. */
 export function publicationProblems(
-  row: Pick<QuestionRow, "type" | "opensAt" | "closesAt" | "expectedResultAt" | "coefficient">,
+  row: Pick<QuestionRow, "type" | "opensAt" | "closesAt" | "expectedResultAt" | "coefficient" | "seasonId">,
   optionLabels: readonly string[],
   now: Date,
 ): string[] {
@@ -82,6 +84,7 @@ export function publicationProblems(
   if (!row.closesAt) problems.push("Il manque la date de clôture.");
   if (row.opensAt && row.closesAt && row.opensAt >= row.closesAt) problems.push(QUESTION_MESSAGES.closesBeforeOpens);
   if (row.closesAt && row.closesAt <= now) problems.push("La clôture est déjà passée.");
+  if (row.closesAt && row.seasonId === null) problems.push(ERROR_MESSAGES.NO_SEASON);
   if (row.closesAt && row.expectedResultAt && row.expectedResultAt < row.closesAt) {
     problems.push(QUESTION_MESSAGES.resultBeforeCloses);
   }
@@ -168,13 +171,15 @@ export async function createQuestion(
   if (Object.keys(errors).length > 0) return fail("INVALID_INPUT", undefined, errors);
 
   return db.transaction(async (tx) => {
+    const seasons = await seasonsForQuestions(tx);
     const problem = await categoryProblem(tx, data.categoryId);
     if (problem) return problem;
     const { type, priceIsRight, unit, options } = shaped.shape;
     const [row] = await tx
       .insert(question)
       .values({
-        seasonId: dates.closesAt ? await ensureSeason(tx, seasonLabelFor(dates.closesAt)) : null,
+        // A draft may close where no season exists yet: it cannot be published until one does.
+        seasonId: dates.closesAt ? (seasonAt(seasons, dates.closesAt)?.id ?? null) : null,
         categoryId: data.categoryId,
         type,
         priceIsRight,
@@ -215,6 +220,7 @@ export async function updateQuestion(
   const patch = parsed.data;
 
   return db.transaction(async (tx) => {
+    const seasons = await seasonsForQuestions(tx);
     const current = await lockQuestion(tx, patch.questionId);
     if (!current) return notFound();
     const currentOptions = (await optionsOf(tx, current.id)).map(({ label }) => label);
@@ -271,6 +277,7 @@ export async function updateQuestion(
       next.expectedResultAt !== current.expectedResultAt;
     const opensChanged = next.opensAt !== current.opensAt;
     const closesChanged = next.closesAt !== current.closesAt;
+    const seasonId = closesChanged ? (next.closesAt ? (seasonAt(seasons, next.closesAt)?.id ?? null) : null) : current.seasonId;
     if (!contentChanged && !otherChanged && !opensChanged && !closesChanged) return ok({ id: current.id });
 
     // Locks (§5.11).
@@ -285,7 +292,7 @@ export async function updateQuestion(
         return fail("QUESTION_LOCKED", message, { closesAt: message });
       }
       // A joker counts in the season of its question: a question with predictions keeps its season.
-      if (seasonLabelFor(next.closesAt!) !== seasonLabelFor(current.closesAt!)) {
+      if (seasonId !== current.seasonId) {
         const message = "Des pronos existent : la clôture ne peut pas passer sur une autre saison.";
         return fail("QUESTION_LOCKED", message, { closesAt: message });
       }
@@ -301,14 +308,10 @@ export async function updateQuestion(
       if (!next.opensAt) errors.opensAt = "Une question publiée garde sa date d'ouverture.";
       if (!next.closesAt) errors.closesAt = "Une question publiée garde sa date de clôture.";
       else if (closesChanged && next.closesAt <= now) errors.closesAt ??= QUESTION_MESSAGES.closesInPast;
+      else if (seasonId === null) errors.closesAt ??= ERROR_MESSAGES.NO_SEASON;
     }
     if (Object.keys(errors).length > 0) return fail("INVALID_INPUT", undefined, errors);
 
-    const seasonId = closesChanged
-      ? next.closesAt
-        ? await ensureSeason(tx, seasonLabelFor(next.closesAt))
-        : null
-      : current.seasonId;
     await tx
       .update(question)
       .set({ ...next, seasonId, updatedAt: now })
@@ -394,7 +397,8 @@ const datesInput = z.object({
 
 /**
  * Dates in series (§5.11): the same opening, closing and, if given, expected result date on each
- * selected question without predictions. The questions stay as they are (draft or published).
+ * selected question without predictions. The questions stay as they are (draft or published); a
+ * published question needs a season for the new closing date.
  */
 export async function setQuestionDates(
   db: Database,
@@ -415,9 +419,9 @@ export async function setQuestionDates(
   if (!opensAt || !closesAt || Object.keys(errors).length > 0) return fail("INVALID_INPUT", undefined, errors);
 
   return db.transaction(async (tx) => {
+    const seasonId = seasonAt(await seasonsForQuestions(tx), closesAt)?.id ?? null;
     const rows = await lockSelection(tx, ids);
     const predictions = await predictionCounts(tx, ids);
-    const seasonId = await ensureSeason(tx, seasonLabelFor(closesAt));
     const report: BatchReport = { succeeded: [], unchanged: [], failed: [] };
     for (const id of ids) {
       const row = rows.get(id);
@@ -433,6 +437,7 @@ export async function setQuestionDates(
       else if (status === "closed" || status === "resolved") reason = "Question déjà clôturée.";
       else if ((predictions.get(id) ?? 0) > 0) reason = "Des pronos existent : change ses dates depuis la page de la question.";
       else if (expected && expected < closesAt) reason = "Sa date de résultat prévue est avant la nouvelle clôture.";
+      else if (row.status === "published" && seasonId === null) reason = ERROR_MESSAGES.NO_SEASON;
       if (reason) {
         report.failed.push({ ...ref, reasons: [reason] });
         continue;

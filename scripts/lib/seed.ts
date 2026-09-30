@@ -18,15 +18,20 @@ import {
   user,
 } from "../../src/lib/db/schema";
 import { computeStandings, type StandingsPrediction, type StandingsQuestion } from "../../src/lib/game/standings";
-import { previousSeasonLabel, seasonBounds, seasonLabelFor } from "../../src/lib/game/time";
+import { seasonAt } from "../../src/lib/game/time";
 import { isMarkedAsProduction } from "./db";
+import { seedSeasons } from "./seed-seasons";
 
 // Development and end-to-end data set (architecture §9.6). It ERASES every row (application and
 // accounts, not app_meta) and inserts the data below, in one transaction.
 //
-// Dates are relative to `now`. The questions of the current season must close inside it: near a
-// season change (1 October), the gaps are shrunk to fit, so the data set stays consistent on any
-// day. In mid-season, "3 days ago" is exactly 3 days ago.
+// The seed creates its own two seasons (§9.6): the previous one and the current one, starting on
+// 1 October and named "YYYY-YYYY". It does not create the next one: the current season has no end,
+// as in production until the admin creates the next season.
+//
+// Dates are relative to `now`. The past questions of the current season must close after its
+// start: just after 1 October, the past gaps are shrunk to fit, so the data set stays consistent
+// on any day. Otherwise "3 days ago" is exactly 3 days ago, and future dates are always exact.
 
 export const SEED_PASSWORD = "Test-1234!";
 /** Value of another player's prediction on an open question: must never reach the page (§9.3). */
@@ -39,10 +44,8 @@ type Env = Record<string, string | undefined>;
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
-/** Past offsets of the current season are expressed in days out of this span… */
+/** Past offsets of the current season are expressed in days out of this span. */
 const PAST_SPAN_DAYS = 30;
-/** …and future ones out of this span (all strictly below it). */
-const FUTURE_SPAN_DAYS = 7;
 
 /** Why seeding this database is forbidden, or null. */
 export async function seedRefusal(db: Database, env: Env): Promise<string | null> {
@@ -97,22 +100,18 @@ async function clearDatabase(db: Database): Promise<void> {
 }
 
 function seedCalendar(now: Date) {
-  const currentLabel = seasonLabelFor(now);
-  const current = seasonBounds(currentLabel);
-  const previousLabel = previousSeasonLabel(currentLabel);
-  const previous = seasonBounds(previousLabel);
+  const { previous, current } = seedSeasons(now);
   const pastSpan = Math.min(now.getTime() - current.startsAt.getTime(), PAST_SPAN_DAYS * DAY);
-  const futureSpan = Math.min(current.endsAt.getTime() - now.getTime(), FUTURE_SPAN_DAYS * DAY);
   const shift = (ms: number) => new Date(now.getTime() + ms);
   return {
-    currentLabel,
-    previousLabel,
+    previous,
+    current,
     /** Exact offset from now, for dates that do not decide a season. */
     shift,
     /** In the current season, `days` (≤ 30) before now. */
     daysAgo: (days: number) => shift(-(days / PAST_SPAN_DAYS) * pastSpan),
-    /** In the current season, `days` (< 7) after now. */
-    daysAhead: (days: number) => shift((days / FUTURE_SPAN_DAYS) * futureSpan),
+    /** `days` after now: still the current season, which has no end. */
+    daysAhead: (days: number) => shift(days * DAY),
     /** `days` after the start of the previous season. */
     previousSeasonDay: (days: number) => new Date(previous.startsAt.getTime() + days * DAY),
   };
@@ -211,28 +210,23 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
 
     const seasons = await tx
       .insert(season)
-      .values([
-        {
-          label: calendar.previousLabel,
-          ...seasonBounds(calendar.previousLabel),
-          proclaimedAt: previousSeasonDay(150),
-        },
-        { label: calendar.currentLabel, ...seasonBounds(calendar.currentLabel) },
-      ])
+      .values([{ ...calendar.previous, proclaimedAt: previousSeasonDay(150) }, calendar.current])
       .returning();
-    const seasonId = new Map(seasons.map(({ id, label }) => [label, id]));
+    const seasonIdOf = (label: string) => seasons.find((row) => row.label === label)!.id;
+    const previousSeasonId = seasonIdOf(calendar.previous.label);
+    const currentSeasonId = seasonIdOf(calendar.current.label);
 
     let questionCount = 0;
     let predictionCount = 0;
     let eventCount = 0;
 
     async function addQuestion(spec: QuestionSpec): Promise<SeededQuestion> {
-      const label = spec.closesAt ? seasonLabelFor(spec.closesAt) : null;
-      if (label !== null && !seasonId.has(label)) throw new Error(`Seed question outside the seeded seasons: ${spec.title}`);
+      const questionSeason = spec.closesAt ? seasonAt(seasons, spec.closesAt) : null;
+      if (spec.closesAt && !questionSeason) throw new Error(`Seed question outside the seeded seasons: ${spec.title}`);
       const [row] = await tx
         .insert(question)
         .values({
-          seasonId: label === null ? null : seasonId.get(label),
+          seasonId: questionSeason?.id ?? null,
           categoryId: categoryId.get(spec.category)!,
           type: spec.type,
           priceIsRight: spec.priceIsRight ?? false,
@@ -573,7 +567,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
     const standings = computeStandings({ questions: previousQuestions, predictions: previousPredictions, players });
     await tx.insert(seasonStanding).values(
       standings.map((row) => ({
-        seasonId: seasonId.get(calendar.previousLabel)!,
+        seasonId: previousSeasonId,
         userId: row.userId,
         rank: row.rank,
         points: row.points,
@@ -599,16 +593,16 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       },
     ]).returning();
     const prizes = await tx.insert(prize).values([
-      { seasonId: seasonId.get(calendar.currentLabel)!, rankLabel: "1er", description: "Un déjeuner d'équipe offert", position: 1 },
-      { seasonId: seasonId.get(calendar.currentLabel)!, rankLabel: "2e", description: "Un sweat de l'école", position: 2 },
-      { seasonId: seasonId.get(calendar.currentLabel)!, rankLabel: "3e", description: "Un mug de l'école", position: 3 },
+      { seasonId: currentSeasonId, rankLabel: "1er", description: "Un déjeuner d'équipe offert", position: 1 },
+      { seasonId: currentSeasonId, rankLabel: "2e", description: "Un sweat de l'école", position: 2 },
+      { seasonId: currentSeasonId, rankLabel: "3e", description: "Un mug de l'école", position: 3 },
     ]).returning();
 
     return {
       users: Object.keys(PEOPLE).length,
       allowedEmails: allowed.length,
       categories: categories.length,
-      seasons: { previous: calendar.previousLabel, current: calendar.currentLabel },
+      seasons: { previous: calendar.previous.label, current: calendar.current.label },
       questions: questionCount,
       predictions: predictionCount,
       events: eventCount,
