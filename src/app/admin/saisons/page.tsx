@@ -2,6 +2,7 @@ import { Info } from "lucide-react";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { PrizesEditor } from "@/components/admin/PrizesEditor";
+import { ProclaimButton } from "@/components/admin/ProclaimButton";
 import { SeasonActions, SeasonCreateForm } from "@/components/admin/SeasonForms";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
@@ -40,8 +41,8 @@ function Notice({ children }: { children: ReactNode }) {
 }
 
 /**
- * Seasons created by the admin and their prizes (architecture §5.13, §8.3). The proclamation of the
- * final standings arrives in step 7.
+ * Seasons created by the admin, their prizes and the proclamation of their final standings
+ * (architecture §5.12, §5.13, §8.3).
  */
 export default async function SeasonsAdminPage() {
   const viewer = await requireAdmin();
@@ -93,6 +94,13 @@ export default async function SeasonsAdminPage() {
             <dt className="text-muted">Classement final</dt>
             <dd>{season.proclaimedAt ? `Proclamé le ${formatDateTime(season.proclaimedAt)}` : "Pas encore proclamé"}</dd>
           </dl>
+          <ProclaimButton
+            seasonId={season.id}
+            label={season.label}
+            proclaimed={season.proclaimedAt !== null}
+            blocker={season.proclamationBlocker}
+            lastSeason={season.endsAt === null}
+          />
           <SeasonActions
             season={{
               id: season.id,

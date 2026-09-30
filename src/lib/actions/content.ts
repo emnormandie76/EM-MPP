@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db/client";
 import { createAnnouncement, deleteAnnouncement, updateAnnouncement } from "@/lib/services/announcements";
 import { archiveCategory, createCategory, renameCategory, unarchiveCategory } from "@/lib/services/categories";
 import type { Result } from "@/lib/services/result";
-import { createSeason, deleteSeason, type PrizeInput, updateSeason, upsertPrizes } from "@/lib/services/seasons";
+import { createSeason, deleteSeason, type PrizeInput, proclaimSeason, updateSeason, upsertPrizes } from "@/lib/services/seasons";
 import type { FormState } from "./form-state";
 
 // Server Actions of /admin/categories, /admin/saisons and /admin/annonces (architecture §7.1).
@@ -75,6 +75,11 @@ export async function deleteSeasonAction(seasonId: number): Promise<Result> {
 export async function savePrizesAction(seasonId: number, prizes: PrizeInput[]): Promise<FormState> {
   const result = await upsertPrizes(getDb(), await getActor(), { seasonId, prizes });
   return toFormState(result, "Lots enregistrés.");
+}
+
+export async function proclaimSeasonAction(seasonId: number): Promise<FormState> {
+  const result = await proclaimSeason(getDb(), await getActor(), { seasonId }, new Date());
+  return toFormState(result, "Classement final proclamé : il est maintenant au palmarès.");
 }
 
 // Announcements

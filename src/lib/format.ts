@@ -17,6 +17,13 @@ export function formatNumber(n: number): string {
   return numberFormat.format(n);
 }
 
+const percentFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
+
+/** A ratio as a percentage with at most one decimal: 0.048 → "4,8 %" (no-break space before %). */
+export function formatPercent(ratio: number): string {
+  return `${percentFormat.format(ratio * 100)} %`;
+}
+
 /** Day and month in Paris time: "21 oct.", "1er oct.". */
 function formatDayMonth(date: Date): string {
   const day = Number(format(date, "d", { in: paris }));

@@ -6,13 +6,20 @@ import { seasonStartFromLocalDate, suggestedSeasonLabel, utcToParisLocalDate } f
 /** 1 October at 00:00, Paris time, of `year`. */
 const octoberFirst = (year: number) => seasonStartFromLocalDate(`${year}-10-01`);
 
-/** The seed's seasons: the one containing `now` and the one before, both starting on 1 October. */
+const season = (startsAt: Date) => ({ label: suggestedSeasonLabel(startsAt), startsAt });
+
+/**
+ * The seed's seasons, all starting on 1 October: the one containing `now` (current), the one before
+ * (previous, proclaimed) and the one before that (older, ready to be proclaimed: decision of
+ * 30/09/2026).
+ */
 export function seedSeasons(now: Date) {
   const year = Number(utcToParisLocalDate(now).slice(0, 4));
   const currentStart = octoberFirst(year) <= now ? octoberFirst(year) : octoberFirst(year - 1);
-  const previousStart = octoberFirst(Number(utcToParisLocalDate(currentStart).slice(0, 4)) - 1);
+  const currentYear = Number(utcToParisLocalDate(currentStart).slice(0, 4));
   return {
-    previous: { label: suggestedSeasonLabel(previousStart), startsAt: previousStart },
-    current: { label: suggestedSeasonLabel(currentStart), startsAt: currentStart },
+    older: season(octoberFirst(currentYear - 2)),
+    previous: season(octoberFirst(currentYear - 1)),
+    current: season(currentStart),
   };
 }

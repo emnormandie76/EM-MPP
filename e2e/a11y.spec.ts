@@ -18,7 +18,18 @@ for (const url of ["/connexion", "/inscription"]) {
   });
 }
 
-for (const url of ["/", "/pronos", "/questions", "/questions?onglet=annulees", "/profil", "/cette-page-n-existe-pas"]) {
+for (const url of [
+  "/",
+  "/pronos",
+  "/questions",
+  "/questions?onglet=annulees",
+  "/profil",
+  "/classement",
+  "/palmares",
+  "/reglement",
+  "/lots",
+  "/cette-page-n-existe-pas",
+]) {
   test(`${url} (player) has no serious or critical accessibility violation`, async ({ page }) => {
     await signIn(page, ACCOUNTS.julien);
     await page.goto(url);
@@ -32,6 +43,32 @@ test("/questions/<id> (open, player) has no serious or critical accessibility vi
   await page.goto("/pronos");
   await page.getByRole("link", { name: "Combien de participants à la JPO du 15 novembre ?" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Combien de participants à la JPO du 15 novembre ?");
+  expect(await blockingViolations(page)).toEqual([]);
+});
+
+// §9.4: the pages of a resolved question (number and choice) and of a closed one, with their
+// results; a player's profile.
+for (const [tab, title] of [
+  ["resolues", "Combien de participants à la JPO de septembre ?"],
+  ["resolues", "Quel campus comptera le plus d'intégrés en Bachelor ?"],
+  ["en-attente", "Combien d'inscrits au webinaire Grande École de septembre ?"],
+]) {
+  test(`/questions/<id> « ${title} » (player) has no serious or critical accessibility violation`, async ({ page }) => {
+    await signIn(page, ACCOUNTS.julien);
+    await page.goto(`/questions?onglet=${tab}`);
+    // A full load, as for the other pages: after a client navigation, Next streams the <title> later.
+    await page.goto((await page.getByRole("link", { name: title }).getAttribute("href"))!);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+    expect(await blockingViolations(page)).toEqual([]);
+  });
+}
+
+test("/joueurs/<id> (player) has no serious or critical accessibility violation", async ({ page }) => {
+  await signIn(page, ACCOUNTS.julien);
+  await page.goto("/classement");
+  await page.goto((await page.getByRole("link", { name: "Sarah", exact: true }).getAttribute("href"))!);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sarah");
+  await expect(page).toHaveTitle(/Joueur/);
   expect(await blockingViolations(page)).toEqual([]);
 });
 

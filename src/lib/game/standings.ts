@@ -105,6 +105,21 @@ export function computeStandings({ questions, predictions, players }: StandingsI
   );
 }
 
+/**
+ * Accounts that belong to the standings of a season (decision of 30/09/2026): those created before
+ * its end, and those with a prediction in it. A colleague who arrives after a season does not show
+ * in it, nor in its palmarès; one who arrives during it does, even at 0. The last season, which has
+ * no end (§5.1), keeps every account. `computeStandings` then leaves out the disabled accounts
+ * without predictions.
+ */
+export function seasonPlayers<P extends { id: string; createdAt: Date }>(
+  players: readonly P[],
+  end: Date | null,
+  participants: ReadonlySet<string>,
+): P[] {
+  return players.filter(({ id, createdAt }) => end === null || createdAt < end || participants.has(id));
+}
+
 /** The latest result: highest `resolvedAt`, then highest id. */
 function latestResolved(questions: readonly StandingsQuestion[]): StandingsQuestion {
   return questions.reduce((latest, question) => {

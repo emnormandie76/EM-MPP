@@ -12,13 +12,15 @@ export const QUESTION_STATUS_LABELS: Record<QuestionStatus, string> = {
   cancelled: "Annulée",
 };
 
+// Outlined chips have a white background: on the page background, `up` only reaches 4.3:1 and
+// `warn` 4.5:1 (axe, step 7); on white, both pass.
 const TONES: Record<QuestionStatus, string> = {
-  draft: "border-line-strong text-ink-2",
-  scheduled: "border-accent-text text-accent-text",
+  draft: "border-line-strong bg-surface text-ink-2",
+  scheduled: "border-accent-text bg-surface text-accent-text",
   open: "border-accent bg-accent text-accent-ink",
-  closed: "border-warn text-warn",
-  resolved: "border-up text-up",
-  cancelled: "border-line text-muted",
+  closed: "border-warn bg-surface text-warn",
+  resolved: "border-up bg-surface text-up",
+  cancelled: "border-line bg-surface text-muted",
 };
 
 export function QuestionStatusChip({ status }: { status: QuestionStatus }) {

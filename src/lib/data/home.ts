@@ -3,10 +3,11 @@ import type { Viewer } from "@/lib/auth/session";
 import type { Database } from "@/lib/db/client";
 import { type AnnouncementView, getAnnouncements, getCurrentSeason } from "./content";
 import { getJokersLeft, getOpenQuestionsForViewer, type PlayerQuestion } from "./questions";
+import { getLatestResult, type LatestResult } from "./results";
 import { getStandings, type Standings, type StandingView } from "./standings";
 
 // Home page (architecture §7.4, §8.3): announcements, welcome and progress, rank, points and
-// jokers, the next closings and the top of the standings. The latest result arrives in step 7.
+// jokers, the next closings, the top of the standings and the latest result.
 
 type PlayerViewer = Pick<Viewer, "id" | "role" | "lastSeenAt" | "previousVisitAt">;
 
@@ -29,6 +30,8 @@ export type HomeData = {
   };
   /** Jokers left in the current season (§5.4). */
   jokersLeft: number;
+  /** The latest resolved question, or null before the first result. */
+  latestResult: LatestResult | null;
 };
 
 export async function getHomeData(db: Database, viewer: PlayerViewer, now: Date): Promise<HomeData> {
@@ -45,5 +48,6 @@ export async function getHomeData(db: Database, viewer: PlayerViewer, now: Date)
     closingSoon: open.slice(0, HOME_CLOSINGS),
     standings: { ...standings, top, me, mine: me && !top.includes(me) ? me : null },
     jokersLeft: await getJokersLeft(db, viewer, current?.id ?? null),
+    latestResult: await getLatestResult(db, viewer, now),
   };
 }

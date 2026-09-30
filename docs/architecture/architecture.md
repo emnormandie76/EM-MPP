@@ -2,7 +2,7 @@
 
 > **Version 1.1 du 30/09/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
-> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3).
+> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6).
 > - Règles fonctionnelles : [cahier des charges v1.1](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
@@ -490,7 +490,7 @@ Contraintes : `UNIQUE (question_id, user_id)` ; `CHECK ((value_number IS NULL) <
 | `bullseyes` | integer | nombre de « Dans le mille » |
 | `mean_error` | numeric(18,6) | nullable ; (18,6) et non (10,6) : un écart supérieur à 9 999 (faute de frappe) ferait échouer la proclamation (décision du 30/09/2026) |
 | `questions_played` | integer | |
-| `name_snapshot` | text | nom affiché au moment de la proclamation |
+| `name_snapshot` | text | nom affiché au moment de la proclamation ; remplacé par le nom anonymisé si le compte est anonymisé ensuite (§6.3, décision du 30/09/2026) |
 
 Clé primaire `(season_id, user_id)`.
 
@@ -717,7 +717,7 @@ La page règlement affiche ces mêmes constantes : règlement et calcul ne peuve
 
 `computeStandings({ questions, predictions, players })`, où `questions` sont les questions **publiées, résolues et non annulées** de la saison.
 
-- **Joueurs listés** : tous les comptes non désactivés, plus les comptes désactivés ayant au moins un prono dans la saison (marqués `inactive`, affichés avec « (inactif) »). Les comptes anonymisés gardent leur nom anonymisé.
+- **Joueurs listés** : tous les comptes non désactivés, plus les comptes désactivés ayant au moins un prono dans la saison (marqués `inactive`, affichés avec « (inactif) »). Les comptes anonymisés gardent leur nom anonymisé. **Seulement les comptes créés avant la fin de la saison** (le début de la suivante ; la dernière saison n'a pas de fin), plus ceux qui y ont un prono : un collègue arrivé après une saison n'apparaît ni dans son classement recalculé ni dans son palmarès, même si la proclamation a lieu après son arrivée ; un joueur arrivé en cours de saison y figure, même à 0 (décision du 30/09/2026, fonction `seasonPlayers`).
 - **Par joueur** :
   - `points` : somme des totaux ;
   - `bullseyes` : nombre de « Dans le mille » ;
@@ -798,7 +798,8 @@ Sortie : `{ key, count, lastEarnedAt }[]`. Le profil affiche les 6 badges : obte
 - `opens_at` et `closes_at` renseignés, `opens_at < closes_at`, `closes_at > now` ;
 - `expected_result_at ≥ closes_at` s'il est renseigné ;
 - coefficient ∈ {1, 2, 3} ;
-- règles de type ci-dessus.
+- règles de type ci-dessus ;
+- la saison de la clôture n'est pas proclamée (décision du 30/09/2026) : « Cette date de clôture tombe dans une saison déjà proclamée : crée d'abord la saison suivante dans Saisons et lots. » Le même refus s'applique aux dates en série et au changement de clôture d'une question publiée. Un brouillon, lui, peut clôturer dans une saison proclamée (il suit sa date) ; il sera publiable une fois la saison suivante créée.
 
 Une question publiée avec `opens_at` dans le futur est « programmée » : l'admin peut préparer la campagne d'octobre à l'avance.
 
@@ -836,6 +837,8 @@ Pour changer un champ verrouillé, l'admin annule la question et en crée une no
 - **Effet**, en une transaction : calcul du classement (§5.6), puis insertion dans `season_standing` (rang, points, « Dans le mille », écart moyen, questions jouées, nom affiché à cet instant), puis `proclaimed_at = now`.
 - **Irréversible** : aucune action d'annulation. Une correction de résultat ultérieure ne modifie pas le palmarès.
 - Le palmarès (`/palmares`) lit uniquement `season_standing`, jamais un recalcul.
+- **Mise en œuvre** (É7) : `proclaimSeason(db, admin, { seasonId }, now)` verrouille la table `season` (comme les autres services de saisons, §5.13), puis les questions publiées de la saison (`FOR SHARE`), vérifie les conditions (`proclamationBlocker`, qui donne aussi la raison affichée sous le bouton) et calcule le classement avec `computeStandings`, comme `/classement`. Codes de refus : `ALREADY_PROCLAIMED`, `NOT_PROCLAIMABLE`.
+- **Saison proclamée** (décision du 30/09/2026) : aucune question ne peut plus y être publiée ni y déplacer sa clôture (§5.11). Proclamer la dernière saison créée avant d'avoir créé la suivante bloque donc la publication des questions qui clôturent après son début ; la confirmation le rappelle.
 
 ### 5.13 Saisons : règles du back-office (v1.1)
 
@@ -928,6 +931,7 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
   - `email = anonyme-<id>@invalid.local` ;
   - avatar par défaut, compte désactivé ;
   - adresse retirée de la liste blanche ;
+  - le nom est aussi remplacé dans le palmarès (`season_standing.name_snapshot`) ; rangs et points restent figés (décision du 30/09/2026) ;
   - les pronos sont conservés, pour que le classement des autres reste juste.
 - **Liste blanche** :
   - ajout en série (une adresse par ligne ; virgules et points-virgules acceptés) ;
@@ -1023,9 +1027,11 @@ type Result<T = void> =
 |---|---|
 | `home.ts` | `getHomeData` : annonces (3 dernières), bienvenue, progression, rang, points, jokers restants, 5 prochaines clôtures, top 6 + ma ligne, dernier résultat |
 | `questions.ts` | `getOpenQuestionsForViewer`, `getQuestionsList(tab)`, `getQuestionDetail`, `getQuestionPredictionsForViewer` |
-| `standings.ts` | `getStandings(seasonLabel?)`, `getAvailableSeasons` |
-| `players.ts` | `getPlayerProfile`, `getAllowedEmails`, `getAccounts` |
-| `admin.ts` | `getAdminDashboard`, `getAdminQuestion`, `getAdminQuestionsList(filters)`, `getSeasonsAdmin`, `hasSeasons` (formulaire de question, §5.13) |
+| `results.ts` (É7) | `getQuestionResults` (après la clôture : pronos de tous, sagesse de la foule, points une fois résolue, badges gagnés sur la question ; passe par `getQuestionPredictionsForViewer`), `getLatestResult` (accueil) |
+| `badges.ts` (É7) | `getPlayerResults` (pronos d'un joueur sur les questions résolues, avec leurs points), `getPlayerBadges`, `getBadgesOnQuestion` |
+| `standings.ts` | `getStandings({ seasonId? })`, `getAvailableSeasons` |
+| `players.ts` | `getPlayerProfile({ userId, seasonId? })`, `getAllowedEmails`, `getAccounts` |
+| `admin.ts` | `getAdminDashboard`, `getAdminQuestion`, `getAdminQuestionsList(filters)`, `getSeasonsAdmin` (avec la raison de ne pas proclamer), `hasSeasons` (formulaire de question, §5.13) |
 | `content.ts` | `getAnnouncements`, `getPrizes(seasonId)`, `getPalmares`, `getCurrentSeason` (pied de page, `/lots`) |
 
 ---
@@ -1218,12 +1224,14 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 - Sélecteur de saison, StandingsTable complète.
 - Note : « Départage : nombre de Dans le mille, puis écart moyen le plus faible. »
 - EmptyState « Le classement démarre au premier résultat. »
+- Précisions de l'É7 : la saison choisie passe dans l'adresse (`?saison=<id>`, une saison inconnue donne la saison par défaut) ; le nom d'un joueur mène à son profil sur la même saison ; pour une saison proclamée, un lien renvoie au palmarès (le classement reste recalculé, le palmarès figé).
 
 **`/joueurs/[id]` Profil public**
 - En-tête : avatar de 64 px, nom, rang et points de la saison affichée.
 - Tuiles : écart moyen, « Dans le mille », pronos joués.
 - BadgeList (les 6 badges).
 - Historique des questions résolues : question, prono, réel, écart, points, joker.
+- Précisions de l'É7 : la saison affichée est la saison par défaut (§5.6) ou celle de `?saison=<id>`, avec le même sélecteur que `/classement` ; tuiles et historique portent sur cette saison, les badges sur toutes les saisons. Un compte désactivé ou anonymisé garde son profil, marqué « (inactif) ».
 
 **`/profil` Mon compte**
 - Nom affiché.
@@ -1370,17 +1378,18 @@ Modes : `dev` (branche Neon `dev`) et `e2e` (PGlite). Le script **efface toutes 
 
 Toutes les dates sont relatives à `now`, pour que le jeu reste cohérent quel que soit le jour. Les questions passées de la saison courante doivent clôturer après son début : les écarts passés sont exacts (« il y a 3 jours ») sauf juste après le 1er octobre, où ils sont resserrés (décision du 30/09/2026). Les dates futures (« dans 6 jours ») sont toujours exactes, puisque la saison courante n'a pas de fin (v1.1).
 
-Saisons (v1.1) : le seed crée lui-même deux saisons, la précédente et la courante, qui commencent le 1er octobre (la courante est celle qui contient `now`) et portent les noms `AAAA-AAAA`. Il ne crée pas la saison suivante : la saison courante n'a pas de fin, comme en production tant que l'admin n'a pas créé la suivante.
+Saisons (v1.1) : le seed crée lui-même trois saisons, l'ancienne, la précédente et la courante, qui commencent le 1er octobre (la courante est celle qui contient `now`) et portent les noms `AAAA-AAAA`. Il ne crée pas la saison suivante : la saison courante n'a pas de fin, comme en production tant que l'admin n'a pas créé la suivante. L'ancienne saison, résolue mais pas proclamée, sert à essayer la proclamation (`e2e/results.spec.ts`, et l'utilisateur sur `dev`) ; ajoutée à l'É7 (décision du 30/09/2026).
 
 | Élément | Contenu |
 |---|---|
 | Comptes (mot de passe `Test-1234!`) | `admin@example.test` (admin, nom « Admin »), `joueur1@` à `joueur8@example.test` (joueurs : Sarah, Julien, Inès, Camille, Thomas, Mehdi, Léa, Hugo), `desactive@example.test` (désactivé) |
 | Liste blanche sans compte | `nouveau1@example.test` (test d'inscription). `nouveau2@example.test` n'y est pas : l'admin l'ajoute dans `e2e/auth.spec.ts` (décision du 30/09/2026) |
 | Catégories | JPO, Candidatures, Intégration, Archivée (archivée) |
+| Saison ancienne (É7) | pas proclamée, prête à l'être : 1 question résolue (JPO, valeur réelle 180) et 4 pronos |
 | Saison précédente | proclamée, avec 2 questions résolues et un `season_standing` (palmarès) |
 | Saison courante : programmée | 1 question (ouverture à +2 j) |
 | Saison courante : ouvertes | 4 questions : nombre (clôture +1 j, urgente), Juste Prix (+3 j), choix à 3 réponses (+5 j), oui/non (+6 j). Pronos variés : enregistrés, validés, avec joker. Un autre joueur a la valeur témoin `987654` sur la première. |
-| Saison courante : clôturée | 1 question sans résultat, avec des pronos |
+| Saison courante : clôturées | 2 questions sans résultat, avec des pronos : « Studyrama » (résolue par `e2e/admin-questions.spec.ts`) et « webinaire » (aucun test ne la résout, É7) |
 | Saison courante : résolues | 3 questions : un nombre qui reproduit les vecteurs P1 (podium avec ex æquo), un Juste Prix qui reproduit J3, un choix ; résolues à des dates différentes, pour tester les flèches |
 | Saison courante : autres | 1 question annulée avec un joker posé, 1 brouillon |
 | Annonces | 2 |

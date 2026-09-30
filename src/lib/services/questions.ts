@@ -73,11 +73,15 @@ export function editRules(status: QuestionStatus, predictionCount: number): Edit
   return { content: null, other: null, opensAt: null, closesAt: null, closesLaterOnly: false };
 }
 
-/** Why a question cannot be published (§5.11), or an empty list. */
+/**
+ * Why a question cannot be published (§5.11), or an empty list. `proclaimedSeasonIds`: a question
+ * that would close in a proclaimed season would never count (decision of 30/09/2026).
+ */
 export function publicationProblems(
   row: Pick<QuestionRow, "type" | "opensAt" | "closesAt" | "expectedResultAt" | "coefficient" | "seasonId">,
   optionLabels: readonly string[],
   now: Date,
+  proclaimedSeasonIds: ReadonlySet<number> = new Set(),
 ): string[] {
   const problems: string[] = [];
   if (!row.opensAt) problems.push("Il manque la date d'ouverture.");
@@ -85,6 +89,7 @@ export function publicationProblems(
   if (row.opensAt && row.closesAt && row.opensAt >= row.closesAt) problems.push(QUESTION_MESSAGES.closesBeforeOpens);
   if (row.closesAt && row.closesAt <= now) problems.push("La clôture est déjà passée.");
   if (row.closesAt && row.seasonId === null) problems.push(ERROR_MESSAGES.NO_SEASON);
+  if (row.seasonId !== null && proclaimedSeasonIds.has(row.seasonId)) problems.push(ERROR_MESSAGES.CLOSING_IN_PROCLAIMED_SEASON);
   if (row.closesAt && row.expectedResultAt && row.expectedResultAt < row.closesAt) {
     problems.push(QUESTION_MESSAGES.resultBeforeCloses);
   }
@@ -137,6 +142,11 @@ async function replaceOptions(db: Database, questionId: number, labels: readonly
   if (labels.length > 0) {
     await db.insert(questionOption).values(labels.map((label, index) => ({ questionId, label, position: index + 1 })));
   }
+}
+
+/** Seasons whose final standings are proclaimed: no question may enter them any more. */
+function proclaimedIds(seasons: readonly { id: number; proclaimedAt: Date | null }[]): Set<number> {
+  return new Set(seasons.filter(({ proclaimedAt }) => proclaimedAt !== null).map(({ id }) => id));
 }
 
 const MINUTE_MS = 60_000;
@@ -309,6 +319,7 @@ export async function updateQuestion(
       if (!next.closesAt) errors.closesAt = "Une question publiée garde sa date de clôture.";
       else if (closesChanged && next.closesAt <= now) errors.closesAt ??= QUESTION_MESSAGES.closesInPast;
       else if (seasonId === null) errors.closesAt ??= ERROR_MESSAGES.NO_SEASON;
+      else if (closesChanged && proclaimedIds(seasons).has(seasonId)) errors.closesAt ??= ERROR_MESSAGES.CLOSING_IN_PROCLAIMED_SEASON;
     }
     if (Object.keys(errors).length > 0) return fail("INVALID_INPUT", undefined, errors);
 
@@ -357,6 +368,8 @@ export async function publishQuestions(
   const ids = parsed.data.questionIds;
 
   return db.transaction(async (tx) => {
+    // The seasons before the questions (lock order of services/seasons.ts): no proclamation meanwhile.
+    const proclaimed = proclaimedIds(await seasonsForQuestions(tx));
     const rows = await lockSelection(tx, ids);
     const report: BatchReport = { succeeded: [], unchanged: [], failed: [] };
     for (const id of ids) {
@@ -375,7 +388,7 @@ export async function publishQuestions(
         continue;
       }
       const labels = (await optionsOf(tx, id)).map(({ label }) => label);
-      const problems = publicationProblems(row, labels, now);
+      const problems = publicationProblems(row, labels, now, proclaimed);
       if (problems.length > 0) {
         report.failed.push({ ...ref, reasons: problems });
         continue;
@@ -419,7 +432,9 @@ export async function setQuestionDates(
   if (!opensAt || !closesAt || Object.keys(errors).length > 0) return fail("INVALID_INPUT", undefined, errors);
 
   return db.transaction(async (tx) => {
-    const seasonId = seasonAt(await seasonsForQuestions(tx), closesAt)?.id ?? null;
+    const seasons = await seasonsForQuestions(tx);
+    const seasonId = seasonAt(seasons, closesAt)?.id ?? null;
+    const inProclaimedSeason = seasonId !== null && proclaimedIds(seasons).has(seasonId);
     const rows = await lockSelection(tx, ids);
     const predictions = await predictionCounts(tx, ids);
     const report: BatchReport = { succeeded: [], unchanged: [], failed: [] };
@@ -438,6 +453,7 @@ export async function setQuestionDates(
       else if ((predictions.get(id) ?? 0) > 0) reason = "Des pronos existent : change ses dates depuis la page de la question.";
       else if (expected && expected < closesAt) reason = "Sa date de résultat prévue est avant la nouvelle clôture.";
       else if (row.status === "published" && seasonId === null) reason = ERROR_MESSAGES.NO_SEASON;
+      else if (row.status === "published" && inProclaimedSeason) reason = ERROR_MESSAGES.CLOSING_IN_PROCLAIMED_SEASON;
       if (reason) {
         report.failed.push({ ...ref, reasons: [reason] });
         continue;

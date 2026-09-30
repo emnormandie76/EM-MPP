@@ -41,6 +41,11 @@ export const ERROR_MESSAGES = {
   SEASON_ORDER: "La date de début doit rester entre celle de la saison précédente et celle de la suivante.",
   SEASON_CHANGE_REFUSED: "Des questions changeraient de saison alors qu'elles ne le peuvent plus.",
   SEASON_HAS_QUESTIONS: "Des questions sont rattachées à cette saison : elle ne peut pas être supprimée.",
+  // Proclamation (§5.12, step 7).
+  ALREADY_PROCLAIMED: "Le classement final de cette saison est déjà proclamé.",
+  NOT_PROCLAIMABLE: "Toutes les questions publiées de la saison doivent être résolues avant la proclamation.",
+  CLOSING_IN_PROCLAIMED_SEASON:
+    "Cette date de clôture tombe dans une saison déjà proclamée : crée d'abord la saison suivante dans Saisons et lots.",
   // Predictions (§5.4, step 6).
   QUESTION_NOT_OPEN: "Cette question n'est pas ouverte aux pronos.",
   ALREADY_VALIDATED: "Ton prono est validé : il ne peut plus être modifié.",

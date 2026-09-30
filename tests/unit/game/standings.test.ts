@@ -4,6 +4,7 @@ import {
   defaultSeason,
   rankStandings,
   type SeasonSummary,
+  seasonPlayers,
   type StandingsInput,
   type StandingsPlayer,
   type StandingsPrediction,
@@ -245,6 +246,30 @@ describe("withMovement: arrows since the previous result", () => {
       players: [...players, player("X", "Xavier", true)],
     });
     expect(rows.find(({ userId }) => userId === "X")).toMatchObject({ rank: 2, delta: 2, inactive: true });
+  });
+});
+
+describe("seasonPlayers: accounts of a season (decision of 30/09/2026)", () => {
+  const end = seasonStartFromLocalDate("2027-10-01");
+  const account = (id: string, createdAt: string) => ({ id, createdAt: new Date(createdAt) });
+  const accounts = [
+    account("before", "2026-09-01T10:00:00Z"),
+    account("during", "2027-03-01T10:00:00Z"),
+    account("at-the-end", end.toISOString()),
+    account("after", "2027-11-01T10:00:00Z"),
+    account("after-but-played", "2027-11-01T10:00:00Z"),
+  ];
+
+  it("keeps the accounts created before the end of the season, and those with a prediction in it", () => {
+    expect(seasonPlayers(accounts, end, new Set(["after-but-played"])).map(({ id }) => id)).toEqual([
+      "before",
+      "during",
+      "after-but-played",
+    ]);
+  });
+
+  it("keeps every account for the last season, which has no end", () => {
+    expect(seasonPlayers(accounts, null, new Set())).toEqual(accounts);
   });
 });
 

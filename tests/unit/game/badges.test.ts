@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { BADGES, type BadgeInput, type BadgeKey, type BadgeResult, computeBadges } from "@/lib/game/badges";
+import { BADGES, type BadgeInput, type BadgeKey, type BadgeResult, badgeName, badgesOnQuestion, computeBadges } from "@/lib/game/badges";
 
 const at = (day: number) => new Date(Date.UTC(2026, 10, day, 10));
 
+let nextQuestionId = 100;
+
 function result(overrides: Partial<BadgeResult> = {}): BadgeResult {
   return {
+    questionId: (nextQuestionId += 1),
     seasonId: 1,
     questionType: "number",
     resolvedAt: at(1),
@@ -38,6 +41,13 @@ describe("computeBadges", () => {
       "Assidu",
       "Champion",
     ]);
+  });
+});
+
+describe("badgeName", () => {
+  it("gives the name of each badge", () => {
+    expect(badgeName("sharpshooter")).toBe("Tireur d'élite");
+    expect(BADGES.every(({ key, name }) => badgeName(key) === name)).toBe(true);
   });
 });
 
@@ -153,5 +163,58 @@ describe("champion", () => {
       ],
     });
     expect(champion.count).toBe(0);
+  });
+});
+
+describe("badgesOnQuestion (ResultPanel, §8.2)", () => {
+  it("gives the first Dans le mille to the earliest one only, ties broken by question", () => {
+    const first = result({ questionId: 1, bullseye: true, resolvedAt: at(3) });
+    const tied = result({ questionId: 2, bullseye: true, resolvedAt: at(3) });
+    // In another season, so that it is not a third Dans le mille (Nostradamus).
+    const later = result({ questionId: 3, seasonId: 2, bullseye: true, resolvedAt: at(9) });
+    const results = [later, tied, first];
+    expect(badgesOnQuestion(results, 1)).toEqual(["first_bullseye"]);
+    expect(badgesOnQuestion(results, 2)).toEqual([]);
+    expect(badgesOnQuestion(results, 3)).toEqual([]);
+    // The same date as computeBadges.
+    expect(computeBadges({ results, predictedQuestionIds: [], proclaimedSeasons: [] })[0].lastEarnedAt).toEqual(at(3));
+  });
+
+  it("gives Nostradamus to the third Dans le mille of a season", () => {
+    const results = [
+      result({ questionId: 1, seasonId: 1, bullseye: true, resolvedAt: at(1) }),
+      result({ questionId: 2, seasonId: 2, bullseye: true, resolvedAt: at(2) }),
+      result({ questionId: 3, seasonId: 1, bullseye: true, resolvedAt: at(3) }),
+      result({ questionId: 4, seasonId: 1, bullseye: true, resolvedAt: at(4) }),
+      result({ questionId: 5, seasonId: 1, bullseye: true, resolvedAt: at(5) }),
+    ];
+    expect(badgesOnQuestion(results, 3)).toEqual([]);
+    expect(badgesOnQuestion(results, 4)).toEqual(["nostradamus"]);
+    expect(badgesOnQuestion(results, 5)).toEqual([]);
+  });
+
+  it("gives Tireur d'élite and Joker gagnant on the question itself", () => {
+    const results = [
+      result({ questionId: 1, podiumRank: 1, joker: true }),
+      result({ questionId: 2, questionType: "choice", correctChoice: true, joker: true }),
+      result({ questionId: 3, podiumRank: 2 }),
+    ];
+    expect(badgesOnQuestion(results, 1)).toEqual(["sharpshooter", "joker_win"]);
+    expect(badgesOnQuestion(results, 2)).toEqual(["joker_win"]);
+    expect(badgesOnQuestion(results, 3)).toEqual([]);
+  });
+
+  it("gives nothing on a question the player did not play", () => {
+    expect(badgesOnQuestion([result({ questionId: 1, bullseye: true, podiumRank: 1 })], 99)).toEqual([]);
+  });
+
+  it("lists the badges in the display order", () => {
+    const results = [
+      result({ questionId: 1, seasonId: 1, bullseye: true, resolvedAt: at(1) }),
+      result({ questionId: 2, seasonId: 1, bullseye: true, resolvedAt: at(2) }),
+      result({ questionId: 3, seasonId: 1, bullseye: true, resolvedAt: at(3), podiumRank: 1, joker: true }),
+    ];
+    expect(badgesOnQuestion(results, 3)).toEqual(["nostradamus", "sharpshooter", "joker_win"]);
+    expect(badgesOnQuestion(results, 1)).toEqual(["first_bullseye"]);
   });
 });

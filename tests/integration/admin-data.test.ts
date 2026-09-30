@@ -163,6 +163,7 @@ describe("getSeasonsAdmin", () => {
         questionsResolved: 0,
         questionsAttached: 1,
         prizes: [],
+        proclamationBlocker: "Aucune question n'a été publiée dans cette saison.",
       },
       {
         id: previous.id,
@@ -175,6 +176,7 @@ describe("getSeasonsAdmin", () => {
         questionsResolved: 1,
         questionsAttached: 3,
         prizes: [expect.objectContaining({ rankLabel: "1er", description: "Un mug" })],
+        proclamationBlocker: "Le classement final de cette saison est déjà proclamé.",
       },
     ]);
     expect(view.current?.id).toBe(current.id);

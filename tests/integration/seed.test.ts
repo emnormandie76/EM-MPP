@@ -56,9 +56,9 @@ describe("seed (scripts/seed.ts)", () => {
       users: 10,
       allowedEmails: 10,
       categories: 4,
-      seasons: { previous: "2025-2026", current: "2026-2027" },
-      questions: 13,
-      predictions: 48,
+      seasons: { older: "2024-2025", previous: "2025-2026", current: "2026-2027" },
+      questions: 15,
+      predictions: 58,
       announcements: 2,
       prizes: 3,
       standings: 9,
@@ -87,7 +87,7 @@ describe("seed (scripts/seed.ts)", () => {
 
     expect(await db.select().from(announcement)).toHaveLength(2);
     expect(await db.select().from(prize)).toHaveLength(3);
-    expect(await db.select().from(prediction)).toHaveLength(48);
+    expect(await db.select().from(prediction)).toHaveLength(58);
     expect((await db.select().from(predictionEvent)).length).toBe(summary.events);
   });
 
@@ -98,8 +98,8 @@ describe("seed (scripts/seed.ts)", () => {
       draft: 1,
       scheduled: 1,
       open: 4,
-      closed: 1,
-      resolved: 5,
+      closed: 2,
+      resolved: 6,
       cancelled: 1,
     });
   });
@@ -111,10 +111,11 @@ describe("seed (scripts/seed.ts)", () => {
 
     const seasons = await db.select().from(season).orderBy(season.startsAt);
     expect(seasons.map(({ label, startsAt, proclaimedAt }) => [label, startsAt, proclaimedAt !== null])).toEqual([
+      ["2024-2025", seasonStartFromLocalDate("2024-10-01"), false],
       ["2025-2026", seasonStartFromLocalDate("2025-10-01"), true],
       ["2026-2027", seasonStartFromLocalDate("2026-10-01"), false],
     ]);
-    const previousQuestions = await db.select().from(question).where(eq(question.seasonId, seasons[0].id));
+    const previousQuestions = await db.select().from(question).where(eq(question.seasonId, seasons[1].id));
     expect(previousQuestions).toHaveLength(2);
     expect(previousQuestions.every(({ resolvedAt }) => resolvedAt !== null)).toBe(true);
 
@@ -129,6 +130,34 @@ describe("seed (scripts/seed.ts)", () => {
       { name: "Julien", rank: 3, points: 50 + 50 },
     ]);
     expect(palmares.map(({ name }) => name)).not.toContain("Nora");
+  });
+
+  it("leaves the older season resolved but not proclaimed, ready for the proclamation (§5.12)", async () => {
+    target = await migratedDb();
+    const { db } = target;
+    await seedDatabase(db, { now: MID_SEASON, env: {} });
+
+    const [older] = await db.select().from(season).where(eq(season.label, "2024-2025"));
+    expect(older.proclaimedAt).toBeNull();
+    const questions = await db.select().from(question).where(eq(question.seasonId, older.id));
+    expect(questions.map(({ status, resolvedAt }) => [status, resolvedAt !== null])).toEqual([["published", true]]);
+    expect(await db.select().from(prediction).where(eq(prediction.questionId, questions[0].id))).toHaveLength(4);
+    expect(await db.select().from(seasonStanding).where(eq(seasonStanding.seasonId, older.id))).toHaveLength(0);
+  });
+
+  it("keeps a second closed question without result, with predictions (§9.6)", async () => {
+    target = await migratedDb();
+    const { db } = target;
+    await seedDatabase(db, { now: MID_SEASON, env: {} });
+
+    const closed = (await db.select().from(question)).filter((row) => questionStatus(row, MID_SEASON) === "closed");
+    expect(closed.map(({ title }) => title).sort()).toEqual([
+      "Combien d'inscrits au webinaire Grande École de septembre ?",
+      "Combien de visiteurs sur le stand du salon Studyrama ?",
+    ]);
+    for (const row of closed) {
+      expect((await db.select().from(prediction).where(eq(prediction.questionId, row.id))).length).toBeGreaterThan(0);
+    }
   });
 
   it("puts the witness value on the open question closing first, from another player than the admin", async () => {
@@ -208,7 +237,7 @@ describe("seed (scripts/seed.ts)", () => {
     expect(again.users).toBe(10);
     expect(await db.select().from(user)).toHaveLength(10);
     expect((await db.select({ id: question.id }).from(question)).map(({ id }) => id).sort((a, b) => a - b)).toEqual(
-      Array.from({ length: 13 }, (_, i) => i + 1),
+      Array.from({ length: 15 }, (_, i) => i + 1),
     );
   });
 
@@ -225,18 +254,18 @@ describe("seed (scripts/seed.ts)", () => {
     const summary = await seedDatabase(db, { now, env: {} });
 
     expect(summary.seasons.current).toBe(currentLabel);
-    expect(await statusCounts(target, now)).toEqual({ draft: 1, scheduled: 1, open: 4, closed: 1, resolved: 5, cancelled: 1 });
+    expect(await statusCounts(target, now)).toEqual({ draft: 1, scheduled: 1, open: 4, closed: 2, resolved: 6, cancelled: 1 });
 
-    // Two seasons, the current one containing now and without a next one.
+    // Three seasons, the current one containing now and without a next one.
     const seasons = await db.select().from(season);
-    expect(seasons).toHaveLength(2);
+    expect(seasons).toHaveLength(3);
     const current = seasonAt(seasons, now)!;
     expect(current.label).toBe(currentLabel);
     expect(seasons.every(({ startsAt }) => startsAt <= current.startsAt)).toBe(true);
 
     const questions = await db.select().from(question).where(isNotNull(question.closesAt));
     const currentQuestions = questions.filter(({ seasonId }) => seasonId === current.id);
-    expect(currentQuestions).toHaveLength(10);
+    expect(currentQuestions).toHaveLength(11);
     for (const row of questions) {
       expect(row.seasonId).toBe(seasonAt(seasons, row.closesAt!)?.id);
       if (row.resolvedAt) expect(row.resolvedAt.getTime()).toBeLessThanOrEqual(now.getTime());

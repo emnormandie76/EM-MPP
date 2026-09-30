@@ -13,12 +13,26 @@ type UserInsert = typeof user.$inferInsert;
 type QuestionInsert = typeof question.$inferInsert;
 type PredictionInsert = typeof prediction.$inferInsert;
 
+/**
+ * Accounts are created long before the test seasons by default, so that they belong to every
+ * season's standings whatever the day the tests run (§5.6, decision of 30/09/2026).
+ */
+export const TEST_ACCOUNTS_CREATED_AT = new Date("2020-01-01T00:00:00Z");
+
 export async function createUser(db: Database, overrides: Partial<UserInsert> = {}) {
   const n = next();
   const id = overrides.id ?? `test-user-${n}`;
   const [row] = await db
     .insert(user)
-    .values({ id, name: `Joueur ${n}`, email: `joueur-${n}@example.test`, role: "player", avatar: defaultAvatarFor(id), ...overrides })
+    .values({
+      id,
+      name: `Joueur ${n}`,
+      email: `joueur-${n}@example.test`,
+      role: "player",
+      avatar: defaultAvatarFor(id),
+      createdAt: TEST_ACCOUNTS_CREATED_AT,
+      ...overrides,
+    })
     .returning();
   return row;
 }

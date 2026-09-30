@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, formatDate, formatDateTime, formatNumber, formatRelative, rankSuffix } from "@/lib/format";
+import { formatCount, formatDate, formatDateTime, formatNumber, formatPercent, formatRelative, rankSuffix } from "@/lib/format";
 
 const NARROW_NBSP = " ";
 
@@ -79,6 +79,16 @@ describe("formatCount", () => {
     expect(formatCount(3, "ajoutée")).toBe("3 ajoutées");
     expect(formatCount(2, "déjà présente")).toBe("2 déjà présentes");
     expect(formatCount(2, "œil", "yeux")).toBe("2 yeux");
+  });
+});
+
+describe("formatPercent", () => {
+  it("writes a ratio as a French percentage, with at most one decimal", () => {
+    expect(formatPercent(0.04)).toBe("4 %");
+    expect(formatPercent(0.048)).toBe("4,8 %");
+    expect(formatPercent(0.004)).toBe("0,4 %");
+    expect(formatPercent(0.0104)).toBe("1 %");
+    expect(formatPercent(0)).toBe("0 %");
   });
 });
 

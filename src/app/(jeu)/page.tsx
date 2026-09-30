@@ -1,11 +1,13 @@
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Trophy } from "lucide-react";
 import Link from "next/link";
 import { AnnouncementBar } from "@/components/game/AnnouncementBar";
 import { QuestionCard } from "@/components/game/QuestionCard";
+import { ResultPanel } from "@/components/game/ResultPanel";
 import { SegmentedProgress } from "@/components/game/SegmentedProgress";
 import { StandingsTable } from "@/components/game/StandingsTable";
 import { StatTile } from "@/components/game/StatTile";
 import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireUser } from "@/lib/auth/session";
 import { getHomeData, type HomeData } from "@/lib/data/home";
@@ -56,7 +58,7 @@ function PositionTile({ standings }: { standings: HomeData["standings"] }) {
   );
 }
 
-/** Home page (architecture §8.3), blocks 1 to 3; the latest result arrives in step 7. */
+/** Home page (architecture §8.3): announcements, welcome, next closings, standings and latest result. */
 export default async function HomePage() {
   const viewer = await requireUser();
   const now = new Date();
@@ -134,6 +136,42 @@ export default async function HomePage() {
           </Link>
         </Card>
       </div>
+
+      <LatestResult latest={data.latestResult} />
     </>
+  );
+}
+
+/** Block 4 (§8.3): the latest resolved question, as a compact ResultPanel. */
+function LatestResult({ latest }: { latest: HomeData["latestResult"] }) {
+  return (
+    <section aria-labelledby="dernier-resultat" className="grid gap-2.5 lg:grid-cols-12">
+      <h2 id="dernier-resultat" className={`${SECTION_TITLE} lg:col-span-12`}>
+        Dernier résultat
+      </h2>
+      {latest ? (
+        <Card as="article" aria-labelledby="dernier-resultat-question" className="flex flex-col gap-4 lg:col-span-8">
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip>{latest.question.categoryName}</Chip>
+              <span className="rounded-chip bg-up px-2 py-0.5 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-accent-ink">
+                Résultat
+              </span>
+            </div>
+            <h3 id="dernier-resultat-question" className="font-display text-[28px] leading-[1.05] font-extrabold uppercase">
+              {latest.question.title}
+            </h3>
+          </div>
+          <ResultPanel question={latest.question} results={latest.results} />
+          <Link href={`/questions/${latest.question.id}`} className={`${LINK} self-start`}>
+            Voir les pronos de tous
+          </Link>
+        </Card>
+      ) : (
+        <div className="lg:col-span-8">
+          <EmptyState icon={Trophy}>Premier résultat attendu en novembre.</EmptyState>
+        </div>
+      )}
+    </section>
   );
 }

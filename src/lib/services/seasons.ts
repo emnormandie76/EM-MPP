@@ -1,20 +1,21 @@
 import { and, count, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "@/lib/db/client";
-import { prediction, prize, question, season } from "@/lib/db/schema";
-import { formatDate } from "@/lib/format";
-import { seasonAt } from "@/lib/game/time";
+import { prediction, prize, question, season, seasonStanding, user } from "@/lib/db/schema";
+import { formatCount, formatDate } from "@/lib/format";
+import { computeStandings, seasonPlayers } from "@/lib/game/standings";
+import { seasonAt, seasonEnd } from "@/lib/game/time";
 import { prizesSchema, seasonNameSchema, seasonStartSchema } from "@/lib/validation/content";
 import { isUniqueViolation } from "./db-errors";
-import { type Actor, authorize, fail, type Failure, fieldErrorsOf, isFailure, ok, type Result } from "./result";
+import { type Actor, authorize, ERROR_MESSAGES, fail, type Failure, fieldErrorsOf, isFailure, ok, type Result } from "./result";
 
-// Seasons and prizes (architecture §5.1, §5.13, §7.3). Seasons are created by the admin (v1.1):
-// each one ends where the next one starts, and a question belongs to the season of its closing
-// date. A change of the seasons recomputes the season of the questions in the same transaction.
-// The proclamation arrives in step 7.
+// Seasons, prizes and proclamation (architecture §5.1, §5.12, §5.13, §7.3). Seasons are created by
+// the admin (v1.1): each one ends where the next one starts, and a question belongs to the season
+// of its closing date. A change of the seasons recomputes the season of the questions in the same
+// transaction.
 //
-// Locks: a change of the seasons locks the season table (EXCLUSIVE), then the questions that have
-// a closing date. The question services read the seasons with FOR SHARE before locking their
+// Locks: a change of the seasons (proclamation included) locks the season table (EXCLUSIVE), then
+// the questions. The question services read the seasons with FOR SHARE before locking their
 // question (`seasonsForQuestions`): a question never gets its season from a list being changed,
 // and the locks are always taken in the same order.
 
@@ -276,5 +277,106 @@ export async function upsertPrizes(
         .values(prizes.map((item, index) => ({ seasonId: row.id, ...item, position: index + 1 })));
     }
     return ok({ seasonId: row.id, count: prizes.length });
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Proclamation (§5.12)
+
+export type ProclamationState = {
+  proclaimed: boolean;
+  /** Published questions of the season, cancelled ones excluded. */
+  publishedCount: number;
+  resolvedCount: number;
+};
+
+/** Why the final standings of a season cannot be proclaimed yet (§5.12), or null. */
+export function proclamationBlocker({ proclaimed, publishedCount, resolvedCount }: ProclamationState): string | null {
+  if (proclaimed) return ERROR_MESSAGES.ALREADY_PROCLAIMED;
+  if (publishedCount === 0) return "Aucune question n'a été publiée dans cette saison.";
+  const waiting = publishedCount - resolvedCount;
+  if (waiting > 0) {
+    return `${formatCount(waiting, "question publiée n'a", "questions publiées n'ont")} pas encore de résultat : la proclamation se fait une fois toutes les questions résolues.`;
+  }
+  return null;
+}
+
+/**
+ * Freezes the final standings of a season (§5.12): computed as the standings page does (§5.6),
+ * copied into `season_standing` with the names of the day, then `proclaimed_at = now`. Only once
+ * every published question of the season is resolved. Irreversible: a later correction of a result
+ * does not change the palmarès.
+ */
+export async function proclaimSeason(
+  db: Database,
+  actor: Actor | null,
+  input: unknown,
+  now: Date,
+): Promise<Result<{ seasonId: number; standings: number }>> {
+  const me = authorize(actor, { admin: true });
+  if (isFailure(me)) return me;
+  const parsed = idInput.safeParse(input);
+  if (!parsed.success) return fail("INVALID_INPUT");
+
+  return db.transaction(async (tx) => {
+    const seasons = await lockSeasons(tx);
+    const current = seasons.find(({ id }) => id === parsed.data.seasonId);
+    if (!current) return notFound();
+    const questions = await tx
+      .select({
+        id: question.id,
+        type: question.type,
+        priceIsRight: question.priceIsRight,
+        coefficient: question.coefficient,
+        resultNumber: question.resultNumber,
+        resultOptionId: question.resultOptionId,
+        resolvedAt: question.resolvedAt,
+      })
+      .from(question)
+      .where(and(eq(question.seasonId, current.id), eq(question.status, "published")))
+      .for("share");
+    const resolved = questions.flatMap((q) => (q.resolvedAt ? [{ ...q, resolvedAt: q.resolvedAt }] : []));
+    const blocker = proclamationBlocker({
+      proclaimed: current.proclaimedAt !== null,
+      publishedCount: questions.length,
+      resolvedCount: resolved.length,
+    });
+    if (blocker) return fail(current.proclaimedAt ? "ALREADY_PROCLAIMED" : "NOT_PROCLAIMABLE", blocker);
+
+    const predictions = await tx
+      .select({
+        questionId: prediction.questionId,
+        userId: prediction.userId,
+        valueNumber: prediction.valueNumber,
+        optionId: prediction.optionId,
+        joker: prediction.joker,
+      })
+      .from(prediction)
+      .where(inArray(prediction.questionId, resolved.map(({ id }) => id)));
+    const accounts = await tx.select({ id: user.id, name: user.name, banned: user.banned, createdAt: user.createdAt }).from(user);
+    // As on /classement: the accounts created after the end of the season are not part of it.
+    const players = seasonPlayers(accounts, seasonEnd(seasons, current), new Set(predictions.map(({ userId }) => userId)));
+    const rows = computeStandings({
+      questions: resolved,
+      predictions,
+      players: players.map(({ id, name, banned }) => ({ id, name, banned: banned === true })),
+    });
+
+    if (rows.length > 0) {
+      await tx.insert(seasonStanding).values(
+        rows.map((row) => ({
+          seasonId: current.id,
+          userId: row.userId,
+          rank: row.rank,
+          points: row.points,
+          bullseyes: row.bullseyes,
+          meanError: row.meanError,
+          questionsPlayed: row.questionsPlayed,
+          nameSnapshot: row.name,
+        })),
+      );
+    }
+    await tx.update(season).set({ proclaimedAt: now }).where(eq(season.id, current.id));
+    return ok({ seasonId: current.id, standings: rows.length });
   });
 }

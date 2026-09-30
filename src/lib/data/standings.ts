@@ -4,7 +4,8 @@ import type { Viewer } from "@/lib/auth/session";
 import { type AvatarKey, isAvatarKey } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
 import { prediction, question, season, user } from "@/lib/db/schema";
-import { defaultSeason, type SeasonSummary, type StandingRowWithMovement, withMovement } from "@/lib/game/standings";
+import { defaultSeason, type SeasonSummary, seasonPlayers, type StandingRowWithMovement, withMovement } from "@/lib/game/standings";
+import { seasonEnd } from "@/lib/game/time";
 
 // Season standings (architecture §5.6, §7.4), recomputed on every read from the predictions of the
 // resolved questions, whose values are public. The predictions of the other questions of the
@@ -44,6 +45,17 @@ async function seasonSummaries(db: Database): Promise<Summary[]> {
       resolvedCount: own.filter(({ resolvedAt }) => resolvedAt !== null).length,
     };
   });
+}
+
+/**
+ * Seasons offered by the season picker (§5.6): those with at least one published question, latest
+ * first. The same for every viewer.
+ */
+export async function getAvailableSeasons(db: Database): Promise<SeasonRef[]> {
+  return (await seasonSummaries(db))
+    .filter(({ publishedCount }) => publishedCount > 0)
+    .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
+    .map(({ id, label, startsAt, proclaimed }) => ({ id, label, startsAt, proclaimed }));
 }
 
 /**
@@ -96,11 +108,16 @@ export async function getStandings(
             .where(inArray(prediction.questionId, otherIds))
         ).map((row) => ({ ...row, valueNumber: null, optionId: null, joker: false }));
 
-  const players = await db.select({ id: user.id, name: user.name, banned: user.banned, avatar: user.avatar }).from(user);
+  const predictions = [...scored, ...tookPart];
+  const accounts = await db
+    .select({ id: user.id, name: user.name, banned: user.banned, avatar: user.avatar, createdAt: user.createdAt })
+    .from(user);
+  // Accounts created after the end of the season are not part of it (decision of 30/09/2026).
+  const players = seasonPlayers(accounts, seasonEnd(summaries, chosen), new Set(predictions.map(({ userId }) => userId)));
   const avatars = new Map(players.map(({ id, avatar }) => [id, isAvatarKey(avatar) ? avatar : ("maillot-bleu-uni" as const)]));
   const rows = withMovement({
     questions: resolved,
-    predictions: [...scored, ...tookPart],
+    predictions,
     players: players.map(({ id, name, banned }) => ({ id, name, banned: banned === true })),
   });
   return {

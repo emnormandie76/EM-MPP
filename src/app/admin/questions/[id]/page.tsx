@@ -55,10 +55,14 @@ function formLocks({ rules }: AdminQuestion): QuestionFormLocks {
 
 const localInput = (date: Date | null) => (date ? utcToParisLocalInput(date) : "");
 
-/** Why the question cannot be published for lack of a season (§5.13), or null. */
+/**
+ * Why the question cannot be published for lack of a season (§5.13), or because its season is
+ * already proclaimed (decision of 30/09/2026); null otherwise.
+ */
 function seasonNotice({ question: q, seasonsExist }: AdminQuestion): string | null {
   if (q.status === "cancelled") return null;
   if (!seasonsExist) return NO_SEASON_YET;
+  if (q.status === "draft" && q.seasonProclaimed) return ERROR_MESSAGES.CLOSING_IN_PROCLAIMED_SEASON;
   return q.closesAt && q.seasonLabel === null ? ERROR_MESSAGES.NO_SEASON : null;
 }
 

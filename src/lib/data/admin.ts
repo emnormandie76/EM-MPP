@@ -9,6 +9,7 @@ import { type PredictionState, predictionState } from "@/lib/game/prediction-sta
 import { type QuestionStatus, questionStatus } from "@/lib/game/question-status";
 import { seasonAt, seasonEnd, seasonStartFromLocalDate, suggestedSeasonLabel, utcToParisLocalDate } from "@/lib/game/time";
 import { type EditRules, editRules } from "@/lib/services/questions";
+import { proclamationBlocker } from "@/lib/services/seasons";
 import { type QuestionKind, kindOf } from "@/lib/validation/question";
 import { getPrizes, type PrizeView } from "./content";
 import { getPredictionStates, getQuestionPredictionsForViewer, type PredictionAnswer } from "./questions";
@@ -235,6 +236,8 @@ export type AdminQuestion = {
     computedStatus: QuestionStatus;
     categoryName: string;
     seasonLabel: string | null;
+    /** Its season is proclaimed: it cannot be published there (decision of 30/09/2026). */
+    seasonProclaimed: boolean;
     duplicatedFrom: { id: number; title: string } | null;
   };
   options: { id: number; label: string }[];
@@ -251,7 +254,7 @@ export type AdminQuestion = {
 export async function getAdminQuestion(db: Database, viewer: ViewerRole, questionId: number, now: Date): Promise<AdminQuestion | null> {
   assertAdmin(viewer);
   const [row] = await db
-    .select({ question, categoryName: category.name, seasonLabel: season.label })
+    .select({ question, categoryName: category.name, seasonLabel: season.label, seasonProclaimedAt: season.proclaimedAt })
     .from(question)
     .innerJoin(category, eq(category.id, question.categoryId))
     .leftJoin(season, eq(season.id, question.seasonId))
@@ -304,6 +307,7 @@ export async function getAdminQuestion(db: Database, viewer: ViewerRole, questio
       computedStatus: status,
       categoryName: row.categoryName,
       seasonLabel: row.seasonLabel,
+      seasonProclaimed: row.seasonProclaimedAt !== null,
       duplicatedFrom,
     },
     options,
@@ -436,6 +440,8 @@ export type AdminSeason = {
   /** Every question attached, drafts and cancelled ones included: then the season cannot be deleted. */
   questionsAttached: number;
   prizes: PrizeView[];
+  /** Why the final standings cannot be proclaimed yet (§5.12), or null when they can. */
+  proclamationBlocker: string | null;
 };
 
 export type SeasonsAdmin = {
@@ -474,6 +480,8 @@ export async function getSeasonsAdmin(db: Database, viewer: ViewerRole, now: Dat
   const current = seasonAt(rows, now);
   const seasons: AdminSeason[] = [];
   for (const row of [...rows].sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())) {
+    const questionsTotal = countsOf.get(row.id)?.total ?? 0;
+    const questionsResolved = countsOf.get(row.id)?.resolved ?? 0;
     seasons.push({
       id: row.id,
       label: row.label,
@@ -481,10 +489,15 @@ export async function getSeasonsAdmin(db: Database, viewer: ViewerRole, now: Dat
       endsAt: seasonEnd(rows, row),
       proclaimedAt: row.proclaimedAt,
       isCurrent: row.id === current?.id,
-      questionsTotal: countsOf.get(row.id)?.total ?? 0,
-      questionsResolved: countsOf.get(row.id)?.resolved ?? 0,
+      questionsTotal,
+      questionsResolved,
       questionsAttached: countsOf.get(row.id)?.attached ?? 0,
       prizes: await getPrizes(db, viewer, row.id),
+      proclamationBlocker: proclamationBlocker({
+        proclaimed: row.proclaimedAt !== null,
+        publishedCount: questionsTotal,
+        resolvedCount: questionsResolved,
+      }),
     });
   }
 

@@ -25,9 +25,10 @@ import { seedSeasons } from "./seed-seasons";
 // Development and end-to-end data set (architecture §9.6). It ERASES every row (application and
 // accounts, not app_meta) and inserts the data below, in one transaction.
 //
-// The seed creates its own two seasons (§9.6): the previous one and the current one, starting on
-// 1 October and named "YYYY-YYYY". It does not create the next one: the current season has no end,
-// as in production until the admin creates the next season.
+// The seed creates its own three seasons (§9.6), starting on 1 October and named "YYYY-YYYY": the
+// current one, the previous one (proclaimed, with its palmarès) and an older one, all resolved but
+// not proclaimed, to try the proclamation (decision of 30/09/2026). It does not create the next
+// one: the current season has no end, as in production until the admin creates the next season.
 //
 // Dates are relative to `now`. The past questions of the current season must close after its
 // start: just after 1 October, the past gaps are shrunk to fit, so the data set stays consistent
@@ -77,7 +78,7 @@ export type SeedSummary = {
   users: number;
   allowedEmails: number;
   categories: number;
-  seasons: { previous: string; current: string };
+  seasons: { older: string; previous: string; current: string };
   questions: number;
   predictions: number;
   events: number;
@@ -100,10 +101,11 @@ async function clearDatabase(db: Database): Promise<void> {
 }
 
 function seedCalendar(now: Date) {
-  const { previous, current } = seedSeasons(now);
+  const { older, previous, current } = seedSeasons(now);
   const pastSpan = Math.min(now.getTime() - current.startsAt.getTime(), PAST_SPAN_DAYS * DAY);
   const shift = (ms: number) => new Date(now.getTime() + ms);
   return {
+    older,
     previous,
     current,
     /** Exact offset from now, for dates that do not decide a season. */
@@ -114,6 +116,10 @@ function seedCalendar(now: Date) {
     daysAhead: (days: number) => shift(days * DAY),
     /** `days` after the start of the previous season. */
     previousSeasonDay: (days: number) => new Date(previous.startsAt.getTime() + days * DAY),
+    /** `days` after the start of the older season. */
+    olderSeasonDay: (days: number) => new Date(older.startsAt.getTime() + days * DAY),
+    /** A month before the older season: the accounts belong to every seeded season (§5.6). */
+    accountsCreatedAt: new Date(older.startsAt.getTime() - PAST_SPAN_DAYS * DAY),
   };
 }
 
@@ -158,7 +164,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
   if (refusal) throw new SeedRefusedError(refusal);
 
   const calendar = seedCalendar(now);
-  const { shift, daysAgo, daysAhead, previousSeasonDay } = calendar;
+  const { shift, daysAgo, daysAhead, previousSeasonDay, olderSeasonDay } = calendar;
   const passwordHash = await hashPassword(SEED_PASSWORD);
 
   return db.transaction(async (tx) => {
@@ -175,6 +181,8 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
         banned: "banned" in data ? data.banned : false,
         banReason: "banned" in data ? "A quitté l'équipe" : null,
         avatar: defaultAvatarFor(ids[person]),
+        // The team was there before the seeded seasons: every account belongs to their standings.
+        createdAt: calendar.accountsCreatedAt,
         // Camille last came 2 hours ago: the question opened 1 hour ago is new to her (§5.9).
         lastSeenAt: person === "camille" ? shift(-2 * HOUR) : null,
       })),
@@ -210,7 +218,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
 
     const seasons = await tx
       .insert(season)
-      .values([{ ...calendar.previous, proclaimedAt: previousSeasonDay(150) }, calendar.current])
+      .values([calendar.older, { ...calendar.previous, proclaimedAt: previousSeasonDay(150) }, calendar.current])
       .returning();
     const seasonIdOf = (label: string) => seasons.find((row) => row.label === label)!.id;
     const previousSeasonId = seasonIdOf(calendar.previous.label);
@@ -308,6 +316,29 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
     const playedOn = (closesAt: Date) => new Date(closesAt.getTime() - 6 * DAY);
     const openOpening = shift(-3 * DAY);
     const openPlay = shift(-2 * DAY);
+
+    // Older season: one resolved question and no palmarès, ready to be proclaimed.
+    const oldCloses = olderSeasonDay(70);
+    const old = await addQuestion({
+      category: "JPO",
+      type: "number",
+      title: "Combien de participants à la JPO de décembre ?",
+      unit: "participants",
+      source: "Tableau BI « JPO », feuilles d'émargement de décembre",
+      status: "published",
+      opensAt: weekBefore(oldCloses),
+      closesAt: oldCloses,
+      expectedResultAt: olderSeasonDay(80),
+      result: 180,
+      resolvedAt: olderSeasonDay(80),
+    });
+    // 180 participants: Camille 185 (+20), Sarah 170 (+10), Julien 200 (+5), Thomas 150.
+    await addPredictions(old, playedOn(oldCloses), [
+      { person: "camille", answer: 185, validated: true },
+      { person: "sarah", answer: 170, validated: true },
+      { person: "julien", answer: 200 },
+      { person: "thomas", answer: 150, validated: true },
+    ]);
 
     // Previous season: proclaimed, 2 resolved questions and its palmarès.
     const pr1Closes = previousSeasonDay(27);
@@ -444,6 +475,27 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       { person: "thomas", answer: 300, validated: true },
       { person: "mehdi", answer: 240 },
       { person: "hugo", answer: 262, validated: true },
+    ]);
+    // A second one, left without result by every test: e2e/admin-questions.spec.ts resolves the first.
+    const webinarCloses = daysAgo(1);
+    const webinar = await addQuestion({
+      category: "Candidatures",
+      type: "number",
+      title: "Combien d'inscrits au webinaire Grande École de septembre ?",
+      unit: "inscrits",
+      source: "Plateforme de webinaires, inscrits à la date du direct",
+      status: "published",
+      opensAt: weekBefore(webinarCloses),
+      closesAt: webinarCloses,
+      expectedResultAt: shift(10 * DAY),
+    });
+    await addPredictions(webinar, playedOn(webinarCloses), [
+      { person: "sarah", answer: 140, validated: true },
+      { person: "julien", answer: 120 },
+      { person: "ines", answer: 150, joker: true, validated: true },
+      { person: "thomas", answer: 95, validated: true },
+      { person: "lea", answer: 130 },
+      { person: "admin", answer: 110, validated: true },
     ]);
 
     // Current season, open: closing in 1 day (urgent), 3, 5 and 6 days.
@@ -602,7 +654,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       users: Object.keys(PEOPLE).length,
       allowedEmails: allowed.length,
       categories: categories.length,
-      seasons: { previous: calendar.previous.label, current: calendar.current.label },
+      seasons: { older: calendar.older.label, previous: calendar.previous.label, current: calendar.current.label },
       questions: questionCount,
       predictions: predictionCount,
       events: eventCount,
