@@ -111,7 +111,7 @@ Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tablea
 
 **Versions** : installer les dernières versions stables au moment de l'étape 1, puis les figer via `package-lock.json`. Plusieurs API évoluent d'une version à l'autre (voir section 14) : pour ces points, lire la documentation de la version installée. **Le comportement attendu est celui décrit ici.**
 
-Node.js : version LTS active (au moins 22).
+Node.js : **24 LTS**, la même partout (poste, terminaux des agents, Vercel). Fixée par le fichier `.node-version` (`24`, lu par fnm) et par `"engines": { "node": "24.x" }` dans `package.json` (lu par Vercel).
 
 ### 1.3 Schéma d'ensemble
 
@@ -722,7 +722,7 @@ La page règlement affiche ces mêmes constantes : règlement et calcul ne peuve
 | C5 | une seule question résolue | tous les `delta` valent `null` |
 | C6 | joueur actif sans prono | présent avec 0 point |
 
-**Saison affichée par défaut** (classement et accueil) : la saison qui contient `now`. Si elle n'a encore aucune question résolue et que la précédente n'est pas proclamée, on affiche la précédente. Un sélecteur liste les saisons ayant au moins une question publiée.
+**Saison affichée par défaut** (classement et accueil) : la saison qui contient `now`. Si elle n'a encore aucune question résolue, que la précédente a au moins une question publiée et qu'elle n'est pas proclamée, on affiche la précédente. Un sélecteur liste les saisons ayant au moins une question publiée.
 
 ### 5.7 Sagesse de la foule et graphiques (`crowd.ts`, `chart.ts`)
 
@@ -1389,6 +1389,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 7. `src/lib/format.ts` : `formatNumber`, `formatDateTime`, `formatRelative` (heure de Paris).
 8. `robots.ts`, `not-found.tsx`, `error.tsx` en français.
 9. `.env.example` avec les noms du §3.1.
+10. `.node-version` (`24`) et `"engines": { "node": "24.x" }` dans `package.json` (§1.2).
 
 **Tests à écrire**
 - `tests/unit/format.test.ts` : `formatNumber(2450)` donne « 2 450 » (avec espace fine insécable) ; `formatDateTime(2026-10-21T16:00Z)` donne « mer. 21 oct. à 18 h » ; `formatDateTime(2026-11-15T17:30Z)` donne « dim. 15 nov. à 18 h 30 ».
@@ -1686,8 +1687,8 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 - **Pourquoi** : pour exécuter le projet.
 - **Étapes** :
   1. L'agent lance `node -v`, `npm -v` et `git --version`.
-  2. Si Node.js manque ou si sa version est inférieure à 22, l'utilisateur télécharge l'installeur « LTS » sur https://nodejs.org, l'installe avec les options par défaut, puis redémarre VS Code.
-- **Vérification** : `node -v` affiche une version ≥ 22.
+  2. Si Node.js manque ou si sa version n'est pas une 24, l'utilisateur installe Node 24 LTS (avec fnm : `fnm install 24` puis `fnm default 24` ; sinon l'installeur « LTS » de https://nodejs.org), puis redémarre VS Code.
+- **Vérification** : `node -v` affiche une version 24, dans le terminal de l'utilisateur et dans celui de l'agent.
 
 ### H-02 — Feu vert sur le document d'architecture (avant É1)
 - **Pourquoi** : c'est le contrat de construction.

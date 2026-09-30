@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+/* B5 "Jour de match" design tokens (architecture §8.1). */
+@theme {
+  /* Only B5 colors: Tailwind's default palette is removed on purpose. */
+  --color-*: initial;
+  --color-bg: #edeff3;
+  --color-surface: #ffffff;
+  --color-raised: #f4f5f8;
+  --color-chip: #e6e9ef;
+  --color-line: #d8dce3;
+  --color-line-strong: #b5bcc8;
+  --color-ink: #0b0e13;
+  --color-ink-2: #2f3642;
+  --color-muted: #5b6472;
+  --color-accent: #1f5bff;
+  --color-accent-ink: #ffffff;
+  --color-accent-text: #1a4fe0;
+  --color-accent-soft: rgb(31 91 255 / 0.12);
+  --color-hot: #d2352b;
+  --color-warn: #a15c00;
+  --color-up: #15803d;
+  --color-down: #c8321f;
+  --color-dots: #a3abb8;
+
+  --radius-chip: 4px;
+  --radius-button: 6px;
+  --radius-field: 8px;
+  --radius-card: 10px;
+  --radius-pill: 99px;
+
+  /* 1 280 px page = 1 184 px of content + 2 × 48 px of side padding. */
+  --container-page: 1280px;
+}
+
+/* Fonts are loaded by next/font in src/app/layout.tsx. */
+@theme inline {
+  --font-display: var(--font-barlow-condensed), "Barlow Condensed", system-ui, sans-serif;
+  --font-sans: var(--font-barlow), "Barlow", system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
