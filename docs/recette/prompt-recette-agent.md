@@ -1,6 +1,11 @@
 # Recette par un agent : tester tout le site dans Chrome
 
-> **Pour l'utilisateur.** Ouvre une nouvelle conversation Claude Code dans ce dépôt (contexte vide, Opus 5.5, effort extra high), avec l'extension « Claude in Chrome » installée dans Chrome, puis écris : « Lis `docs/recette/prompt-recette-agent.md` et exécute-le. » L'agent ouvre ses onglets dans ta fenêtre Chrome ; laisse-le faire et accepte les autorisations « Claude in Chrome wants to… » pour `127.0.0.1`. Durée estimée : 2 à 3 heures. Résultat : un rapport dans `docs/recette/`.
+> **Pour l'utilisateur.**
+> 1. Dans Chrome : installe l'extension « Claude in Chrome » et connecte-la à ton compte claude.ai (bouton de connexion de l'extension, pas de commande).
+> 2. Dans VS Code, ouvre une nouvelle conversation Claude Code dans ce dépôt (contexte vide, Opus 5.5, effort extra high). Vérifie avec `/status` (compte claude.ai Pro, Max ou Team) et `/chrome` (extension connectée ; sinon, redémarre Chrome puis « Reconnect extension »).
+> 3. Écris : « @browser Lis `docs/recette/prompt-recette-agent.md` et exécute-le. » (dans VS Code, `@browser` donne à Claude l'accès au navigateur).
+>
+> L'agent ouvre ses onglets dans ta fenêtre Chrome ; laisse-le faire et accepte les autorisations « Claude in Chrome wants to… » pour `127.0.0.1`. Durée estimée : 2 à 3 heures. Résultat : un rapport dans `docs/recette/`.
 
 Tout ce qui suit s'adresse à l'agent.
 
