@@ -11,6 +11,7 @@ import { UnlockButton } from "@/components/admin/UnlockButton";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { requireAdmin } from "@/lib/auth/session";
 import { type AdminQuestion, getAdminQuestion, getQuestionHistory, type HistoryEvent, type HistoryEventType, type TrackingRow } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
@@ -113,7 +114,7 @@ function Tracking({ detail, rows }: { detail: AdminQuestion; rows: TrackingRow[]
           Avant la clôture, seuls les états sont visibles : personne ne voit les valeurs, pas même l&apos;admin.
         </p>
       ) : null}
-      <div className="overflow-x-auto">
+      <TableScroll label="Suivi des joueurs">
         <table className="w-full min-w-140 text-left text-[15px]">
           <caption className="sr-only">Suivi des joueurs</caption>
           <thead>
@@ -165,7 +166,7 @@ function Tracking({ detail, rows }: { detail: AdminQuestion; rows: TrackingRow[]
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </Card>
   );
 }
@@ -191,7 +192,7 @@ function History({ detail, events }: { detail: AdminQuestion; events: HistoryEve
       ) : (
         <>
           {!revealed ? <p className="text-[15px] text-ink-2">Avant la clôture, l&apos;historique ne montre ni les valeurs ni les réponses.</p> : null}
-          <div className="overflow-x-auto">
+          <TableScroll label="Historique des pronos">
             <table className="w-full min-w-140 text-left text-[15px]">
               <caption className="sr-only">Historique des pronos</caption>
               <thead>
@@ -221,7 +222,7 @@ function History({ detail, events }: { detail: AdminQuestion; events: HistoryEve
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </>
       )}
     </Card>
@@ -278,7 +279,12 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
             </>
           ) : null}
         </p>
-        {q.cancelledAt ? <p className="text-[15px] font-semibold text-hot">Annulée le {formatDateTime(q.cancelledAt)}.</p> : null}
+        {q.cancelledAt ? (
+          // White background: `hot` text reaches 4.9:1 on it, but only 4.2:1 on the page background.
+          <p className="self-start rounded-field border border-hot bg-surface px-3 py-1.5 text-[15px] font-semibold text-hot">
+            Annulée le {formatDateTime(q.cancelledAt)}.
+          </p>
+        ) : null}
       </header>
 
       <FormMessage feedback={notice ? { tone: "success", text: NOTICES[notice] } : null} />

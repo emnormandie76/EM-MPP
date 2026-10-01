@@ -403,6 +403,16 @@ export type QuestionDetail = PlayerQuestion & {
  * viewer: draft, scheduled, or cancelled before it opened (404). The admin has the back office for
  * those.
  */
+/**
+ * Whether the page of a question exists for players (§6.6, §8.3), from its row alone: the layout
+ * of /questions/[id] answers 404 before the page streams its loading skeleton (a streamed page
+ * can no longer change its status code). The same for every viewer, admin included.
+ */
+export async function isQuestionVisible(db: Database, questionId: number, now: Date): Promise<boolean> {
+  const [row] = await db.select().from(question).where(eq(question.id, questionId));
+  return row !== undefined && playerStatus(row, now) !== null;
+}
+
 export async function getQuestionDetail(db: Database, viewer: PlayerViewer, questionId: number, now: Date): Promise<QuestionDetail | null> {
   const [row] = await questionRows(db, eq(question.id, questionId));
   if (!row) return null;

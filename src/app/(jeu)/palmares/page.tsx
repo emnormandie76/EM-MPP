@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/avatars/Avatar";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { requireUser } from "@/lib/auth/session";
 import { getPalmares, type PalmaresSeason } from "@/lib/data/content";
 import { getDb } from "@/lib/db/client";
@@ -53,7 +54,7 @@ function FullStandings({ season }: { season: PalmaresSeason }) {
       <summary className="cursor-pointer px-4 py-3 font-display text-lg font-bold uppercase tracking-[0.04em] hover:bg-chip">
         Classement complet ({formatCount(season.rows.length, "joueur")})
       </summary>
-      <div className="overflow-x-auto px-2 pb-2">
+      <TableScroll label={`Classement final de la saison ${season.label}`} className="px-2 pb-2">
         <table className="w-full min-w-120 text-left text-[15px]">
           <caption className="sr-only">Classement final de la saison {season.label}</caption>
           <thead>
@@ -85,7 +86,7 @@ function FullStandings({ season }: { season: PalmaresSeason }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </details>
   );
 }

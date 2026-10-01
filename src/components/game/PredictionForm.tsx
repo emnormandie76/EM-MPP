@@ -133,7 +133,9 @@ export function PredictionForm(props: PredictionFormProps) {
           autoComplete="off"
           aria-invalid={fieldError ? true : undefined}
           aria-describedby={describedBy}
-          className="min-w-0 grow bg-transparent font-display text-4xl font-bold tabular-nums text-ink outline-none read-only:text-ink-2"
+          // w-0: the field takes the room left by the unit; its own width (20 characters at 36 px)
+          // would widen the card beyond a phone screen.
+          className="w-0 min-w-0 grow bg-transparent font-display text-4xl font-bold tabular-nums text-ink outline-none read-only:text-ink-2"
         />
         {unit ? <span className="shrink-0 text-sm text-muted">{unit}</span> : null}
       </div>

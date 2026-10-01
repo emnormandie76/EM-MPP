@@ -4,6 +4,7 @@ import { AccountActions } from "@/components/admin/AccountActions";
 import { AllowListForm } from "@/components/admin/AllowListForm";
 import { RemoveAllowedEmailButton } from "@/components/admin/RemoveAllowedEmailButton";
 import { Card } from "@/components/ui/Card";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { requireAdmin } from "@/lib/auth/session";
 import { getAccounts, getAllowedEmails } from "@/lib/data/players";
 import { getDb } from "@/lib/db/client";
@@ -35,7 +36,7 @@ export default async function PlayersAdminPage() {
           </p>
         </div>
         <AllowListForm />
-        <div className="overflow-x-auto">
+        <TableScroll label="Adresses de la liste blanche">
           <table className="w-full min-w-120 text-left text-[15px]">
             <caption className="sr-only">Adresses de la liste blanche</caption>
             <thead>
@@ -57,12 +58,12 @@ export default async function PlayersAdminPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </Card>
 
       <Card as="section" className="flex flex-col gap-5">
         <h2 className={SECTION_TITLE}>Comptes</h2>
-        <div className="overflow-x-auto">
+        <TableScroll label="Comptes des joueurs">
           <table className="w-full min-w-260 text-left text-[15px]">
             <caption className="sr-only">Comptes des joueurs</caption>
             <thead>
@@ -103,7 +104,7 @@ export default async function PlayersAdminPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </Card>
     </>
   );

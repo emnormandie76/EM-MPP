@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Field } from "@/components/ui/Field";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { duplicateQuestionsAction, publishQuestionsAction, setQuestionDatesAction } from "@/lib/actions/questions";
 import { formatCount } from "@/lib/format";
 import type { QuestionStatus } from "@/lib/game/question-status";
@@ -145,7 +146,7 @@ export function QuestionsTable({ rows }: { rows: QuestionListItem[] }) {
         ) : null}
       </div>
 
-      <div className="overflow-x-auto">
+      <TableScroll label="Questions">
         <table className="w-full min-w-230 text-left text-[15px]">
           <caption className="sr-only">Questions</caption>
           <thead>
@@ -199,7 +200,7 @@ export function QuestionsTable({ rows }: { rows: QuestionListItem[] }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
 
       <Dialog open={datesOpen} onClose={() => setDatesOpen(false)} title="Définir les dates">
         <form

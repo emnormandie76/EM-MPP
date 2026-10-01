@@ -77,13 +77,14 @@ function OptionsEditor({ initial, disabled, error }: { initial: string[]; disabl
     setRows(next);
   }
 
+  // min-w-0: a fieldset is otherwise as wide as its fields, wider than a phone screen.
   return (
-    <fieldset className="flex flex-col gap-2" aria-describedby={errorId}>
+    <fieldset className="flex min-w-0 flex-col gap-2" aria-describedby={errorId}>
       <legend className={`${LEGEND} mb-1.5`}>Réponses possibles</legend>
       <ol className="flex flex-col gap-2">
         {rows.map((row, index) => (
-          <li key={row.key} className="flex items-center gap-1.5">
-            <label htmlFor={`option-${row.key}`} className="w-24 shrink-0 text-sm font-semibold text-ink-2">
+          <li key={row.key} className="flex flex-wrap items-center gap-1.5">
+            <label htmlFor={`option-${row.key}`} className="w-full shrink-0 text-sm font-semibold text-ink-2 sm:w-24">
               Réponse {index + 1}
             </label>
             <input
@@ -187,7 +188,7 @@ export function QuestionForm({
       <Card as="section" className="flex flex-col gap-4">
         <h2 className={SECTION_TITLE}>Question</h2>
         <LockNote reason={locks.content} />
-        <fieldset className="flex flex-col gap-1.5" aria-describedby={errors.kind ? "kind-error" : undefined}>
+        <fieldset className="flex min-w-0 flex-col gap-1.5" aria-describedby={errors.kind ? "kind-error" : undefined}>
           <legend className={`${LEGEND} mb-1.5`}>Type</legend>
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             {QUESTION_KINDS.map((value) => (
@@ -268,7 +269,7 @@ export function QuestionForm({
         )}
         {errors.options && kind === "yesNo" ? <p className="text-sm font-medium text-hot">{errors.options}</p> : null}
 
-        <fieldset className="flex flex-col gap-1.5">
+        <fieldset className="flex min-w-0 flex-col gap-1.5">
           <legend className={`${LEGEND} mb-1.5`}>Coefficient</legend>
           <div className="flex flex-wrap gap-2">
             {COEFFICIENTS.map((value) => (

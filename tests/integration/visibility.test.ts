@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getQuestionHistory } from "@/lib/data/admin";
 import { getHomeData } from "@/lib/data/home";
-import { getOpenQuestionsForViewer, getQuestionDetail, getQuestionPredictionsForViewer, getQuestionsList } from "@/lib/data/questions";
+import { getOpenQuestionsForViewer, getQuestionDetail, getQuestionPredictionsForViewer, getQuestionsList, isQuestionVisible } from "@/lib/data/questions";
 import { getStandings } from "@/lib/data/standings";
 import type { Database } from "@/lib/db/client";
 import { predictionEvent } from "@/lib/db/schema";
@@ -169,6 +169,28 @@ describe("questions that do not exist for a player", () => {
     expect(list.items.map(({ id }) => id)).toEqual([cancelled.id]);
     expect(list.counts).toEqual({ open: 1, closed: 0, resolved: 0, cancelled: 1 });
     expect(await getQuestionPredictionsForViewer(db, viewer, cancelled.id, now)).toEqual([]);
+  });
+
+  it("isQuestionVisible, the check of the layout of /questions/[id], agrees with getQuestionDetail", async () => {
+    const { admin, sarah, categoryId, published, open } = await setUp();
+    const questions = [
+      open,
+      await createQuestion(db, { ...published, opensAt: clock.at("+1d"), closesAt: clock.at("+3d") }),
+      await createQuestion(db, { categoryId, createdBy: admin.id }),
+      await createQuestion(db, { ...published, opensAt: clock.at("-5d"), closesAt: clock.at("-1d") }),
+      await createQuestion(db, { ...published, opensAt: clock.at("-5d"), closesAt: clock.at("-2d"), resultNumber: 12, resolvedAt: clock.at("-1d") }),
+      await createQuestion(db, { ...published, status: "cancelled", opensAt: clock.at("+1d"), closesAt: clock.at("+3d"), cancelledAt: clock.at("-1h") }),
+      await createQuestion(db, { ...published, status: "cancelled", opensAt: clock.at("-3d"), closesAt: clock.at("+3d"), cancelledAt: clock.at("-1d") }),
+    ];
+    const visible = [];
+    for (const q of questions) {
+      const shown = await isQuestionVisible(db, q.id, now);
+      expect(shown, `question ${q.id}`).toBe((await getQuestionDetail(db, view(sarah), q.id, now)) !== null);
+      visible.push(shown);
+    }
+    // Open, closed, resolved and cancelled once open; not the scheduled, the draft, nor the one cancelled before opening.
+    expect(visible).toEqual([true, false, false, true, true, false, true]);
+    expect(await isQuestionVisible(db, 999_999, now)).toBe(false);
   });
 });
 

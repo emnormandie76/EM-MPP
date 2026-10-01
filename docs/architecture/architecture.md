@@ -2,7 +2,7 @@
 
 > **Version 1.1 du 30/09/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
-> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6).
+> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6). Précisé pendant l'É8 (01/10/2026) : bordure `line-strong` foncée à #7E8796 (§8.1), classement compact sur téléphone (§8.3, §8.4), conteneur défilant des tableaux et squelettes de chargement (§2, §8.3, §8.4), page d'erreur globale (§8.3), contrôle de visibilité dans le layout de `/questions/[id]` (§7.4, §8.3), tests à 390 px (§9.4), streaming (§14).
 > - Règles fonctionnelles : [cahier des charges v1.1](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
@@ -171,7 +171,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 │  ├─ e2e-prepare.ts              remet à zéro .pglite-e2e, migre, seed
 │  └─ lib/                        db.ts (ouverture et migration), env-rules.ts, load-env.ts, seed.ts,
 │                                  seed-seasons.ts (saisons du seed, lues aussi par les tests de bout en bout)
-├─ docs/                          cahier des charges, architecture, maquette
+├─ docs/                          cahier des charges, architecture, maquette, recette (prompt de recette par un agent, É8)
 ├─ e2e/                           tests Playwright (*.spec.ts)
 ├─ tests/
 │  ├─ unit/                       règles pures (src/lib/game, format)
@@ -183,6 +183,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
    │  ├─ globals.css              Tailwind + jetons B5
    │  ├─ not-found.tsx            404 en français
    │  ├─ error.tsx                erreur en français
+   │  ├─ global-error.tsx         la même erreur, si le layout racine échoue (É8)
    │  ├─ robots.ts                tout interdire
    │  ├─ (public)/
    │  │  ├─ layout.tsx            page centrée, sans en-tête de jeu
@@ -190,11 +191,14 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
    │  │  └─ inscription/page.tsx
    │  ├─ (jeu)/
    │  │  ├─ layout.tsx            exige une session ; en-tête ; suivi de visite
-   │  │  ├─ page.tsx              accueil
+   │  │  ├─ (accueil)/page.tsx    accueil, dans son propre groupe pour que son loading.tsx
+   │  │  │                        ne serve qu'à lui (É8)
    │  │  ├─ pronos/page.tsx       grille de saisie des questions ouvertes
    │  │  ├─ questions/page.tsx    liste par onglets
+   │  │  ├─ questions/[id]/layout.tsx  404 avant le squelette (É8, §8.3)
    │  │  ├─ questions/[id]/page.tsx
    │  │  ├─ classement/page.tsx
+   │  │  │                        loading.tsx dans (accueil), pronos, questions/[id], classement
    │  │  ├─ joueurs/[id]/page.tsx profil public
    │  │  ├─ profil/page.tsx       mon compte
    │  │  ├─ lots/page.tsx
@@ -215,7 +219,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
    │     └─ health/route.ts
    ├─ proxy.ts                    (ou middleware.ts selon la version de Next, §14)
    ├─ components/
-   │  ├─ ui/                      Button, Chip, Card, Field, Dialog, Tabs…
+   │  ├─ ui/                      Button, Chip, Card, Field, Dialog, Tabs, TableScroll, Skeleton…
    │  ├─ game/                    Countdown, StatusChip, QuestionCard, PredictionForm,
    │  │                           HelpPanel, StandingsTable, StripChart,
    │  │                           ChoiceDistribution, ResultPanel, BadgeList…
@@ -1026,7 +1030,7 @@ type Result<T = void> =
 | Fichier | Fonctions |
 |---|---|
 | `home.ts` | `getHomeData` : annonces (3 dernières), bienvenue, progression, rang, points, jokers restants, 5 prochaines clôtures, top 6 + ma ligne, dernier résultat |
-| `questions.ts` | `getOpenQuestionsForViewer`, `getQuestionsList(tab)`, `getQuestionDetail`, `getQuestionPredictionsForViewer` |
+| `questions.ts` | `getOpenQuestionsForViewer`, `getQuestionsList(tab)`, `getQuestionDetail`, `getQuestionPredictionsForViewer`, `isQuestionVisible` (É8 : contrôle du layout de `/questions/[id]`, sans paramètre `viewer`, la réponse étant la même pour tous) |
 | `results.ts` (É7) | `getQuestionResults` (après la clôture : pronos de tous, sagesse de la foule, points une fois résolue, badges gagnés sur la question ; passe par `getQuestionPredictionsForViewer`), `getLatestResult` (accueil) |
 | `badges.ts` (É7) | `getPlayerResults` (pronos d'un joueur sur les questions résolues, avec leurs points), `getPlayerBadges`, `getBadgesOnQuestion` |
 | `standings.ts` | `getStandings({ seasonId? })`, `getAvailableSeasons` |
@@ -1049,7 +1053,7 @@ type Result<T = void> =
 | `--color-raised` | `#F4F5F8` | lignes du classement, tuiles secondaires |
 | `--color-chip` | `#E6E9EF` | étiquettes de catégorie, fond des avatars à initiales |
 | `--color-line` | `#D8DCE3` | bordures, axe des graphiques, segments vides |
-| `--color-line-strong` | `#B5BCC8` | bordures des boutons secondaires et des champs |
+| `--color-line-strong` | `#7E8796` | bordures des boutons secondaires et des champs, contours en pointillés (joker, états vides), tuiles de réponse. La maquette donnait `#B5BCC8` (1,9:1 sur `surface`, sous le seuil de 3:1 des composants d'interface) ; foncé à l'É8 avec l'accord de l'utilisateur : 3,6:1 sur `surface`, 3,15:1 sur `bg` (décision du 01/10/2026) |
 | `--color-ink` | `#0B0E13` | texte principal |
 | `--color-ink-2` | `#2F3642` | texte secondaire, navigation inactive |
 | `--color-muted` | `#5B6472` | libellés, métadonnées |
@@ -1063,7 +1067,7 @@ type Result<T = void> =
 | `--color-down` | `#C8321F` | descente ▼ |
 | `--color-dots` | `#A3ABB8` | points des autres joueurs sur le graphique |
 
-**Contrastes vérifiés** : `ink`, `ink-2`, `muted` et `accent-text` sur `surface` et sur `bg` ≥ 4,5:1 ; `accent-ink` sur `accent` ≈ 5,2:1. Tout nouveau couple de couleurs doit atteindre 4,5:1 (3:1 pour un texte ≥ 24 px ou ≥ 18,66 px en gras).
+**Contrastes vérifiés** : `ink`, `ink-2`, `muted` et `accent-text` sur `surface` et sur `bg` ≥ 4,5:1 ; `accent-ink` sur `accent` ≈ 5,2:1. Tout nouveau couple de couleurs doit atteindre 4,5:1 (3:1 pour un texte ≥ 24 px ou ≥ 18,66 px en gras). Sur le fond de page `bg`, `hot` (4,3:1) et `up` (4,4:1) restent sous 4,5:1 : ces textes y sont posés sur un fond blanc (bouton `danger`, pastilles de statut, messages de `FormMessage`, « Annulée le … » de l'admin) ou écrits en grand texte (compte à rebours compact).
 
 **Typographie** (`next/font/google`) :
 
@@ -1225,6 +1229,7 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 - Note : « Départage : nombre de Dans le mille, puis écart moyen le plus faible. »
 - EmptyState « Le classement démarre au premier résultat. »
 - Précisions de l'É7 : la saison choisie passe dans l'adresse (`?saison=<id>`, une saison inconnue donne la saison par défaut) ; le nom d'un joueur mène à son profil sur la même saison ; pour une saison proclamée, un lien renvoie au palmarès (le classement reste recalculé, le palmarès figé).
+- **Sur téléphone (sous 640 px)**, la liste compacte de l'accueil remplace le tableau : rang, joueur, évolution et points, les noms menant aux profils sur la même saison. Le tableau aurait poussé les points hors de l'écran. « Dans le mille » et « Questions jouées » restent sur le profil de chacun (décision du 01/10/2026).
 
 **`/joueurs/[id]` Profil public**
 - En-tête : avatar de 64 px, nom, rang et points de la saison affichée.
@@ -1297,9 +1302,11 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 
 **Pages d'erreur** :
 - 404 : « Cette page n'existe pas. » et « Retour à l'accueil » ;
-- erreur : « Une erreur est survenue. Réessaie. » et « Réessayer ».
+- erreur : « Une erreur est survenue. Réessaie. » et « Réessayer » (`error.tsx`, et `global-error.tsx` pour une erreur du layout racine, qui a son propre document ; É8).
 
-**Chargement** : `loading.tsx` avec des squelettes gris `chip` sur l'accueil, `/pronos`, `/classement` et `/questions/[id]`.
+**Chargement** : `loading.tsx` avec des squelettes gris `chip` sur l'accueil, `/pronos`, `/classement` et `/questions/[id]` (composants de `src/components/ui/Skeleton.tsx`, annoncés « Chargement… » aux lecteurs d'écran). Mise en œuvre (É8) :
+- un `loading.tsx` couvre toutes les pages placées sous lui : l'accueil est donc rangé dans le groupe de routes `(jeu)/(accueil)`, pour que son squelette ne s'affiche pas en allant sur `/profil` ou `/lots` ;
+- une page qui part en streaming derrière son squelette ne peut plus changer son code HTTP : `/questions/[id]` répondrait 200 au lieu de 404 pour une question programmée. Son `layout.tsx` fait donc le contrôle avant le squelette (`isQuestionVisible`, une requête légère), et appelle `notFound()`.
 
 ### 8.4 Responsive
 
@@ -1308,9 +1315,9 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
   - une seule colonne ;
   - la navigation se replie dans un bouton « Menu » (`<details>` ou `<dialog>`) ;
   - les tuiles passent en grille de 2 colonnes ;
-  - les tableaux défilent horizontalement dans leur conteneur ;
+  - les tableaux défilent horizontalement dans leur conteneur (`TableScroll`) : il est `relative`, pour que les textes réservés aux lecteurs d'écran ne débordent pas de la page, et devient une région nommée accessible au clavier tant que son tableau dépasse (É8) ; seul `/classement` affiche à la place la liste compacte, sous 640 px (§8.3) ;
   - le compte à rebours passe en version compacte.
-- À 390 px de large : aucun défilement horizontal de la page, toutes les actions restent accessibles.
+- À 390 px de large : aucun défilement horizontal de la page, toutes les actions restent accessibles. Points relevés à l'É8 : un `<input>` ou un `<fieldset>` impose sa largeur propre à son conteneur (`w-0` ou `min-w-0` le libère), et les tuiles « Réel, médiane, moyenne » passent sur deux lignes.
 
 ### 8.5 Accessibilité
 
@@ -1363,7 +1370,8 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 - Un seul worker, tests indépendants entre eux : chaque test qui écrit utilise ses propres comptes et questions du seed.
 - Sélecteurs par rôle et par libellé (`getByRole`, `getByLabel`). `data-testid` seulement pour les zones sans rôle (compte à rebours, graphique).
 - Les tests importent `test` depuis `e2e/fixtures.ts` : chaque test y reçoit sa propre adresse client (`x-forwarded-for`), sinon la limitation des tentatives (5 connexions par minute et par adresse) bloquerait la suite. `signIn()` et `signOut()` passent par l'interface. Un test qui modifie un compte du seed (nom, mot de passe) le remet dans son état initial.
-- Accessibilité : `AxeBuilder` sur `/connexion`, `/`, `/pronos`, `/questions/<résolue>`, `/classement`, `/profil`, `/admin`, `/admin/questions/<id>`. Aucune violation `serious` ni `critical`.
+- Accessibilité : `AxeBuilder` sur `/connexion`, `/`, `/pronos`, `/questions/<résolue>`, `/classement`, `/profil`, `/admin`, `/admin/questions/<id>`. Aucune violation `serious` ni `critical`. Depuis l'É8, aussi à 390 px sur les pages à tableaux (zones défilantes accessibles au clavier) ; après une navigation côté client, attendre le `<title>` avant axe (Next l'ajoute un peu plus tard).
+- Responsive (`e2e/responsive.spec.ts`, É8) : à 390 × 844, pas de défilement horizontal sur toutes les pages du joueur et de l'admin ; menu, champ du prono et boutons visibles ; liste compacte de `/classement`. En-têtes (`e2e/headers.spec.ts`) : ceux du §3.3 sur les pages publiques, connectées, l'API et les redirections, `robots.txt`, balise `noindex`.
 
 ### 9.5 Seuils de couverture (`npm run test:coverage`)
 
@@ -1965,6 +1973,7 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | Vercel : commande de build | `vercel.json` → `buildCommand`. Vérifier dans les logs de build que la migration s'exécute bien avant `next build`. |
 | Cookies de 400 jours | Chrome plafonne la durée d'un cookie à 400 jours : ne pas dépasser. |
 | Heures d'été et d'hiver | Toujours passer par `@date-fns/tz`. Ne jamais construire une date « Paris » en ajoutant +1 ou +2 heures à la main. |
+| Streaming et `loading.tsx` (É8) | Une page sous un `loading.tsx` part en streaming : un `notFound()` appelé dans la page donne un code 200 (avec `noindex`). Le contrôle se fait dans un `layout.tsx` du même dossier, avant le squelette (§8.3). Quand le navigateur quitte une page avant la fin de son streaming, le serveur journalise `Error: The destination stream closed early.` (React abandonne le rendu) : sans conséquence pour le joueur, visible dans les journaux de Vercel et des tests de bout en bout. |
 
 ---
 

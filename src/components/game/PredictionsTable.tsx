@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatars/Avatar";
+import { TableScroll } from "@/components/ui/TableScroll";
 import type { QuestionDetail } from "@/lib/data/questions";
 import type { ResultRow } from "@/lib/data/results";
 import { formatNumber, formatPercent, rankSuffix } from "@/lib/format";
@@ -26,7 +27,7 @@ export function PredictionsTable({ question: q, rows }: { question: QuestionDeta
   const scored = q.status === "resolved";
   const number = q.type === "number";
   return (
-    <div className="overflow-x-auto">
+    <TableScroll label="Pronos de tous les joueurs">
       <table className="w-full min-w-120 text-left text-[15px]">
         <caption className="sr-only">Pronos de tous les joueurs{scored ? ", avec leurs points" : ""}</caption>
         <thead>
@@ -78,6 +79,6 @@ export function PredictionsTable({ question: q, rows }: { question: QuestionDeta
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }

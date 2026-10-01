@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatars/Avatar";
+import { TableScroll } from "@/components/ui/TableScroll";
 import type { StandingView } from "@/lib/data/standings";
 
 // Standings rows (§8.2). The compact version of the home page: rank, avatar, name, movement and
@@ -33,7 +34,8 @@ function Movement({ delta, onTint }: { delta: number | null; onTint: boolean }) 
   );
 }
 
-function Row({ row }: { row: StandingView }) {
+/** With a season, the name leads to the player's profile on that season (/classement on a phone). */
+function Row({ row, seasonId }: { row: StandingView; seasonId?: number }) {
   const me = row.isViewer;
   return (
     <li
@@ -53,7 +55,13 @@ function Row({ row }: { row: StandingView }) {
       </span>
       <Avatar avatar={row.avatar} name={row.name} size={32} ring={me} />
       <span className={`min-w-0 grow truncate text-base ${me ? "font-bold" : "font-semibold"}`}>
-        {row.name}
+        {seasonId === undefined ? (
+          row.name
+        ) : (
+          <Link href={`/joueurs/${row.userId}?saison=${seasonId}`} className="hover:underline">
+            {row.name}
+          </Link>
+        )}
         {me ? " (toi)" : ""}
         {row.inactive ? <span className="font-normal text-muted"> (inactif)</span> : null}
       </span>
@@ -86,7 +94,7 @@ function cell(me: boolean, position: "first" | "middle" | "last", extra = ""): s
  */
 export function StandingsFullTable({ rows, caption, seasonId }: { rows: StandingView[]; caption: string; seasonId: number }) {
   return (
-    <div className="overflow-x-auto">
+    <TableScroll label={caption}>
       <table className="w-full min-w-130 border-separate border-spacing-y-1 text-left text-[15px]">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -150,17 +158,32 @@ export function StandingsFullTable({ rows, caption, seasonId }: { rows: Standing
           })}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }
 
-/** The top rows, then the viewer's own row when it is further down. */
-export function StandingsTable({ rows, mine, label }: { rows: StandingView[]; mine?: StandingView | null; label: string }) {
+/**
+ * The compact standings: the top rows, then the viewer's own row when it is further down. Also the
+ * full standings of /classement on a phone, where the table would hide the points (decision of
+ * 01/10/2026).
+ */
+export function StandingsTable({
+  rows,
+  mine,
+  label,
+  seasonId,
+}: {
+  rows: StandingView[];
+  mine?: StandingView | null;
+  label: string;
+  /** Turns the names into links to the profiles, on this season. */
+  seasonId?: number;
+}) {
   return (
     <div className="flex flex-col gap-1">
       <ol aria-label={label} className="flex flex-col gap-1">
         {rows.map((row) => (
-          <Row key={row.userId} row={row} />
+          <Row key={row.userId} row={row} seasonId={seasonId} />
         ))}
       </ol>
       {mine ? (
@@ -169,7 +192,7 @@ export function StandingsTable({ rows, mine, label }: { rows: StandingView[]; mi
             …
           </p>
           <ol aria-label="Ta place" className="flex flex-col gap-1">
-            <Row row={mine} />
+            <Row row={mine} seasonId={seasonId} />
           </ol>
         </>
       ) : null}

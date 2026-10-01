@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { requireUser } from "@/lib/auth/session";
 import { formatNumber } from "@/lib/format";
 import { CHOICE_POINTS, COEFFICIENTS, JOKER_MULTIPLIER, JOKERS_PER_SEASON, PODIUM_BONUS, SCORE_TIERS } from "@/lib/game/constants";
@@ -98,7 +99,7 @@ export default async function RulesPage() {
           Sur une question à nombre, on note l&apos;<strong>écart relatif</strong> : |prono − valeur réelle| / valeur réelle. Se
           tromper de 50 n&apos;a pas le même sens pour une JPO de 200 personnes et pour plusieurs milliers de candidatures.
         </p>
-        <div className="overflow-x-auto">
+        <TableScroll label="Points selon l'écart relatif">
           <table className="w-full max-w-120 text-left">
             <caption className="sr-only">Points selon l&apos;écart relatif</caption>
             <thead>
@@ -125,7 +126,7 @@ export default async function RulesPage() {
               </tr>
             </tbody>
           </table>
-        </div>
+        </TableScroll>
         <p>
           <strong>Total d&apos;une question</strong> = (points du barème + bonus podium) × coefficient × {JOKER_MULTIPLIER} avec
           un joker.

@@ -28,16 +28,3 @@ test("an unknown address shows the French 404 page", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "Cette page n'existe pas." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Retour à l'accueil" })).toHaveAttribute("href", "/");
 });
-
-test("at 390 px the page does not scroll sideways and the menu opens", async ({ page }) => {
-  await signIn(page, ACCOUNTS.sarah);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(390);
-
-  await page.getByText("Menu", { exact: true }).click();
-  await expect(page.getByRole("link", { name: "Classement", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Mon profil" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeVisible();
-});

@@ -13,11 +13,15 @@ import { StripChart } from "./StripChart";
 // prono" band with the viewer's points, and the badges earned on this question.
 
 const TILE_LABEL = "font-display text-[13px] font-extrabold uppercase tracking-[0.08em]";
-const TILE_VALUE = "font-display text-[40px] leading-none font-extrabold tabular-nums";
+const TILE_VALUE = "font-display text-[34px] leading-none font-extrabold tabular-nums sm:text-[40px]";
 
+/**
+ * A figure of the results. On a phone, the real value takes a row of its own, above the median and
+ * the mean: three tiles side by side would cut a value like « 1 200 » in two.
+ */
 function Tile({ label, children, sub, tone = "plain" }: { label: string; children: ReactNode; sub?: string | null; tone?: "real" | "plain" | "mean" }) {
   return (
-    <div className={`flex min-w-0 grow basis-0 flex-col gap-0.5 rounded-field px-3 py-2.5 ${tone === "real" ? "bg-ink text-bg" : "bg-raised"}`}>
+    <div className={`flex min-w-0 grow flex-col gap-0.5 rounded-field px-3 py-2.5 ${tone === "real" ? "basis-full bg-ink text-bg sm:basis-0" : "basis-0 bg-raised"}`}>
       <dt className={`${TILE_LABEL} ${tone === "real" ? "" : "text-muted"}`}>{label}</dt>
       <dd className={`${TILE_VALUE} ${tone === "mean" ? "text-hot" : ""} break-words`}>{children}</dd>
       {sub ? <dd className="text-[13px] text-ink-2">{sub}</dd> : null}

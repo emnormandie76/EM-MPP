@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CategoryActions, CategoryCreateForm } from "@/components/admin/CategoryForms";
 import { Card } from "@/components/ui/Card";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { requireAdmin } from "@/lib/auth/session";
 import { getCategoriesAdmin } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
@@ -28,7 +29,7 @@ export default async function CategoriesAdminPage() {
         {categories.length === 0 ? (
           <p className="text-[15px] text-ink-2">Aucune catégorie pour l&apos;instant.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <TableScroll label="Catégories">
             <table className="w-full min-w-160 text-left text-[15px]">
               <caption className="sr-only">Catégories</caption>
               <thead>
@@ -54,7 +55,7 @@ export default async function CategoriesAdminPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </Card>
     </>

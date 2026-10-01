@@ -11,6 +11,16 @@ export type ChartDot = { name: string; value: number; isViewer: boolean };
 /** Top of the 12 px dots of each row, from the axis up (the axis is at 86 px). */
 const ROW_TOPS = [66, 52, 38, 24];
 
+/**
+ * A label is centred on its point; near an edge of the chart, it is aligned on that edge instead, so
+ * that a long value (« Réel 12 500 ») does not stick out of the card on a phone.
+ */
+function labelAlign(x: number): string {
+  if (x < 15) return "-ml-1.5";
+  if (x > 85) return "ml-1.5 -translate-x-full";
+  return "-translate-x-1/2";
+}
+
 export function StripChart({
   dots,
   real,
@@ -43,7 +53,7 @@ export function StripChart({
           <>
             <div className="absolute top-[18px] -ml-px h-[68px] w-0.5 bg-ink" style={{ left: `${chart.realX}%` }} />
             <span
-              className="absolute top-0 -translate-x-1/2 font-display text-[13px] font-extrabold tracking-[0.06em] whitespace-nowrap uppercase"
+              className={`absolute top-0 ${labelAlign(chart.realX)} font-display text-[13px] font-extrabold tracking-[0.06em] whitespace-nowrap uppercase`}
               style={{ left: `${chart.realX}%` }}
             >
               Réel {formatNumber(real)}
@@ -70,7 +80,7 @@ export function StripChart({
                 style={{ left: `${point.x}%`, top: top - 2 }}
               />
               <span
-                className="absolute z-10 -translate-x-1/2 font-display text-[13px] font-extrabold text-accent-text"
+                className={`absolute z-10 ${labelAlign(point.x)} font-display text-[13px] font-extrabold text-accent-text`}
                 style={{ left: `${point.x}%`, top: top - 20 }}
               >
                 TOI

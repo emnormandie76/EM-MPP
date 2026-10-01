@@ -50,7 +50,7 @@ export function ResultForm({
           className="max-w-80"
         />
       ) : (
-        <fieldset className="flex flex-col gap-2">
+        <fieldset className="flex min-w-0 flex-col gap-2">
           <legend className="mb-1.5 font-display text-[15px] font-bold uppercase tracking-[0.08em] text-muted">
             Bonne réponse
           </legend>

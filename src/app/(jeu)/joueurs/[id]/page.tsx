@@ -8,6 +8,7 @@ import { SeasonTabs } from "@/components/game/SeasonTabs";
 import { StatTile } from "@/components/game/StatTile";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { requireUser } from "@/lib/auth/session";
 import { type AnswerView, getPlayerProfile, type PlayerProfile } from "@/lib/data/players";
 import { getDb } from "@/lib/db/client";
@@ -49,7 +50,7 @@ function Standing({ profile }: { profile: PlayerProfile }) {
 
 function HistoryTable({ profile }: { profile: PlayerProfile }) {
   return (
-    <div className="overflow-x-auto">
+    <TableScroll label={`Historique des questions résolues de ${profile.player.name}`}>
       <table className="w-full min-w-140 text-left text-[15px]">
         <caption className="sr-only">Historique des questions résolues de {profile.player.name}</caption>
         <thead>
@@ -90,7 +91,7 @@ function HistoryTable({ profile }: { profile: PlayerProfile }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }
 

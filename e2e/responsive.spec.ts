@@ -1,0 +1,117 @@
+import type { Page } from "@playwright/test";
+import { seedSeasons } from "../scripts/lib/seed-seasons";
+import { ACCOUNTS, expect, signIn, test } from "./fixtures";
+
+// Architecture §8.4: at 390 × 844, the page never scrolls sideways (wide tables scroll in their own
+// container) and every action stays reachable.
+
+const SEASONS = seedSeasons(new Date());
+
+test.use({ viewport: { width: 390, height: 844 } });
+
+async function expectNoSidewaysScroll(page: Page): Promise<void> {
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(scrollWidth, page.url()).toBeLessThanOrEqual(clientWidth);
+}
+
+/** The address of a seeded question, from a tab of /questions (its id depends on the seed). */
+async function questionHref(page: Page, tab: string, title: string): Promise<string> {
+  await page.goto(`/questions${tab}`);
+  return (await page.getByRole("link", { name: title }).getAttribute("href"))!;
+}
+
+test("at 390 px the page does not scroll sideways and the menu opens", async ({ page }) => {
+  await signIn(page, ACCOUNTS.sarah);
+  await page.goto("/");
+  await expectNoSidewaysScroll(page);
+
+  await page.getByText("Menu", { exact: true }).click();
+  await expect(page.getByRole("link", { name: "Classement", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Mon profil" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeVisible();
+});
+
+for (const url of ["/connexion", "/inscription"]) {
+  test(`${url} does not scroll sideways at 390 px`, async ({ page }) => {
+    await page.goto(url);
+    await expectNoSidewaysScroll(page);
+  });
+}
+
+test("the player pages do not scroll sideways at 390 px", async ({ page }) => {
+  await signIn(page, ACCOUNTS.julien);
+  for (const url of ["/", "/pronos", "/questions", "/classement", "/palmares", "/reglement", "/lots", "/profil"]) {
+    await page.goto(url);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expectNoSidewaysScroll(page);
+  }
+});
+
+// Open (number, Juste Prix), closed and resolved (number with a joker, choice) questions.
+for (const [tab, title] of [
+  ["", "Combien de participants à la JPO du 15 novembre ?"],
+  ["", "Combien de candidatures Grande École au 31 mai ?"],
+  ["?onglet=en-attente", "Combien d'inscrits au webinaire Grande École de septembre ?"],
+  ["?onglet=resolues", "Combien de candidatures Grande École au 31 mars ?"],
+  ["?onglet=resolues", "Quel campus comptera le plus d'intégrés en Bachelor ?"],
+]) {
+  test(`/questions/<id> « ${title} » does not scroll sideways at 390 px`, async ({ page }) => {
+    await signIn(page, ACCOUNTS.julien);
+    await page.goto(await questionHref(page, tab, title));
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+    await expectNoSidewaysScroll(page);
+  });
+}
+
+test("on an open question at 390 px, the prediction field and both buttons fit the screen", async ({ page }) => {
+  await signIn(page, ACCOUNTS.julien);
+  await page.goto(await questionHref(page, "", "Combien de participants à la JPO du 15 novembre ?"));
+  for (const target of [
+    page.getByLabel("Ton prono", { exact: true }),
+    page.getByRole("button", { name: "Enregistrer" }),
+    page.getByRole("button", { name: "Valider" }),
+  ]) {
+    await expect(target).toBeInViewport({ ratio: 1 });
+  }
+});
+
+test("/classement shows the compact standings at 390 px, with the points and the links to the profiles", async ({ page }) => {
+  await signIn(page, ACCOUNTS.hugo);
+  await page.goto("/classement");
+  // The wide table is hidden on a phone: it would push the points out of the screen.
+  await expect(page.getByRole("table")).toHaveCount(0);
+  const list = page.getByRole("list", { name: `Classement de la saison ${SEASONS.current.label}` });
+  await expect(list.getByRole("listitem").first()).toContainText(/^Rang 1.*Julien.*\d+ points$/);
+  await expect(list.getByRole("listitem").filter({ hasText: "Hugo" })).toContainText("(toi)");
+  const julien = list.getByRole("link", { name: "Julien" });
+  await expect(julien).toBeInViewport();
+  await expect(julien).toHaveAttribute("href", /^\/joueurs\/[^?]+\?saison=\d+$/);
+  await expectNoSidewaysScroll(page);
+});
+
+test("a player profile does not scroll sideways at 390 px", async ({ page }) => {
+  await signIn(page, ACCOUNTS.julien);
+  await page.goto("/classement");
+  await page.getByRole("link", { name: "Sarah", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sarah");
+  await expectNoSidewaysScroll(page);
+});
+
+test("the back-office pages do not scroll sideways at 390 px", async ({ page }) => {
+  await signIn(page, ACCOUNTS.admin);
+  for (const url of ["/admin", "/admin/joueurs", "/admin/questions", "/admin/questions/nouvelle", "/admin/categories", "/admin/saisons", "/admin/annonces"]) {
+    await page.goto(url);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expectNoSidewaysScroll(page);
+  }
+  // An open question (follow-up, history) and a choice question (editor of the answers).
+  for (const title of ["Combien de participants à la JPO du 15 novembre ?", "Quel programme recevra le plus de candidatures en décembre ?"]) {
+    await page.goto("/admin/questions");
+    await page.goto((await page.getByRole("link", { name: title }).getAttribute("href"))!);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+    await expectNoSidewaysScroll(page);
+  }
+});

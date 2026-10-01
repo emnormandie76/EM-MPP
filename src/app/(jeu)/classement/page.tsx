@@ -2,7 +2,7 @@ import { Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SeasonTabs, seasonParam } from "@/components/game/SeasonTabs";
-import { StandingsFullTable } from "@/components/game/StandingsTable";
+import { StandingsFullTable, StandingsTable } from "@/components/game/StandingsTable";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireUser } from "@/lib/auth/session";
@@ -40,7 +40,13 @@ export default async function StandingsPage({ searchParams }: PageProps<"/classe
             Après {formatCount(resolvedCount, "question résolue", "questions résolues")}. Les flèches montrent l&apos;évolution
             depuis le résultat précédent.
           </p>
-          <StandingsFullTable rows={rows} caption={`Classement de la saison ${season.label}`} seasonId={season.id} />
+          {/* On a phone, the compact list keeps the points in sight (decision of 01/10/2026). */}
+          <div className="sm:hidden">
+            <StandingsTable rows={rows} label={`Classement de la saison ${season.label}`} seasonId={season.id} />
+          </div>
+          <div className="hidden sm:block">
+            <StandingsFullTable rows={rows} caption={`Classement de la saison ${season.label}`} seasonId={season.id} />
+          </div>
         </Card>
       )}
 

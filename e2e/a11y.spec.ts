@@ -43,6 +43,8 @@ test("/questions/<id> (open, player) has no serious or critical accessibility vi
   await page.goto("/pronos");
   await page.getByRole("link", { name: "Combien de participants à la JPO du 15 novembre ?" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Combien de participants à la JPO du 15 novembre ?");
+  // After a client navigation, Next streams the <title> later: axe would find none.
+  await expect(page).toHaveTitle(/^Question · /);
   expect(await blockingViolations(page)).toEqual([]);
 });
 
@@ -97,6 +99,45 @@ for (const title of ["Combien de participants à la JPO du 15 novembre ?", "Comb
     await page.goto("/admin/questions");
     await page.getByRole("link", { name: title }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+    await expect(page).toHaveTitle(/^Question · /);
     expect(await blockingViolations(page)).toEqual([]);
   });
 }
+
+// §8.4, §8.5: at 390 px, the wide tables scroll in their container, which must then take the
+// keyboard focus (axe "scrollable-region-focusable"); the colours stay readable on every background.
+test.describe("at 390 px", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("the player pages have no serious or critical accessibility violation", async ({ page }) => {
+    await signIn(page, ACCOUNTS.julien);
+    for (const url of ["/", "/pronos", "/classement", "/palmares", "/profil"]) {
+      await page.goto(url);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      expect(await blockingViolations(page), url).toEqual([]);
+    }
+    await page.goto("/questions?onglet=resolues");
+    await page.goto((await page.getByRole("link", { name: "Combien de candidatures Grande École au 31 mars ?" }).getAttribute("href"))!);
+    // The table of the predictions overflows: its container is a named region in the tab order.
+    await expect(page.getByRole("region", { name: "Pronos de tous les joueurs" })).toHaveAttribute("tabindex", "0");
+    expect(await blockingViolations(page), "question résolue").toEqual([]);
+    await page.goto("/classement");
+    await page.goto((await page.getByRole("link", { name: "Sarah", exact: true }).getAttribute("href"))!);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sarah");
+    expect(await blockingViolations(page), "profil de Sarah").toEqual([]);
+  });
+
+  test("the back-office pages have no serious or critical accessibility violation", async ({ page }) => {
+    await signIn(page, ACCOUNTS.admin);
+    for (const url of ["/admin/joueurs", "/admin/questions", "/admin/categories"]) {
+      await page.goto(url);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      expect(await blockingViolations(page), url).toEqual([]);
+    }
+    await page.goto("/admin/questions");
+    await page.getByRole("link", { name: "Combien de participants à la JPO du 15 novembre ?" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Combien de participants à la JPO du 15 novembre ?");
+    await expect(page).toHaveTitle(/^Question · /);
+    expect(await blockingViolations(page), "suivi d'une question ouverte").toEqual([]);
+  });
+});

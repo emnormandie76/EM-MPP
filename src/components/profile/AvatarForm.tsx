@@ -13,7 +13,7 @@ export function AvatarForm({ avatar, name }: { avatar: AvatarKey; name: string }
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <fieldset>
+      <fieldset className="min-w-0">
         <legend className="mb-3 text-[15px] text-ink-2">Choisis ton maillot. Tes initiales sont imprimées dessus.</legend>
         <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-8">
           {AVATAR_KEYS.map((key) => (
