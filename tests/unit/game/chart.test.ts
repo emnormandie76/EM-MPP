@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildStripChart, CHART_ROWS, MIN_POINT_GAP_PX, niceTicks } from "@/lib/game/chart";
+import {
+  buildStripChart,
+  CHART_ROWS,
+  DEFAULT_CHART_WIDTH,
+  MIN_POINT_GAP_PX,
+  niceTicks,
+  VIEWER_LABEL_PX,
+  viewerLabelSide,
+} from "@/lib/game/chart";
 
 const F1 = [180, 205, 220, 228, 235, 240, 262, 270, 285, 300, 310, 330];
 const F1_MEAN = 3065 / 12;
@@ -118,5 +126,52 @@ describe("buildStripChart: points", () => {
     const wide = buildStripChart([0, 10, 100], null, 50, 1000);
     expect(narrow.points[1].row).toBe(1);
     expect(wide.points[1].row).toBe(0);
+  });
+});
+
+// Test report of 01/10/2026, R-03: the « TOI » label, drawn above the viewer's dot, hid the dot of
+// the next row. It now sits beside the dot, and takes room on the viewer's row.
+describe("buildStripChart: the viewer's label", () => {
+  it("is on the right of the dot, or on its left from 85 % of the width", () => {
+    expect(viewerLabelSide(0)).toBe("right");
+    expect(viewerLabelSide(85)).toBe("right");
+    expect(viewerLabelSide(85.1)).toBe("left");
+  });
+
+  it("on the right, keeps the next dots of the viewer's row 28 px further", () => {
+    // Domain -20..120: 1 unit ≈ 3.14 px. 6 is 18.9 px after 0: on the viewer's row, it would sit on the label.
+    const chart = buildStripChart([0, 3, 6, 100], null, 50, DEFAULT_CHART_WIDTH, 0);
+    expect(chart.points.map(({ value, row }) => [value, row])).toEqual([
+      [0, 0],
+      [3, 1],
+      [6, 2],
+      [100, 0],
+    ]);
+  });
+
+  it("on the left, needs 28 px more after the previous dot of the row", () => {
+    // 100 is at 85.7 % of the axis -20..120, and 95 is 15.7 px before it.
+    expect(buildStripChart([0, 95, 100], null, 50).points.map(({ row }) => row)).toEqual([0, 0, 0]);
+    const chart = buildStripChart([0, 95, 100], null, 50, DEFAULT_CHART_WIDTH, 2);
+    expect(chart.points.map(({ row }) => row)).toEqual([0, 0, 1]);
+  });
+
+  it("A7 of the report (P1 vector, two predictions of 235): no dot under the label, whoever the viewer is", () => {
+    const values = [240, 262, 235, 235, 300];
+    const px = (x: number) => (x / 100) * DEFAULT_CHART_WIDTH;
+    for (let viewer = 0; viewer < values.length; viewer += 1) {
+      const chart = buildStripChart(values, 250, 254.4, DEFAULT_CHART_WIDTH, viewer);
+      const me = chart.points.find(({ index }) => index === viewer)!;
+      const side = viewerLabelSide(me.x);
+      for (const other of chart.points.filter(({ index, row }) => index !== viewer && row === me.row)) {
+        const ahead = (px(other.x) - px(me.x)) * (side === "right" ? 1 : -1);
+        expect(ahead, `viewer ${viewer}, dot ${other.index}`).not.toBe(0);
+        if (ahead > 0) expect(ahead).toBeGreaterThanOrEqual(VIEWER_LABEL_PX + MIN_POINT_GAP_PX);
+      }
+    }
+  });
+
+  it("changes nothing without a viewer", () => {
+    expect(buildStripChart([0, 3, 6, 100], null, 50, DEFAULT_CHART_WIDTH, null)).toEqual(buildStripChart([0, 3, 6, 100], null, 50));
   });
 });

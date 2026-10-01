@@ -1,5 +1,5 @@
 import "server-only";
-import { asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Viewer } from "@/lib/auth/session";
 import { type AvatarKey, isAvatarKey } from "@/lib/avatars";
@@ -365,13 +365,14 @@ export async function getQuestionHistory(db: Database, viewer: ViewerRole, quest
   const order = [desc(predictionEvent.createdAt), desc(predictionEvent.id)];
 
   if (!revealed) {
-    // Types and times only: no value column is selected.
+    // Types and times only: no value column is selected. The jokers stay hidden too: the admin plays,
+    // and knowing who put one where would help them (decision of 01/10/2026).
     const rows = await db
       .select(columns)
       .from(predictionEvent)
       .innerJoin(owner, eq(owner.id, predictionEvent.ownerId))
       .innerJoin(actor, eq(actor.id, predictionEvent.actorId))
-      .where(ofQuestion)
+      .where(and(ofQuestion, notInArray(predictionEvent.type, ["joker_on", "joker_off"])))
       .orderBy(...order);
     return rows.map((event) => ({ id: event.id, type: event.type, createdAt: event.createdAt, ...who(event), answer: null }));
   }

@@ -99,25 +99,27 @@ describe("before the closing", () => {
     ]);
   });
 
-  it("the history of the back office gives types and times, without values", async () => {
+  it("the history of the back office gives types and times, without values nor jokers", async () => {
     const { admin, julien, open, julienPrediction } = await setUp();
     const event = { predictionId: julienPrediction.id, questionId: open.id, ownerId: julien.id, actorId: julien.id, valueNumber: WITNESS };
     await db.insert(predictionEvent).values([
       { ...event, type: "saved", joker: false, createdAt: clock.at("-3h") },
       { ...event, type: "joker_on", joker: true, createdAt: clock.at("-150min") },
       { ...event, actorId: admin.id, type: "unlocked", joker: true, createdAt: clock.at("-1h") },
+      { ...event, type: "joker_off", joker: false, createdAt: clock.at("-30min") },
     ]);
 
     const before = await getQuestionHistory(db, view(admin), open.id, now);
     expectNoWitness(before);
     expect(JSON.stringify(before)).not.toMatch(/"(valueNumber|optionId|joker)"/);
+    // The admin plays too: who put a joker where stays hidden until the closing (decision of 01/10/2026).
     expect(before.map(({ type, ownerName, actorName, answer }) => ({ type, ownerName, actorName, answer }))).toEqual([
       { type: "unlocked", ownerName: "Julien", actorName: "Admin", answer: null },
-      { type: "joker_on", ownerName: "Julien", actorName: null, answer: null },
       { type: "saved", ownerName: "Julien", actorName: null, answer: null },
     ]);
 
     const after = await getQuestionHistory(db, view(admin), open.id, clock.at("+3d"));
+    expect(after.map(({ type }) => type)).toEqual(["joker_off", "unlocked", "joker_on", "saved"]);
     expect(after.at(-1)).toMatchObject({ type: "saved", answer: { valueNumber: WITNESS, optionId: null, joker: false } });
     await expect(getQuestionHistory(db, view(julien), open.id, now)).rejects.toThrow("FORBIDDEN");
   });

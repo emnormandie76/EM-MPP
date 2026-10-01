@@ -7,14 +7,16 @@ import { type QuestionListItem, QuestionsTable } from "@/components/admin/Questi
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { SelectField } from "@/components/ui/Field";
-import { requireAdmin } from "@/lib/auth/session";
+import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { type AdminQuestionFilters, getAdminQuestionsList, QUESTION_STATUSES } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
 import { formatDateTime } from "@/lib/format";
 import type { QuestionStatus } from "@/lib/game/question-status";
 import { QUESTION_KIND_LABELS } from "@/lib/validation/question";
 
-export const metadata: Metadata = { title: "Questions" };
+export async function generateMetadata(): Promise<Metadata> {
+  return adminMetadata("Questions");
+}
 
 /** Status filter in the address, in French: /admin/questions?statut=programmee. */
 const STATUS_SLUGS: Record<QuestionStatus, string> = {
@@ -43,14 +45,15 @@ function filtersOf(params: Record<string, string | string[] | undefined>): Admin
   };
 }
 
-const optionalDate = (date: Date | null) => (date ? formatDateTime(date) : null);
+const optionalDate = (date: Date | null, now: Date) => (date ? formatDateTime(date, now) : null);
 
 /** Questions list: filters, selection and group actions (architecture §8.3). */
 export default async function QuestionsAdminPage({ searchParams }: PageProps<"/admin/questions">) {
   const viewer = await requireAdmin();
   const params = await searchParams;
   const filters = filtersOf(params);
-  const { rows, seasons, categories } = await getAdminQuestionsList(getDb(), viewer, filters, new Date());
+  const now = new Date();
+  const { rows, seasons, categories } = await getAdminQuestionsList(getDb(), viewer, filters, now);
   const filtered = Boolean(filters.status || filters.season || filters.categoryId);
   const items: QuestionListItem[] = rows.map((row) => ({
     id: row.id,
@@ -60,9 +63,9 @@ export default async function QuestionsAdminPage({ searchParams }: PageProps<"/a
     coefficient: row.coefficient,
     seasonLabel: row.seasonLabel,
     status: row.status,
-    opensLabel: optionalDate(row.opensAt),
-    closesLabel: optionalDate(row.closesAt),
-    expectedLabel: optionalDate(row.expectedResultAt),
+    opensLabel: optionalDate(row.opensAt, now),
+    closesLabel: optionalDate(row.closesAt, now),
+    expectedLabel: optionalDate(row.expectedResultAt, now),
     predictionCount: row.predictionCount,
   }));
 

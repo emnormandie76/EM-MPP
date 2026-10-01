@@ -93,7 +93,8 @@ export function computeStandings({ questions, predictions, players }: StandingsI
       row.points += score.total;
       row.questionsPlayed += 1;
       if (score.bullseye) row.bullseyes += 1;
-      if (score.relativeError !== null && Number.isFinite(score.relativeError)) row.errors.push(score.relativeError);
+      // A Juste Prix prediction that went over scores nothing, and does not help the tie-break either.
+      if (!score.wentOver && score.relativeError !== null && Number.isFinite(score.relativeError)) row.errors.push(score.relativeError);
     }
   }
 

@@ -5,12 +5,14 @@ import { AllowListForm } from "@/components/admin/AllowListForm";
 import { RemoveAllowedEmailButton } from "@/components/admin/RemoveAllowedEmailButton";
 import { Card } from "@/components/ui/Card";
 import { TableScroll } from "@/components/ui/TableScroll";
-import { requireAdmin } from "@/lib/auth/session";
+import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { getAccounts, getAllowedEmails } from "@/lib/data/players";
 import { getDb } from "@/lib/db/client";
 import { formatCount, formatRelative } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Joueurs" };
+export async function generateMetadata(): Promise<Metadata> {
+  return adminMetadata("Joueurs");
+}
 
 const SECTION_TITLE = "font-display text-[26px] font-extrabold uppercase leading-none";
 const TH = "px-3 py-2 font-display text-[13px] font-bold uppercase tracking-[0.08em] text-muted";

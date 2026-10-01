@@ -1,8 +1,8 @@
 import { formatNumber } from "@/lib/format";
-import { buildStripChart } from "@/lib/game/chart";
+import { buildStripChart, DEFAULT_CHART_WIDTH, viewerLabelSide } from "@/lib/game/chart";
 
 // Strip chart of the predictions of a number question (§5.7, §8.2): one dot per player on an axis,
-// the viewer's dot in accent with "TOI", the team's mean in dashes and, once resolved, the real
+// the viewer's dot in accent with "TOI" beside it, the team's mean in dashes and, once resolved, the real
 // value as a solid line. The drawing is hidden from screen readers: the caption says how to read
 // it, and the predictions are listed in a table (here, or in the table of the page).
 
@@ -37,10 +37,13 @@ export function StripChart({
   withTable?: boolean;
 }) {
   if (dots.length === 0) return null;
+  const viewerIndex = dots.findIndex(({ isViewer }) => isViewer);
   const chart = buildStripChart(
     dots.map(({ value }) => value),
     real,
     mean,
+    DEFAULT_CHART_WIDTH,
+    viewerIndex >= 0 ? viewerIndex : null,
   );
   const toX = (value: number) => `${((value - chart.min) / (chart.max - chart.min)) * 100}%`;
   const withUnit = (value: number) => (unit ? `${formatNumber(value)} ${unit}` : formatNumber(value));
@@ -73,6 +76,8 @@ export function StripChart({
               />
             );
           }
+          // Beside the dot, where the placement kept room for it: above, it would hide the next row.
+          const onLeft = viewerLabelSide(point.x) === "left";
           return (
             <span key={point.index}>
               <span
@@ -80,8 +85,8 @@ export function StripChart({
                 style={{ left: `${point.x}%`, top: top - 2 }}
               />
               <span
-                className={`absolute z-10 ${labelAlign(point.x)} font-display text-[13px] font-extrabold text-accent-text`}
-                style={{ left: `${point.x}%`, top: top - 20 }}
+                className={`absolute z-10 -translate-y-1/2 ${onLeft ? "-translate-x-full" : ""} font-display text-[13px] leading-none font-extrabold text-accent-text`}
+                style={{ left: `calc(${point.x}% ${onLeft ? "-" : "+"} 14px)`, top: top + 6 }}
               >
                 TOI
               </span>

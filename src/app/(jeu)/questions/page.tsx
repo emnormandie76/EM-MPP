@@ -22,20 +22,27 @@ const TABS: { key: string; tab: QuestionListTab; label: string; empty: string }[
   { key: "annulees", tab: "cancelled", label: "Annulées", empty: "Aucune question annulée." },
 ];
 
-function Dates({ item }: { item: QuestionListItem }) {
+/** The questions of past seasons are listed too: their dates carry the year (R-08). */
+function Dates({ item, now }: { item: QuestionListItem; now: Date }) {
   switch (item.status) {
     case "open":
-      return <>Clôture {formatDateTime(item.closesAt)}</>;
+      return <>Clôture {formatDateTime(item.closesAt, now)}</>;
     case "closed":
-      return <>{item.expectedResultAt ? `Résultat attendu ${formatDateTime(item.expectedResultAt)}` : `Clôturée ${formatDateTime(item.closesAt)}`}</>;
+      return (
+        <>
+          {item.expectedResultAt
+            ? `Résultat attendu ${formatDateTime(item.expectedResultAt, now)}`
+            : `Clôturée ${formatDateTime(item.closesAt, now)}`}
+        </>
+      );
     case "resolved":
-      return <>{item.resolvedAt ? `Résolue ${formatDateTime(item.resolvedAt)}` : "Résolue"}</>;
+      return <>{item.resolvedAt ? `Résolue ${formatDateTime(item.resolvedAt, now)}` : "Résolue"}</>;
     case "cancelled":
-      return <>{item.cancelledAt ? `Annulée ${formatDateTime(item.cancelledAt)}` : "Annulée"}</>;
+      return <>{item.cancelledAt ? `Annulée ${formatDateTime(item.cancelledAt, now)}` : "Annulée"}</>;
   }
 }
 
-function QuestionItem({ item }: { item: QuestionListItem }) {
+function QuestionItem({ item, now }: { item: QuestionListItem; now: Date }) {
   return (
     <li className="flex flex-col gap-3 rounded-card border border-line bg-surface px-4.5 py-4 lg:flex-row lg:items-center lg:gap-5">
       <div className="flex min-w-0 grow flex-col gap-2">
@@ -48,7 +55,7 @@ function QuestionItem({ item }: { item: QuestionListItem }) {
           </Link>
         </h2>
         <p className="text-sm text-muted">
-          {QUESTION_KIND_LABELS[item.kind]} · coef. ×{item.coefficient} · <Dates item={item} />
+          {QUESTION_KIND_LABELS[item.kind]} · coef. ×{item.coefficient} · <Dates item={item} now={now} />
         </p>
       </div>
       {item.status === "resolved" ? (
@@ -73,7 +80,8 @@ export default async function QuestionsPage({ searchParams }: PageProps<"/questi
   const viewer = await requireUser();
   const { onglet } = await searchParams;
   const current = TABS.find(({ key }) => key === onglet) ?? TABS[0];
-  const { counts, items } = await getQuestionsList(getDb(), viewer, current.tab, new Date());
+  const now = new Date();
+  const { counts, items } = await getQuestionsList(getDb(), viewer, current.tab, now);
 
   return (
     <>
@@ -92,7 +100,7 @@ export default async function QuestionsPage({ searchParams }: PageProps<"/questi
       ) : (
         <ul aria-label={current.label} className="flex flex-col gap-3">
           {items.map((item) => (
-            <QuestionItem key={item.id} item={item} />
+            <QuestionItem key={item.id} item={item} now={now} />
           ))}
         </ul>
       )}

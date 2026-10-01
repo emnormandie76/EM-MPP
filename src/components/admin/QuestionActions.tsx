@@ -1,10 +1,11 @@
 "use client";
 
 import { Ban, Copy, Trash } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { useStaleResult } from "@/components/ui/useStaleResult";
 import { cancelQuestionAction, deleteQuestionAction, duplicateQuestionAction } from "@/lib/actions/questions";
 import type { Result } from "@/lib/services/result";
 
@@ -23,6 +24,8 @@ export function QuestionActions({
   const [pending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<null | "cancel" | "delete">(null);
   const [feedback, setFeedback] = useState<{ tone: "error" | "success"; text: string } | null>(null);
+  const zone = useRef<HTMLDivElement>(null);
+  const stale = useStaleResult(feedback, zone);
 
   function run(action: () => Promise<Result<unknown>>, success?: string) {
     startTransition(async () => {
@@ -35,7 +38,7 @@ export function QuestionActions({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={zone} className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" pending={pending} onClick={() => run(() => duplicateQuestionAction(questionId))}>
           <Copy {...ICON} />
@@ -54,7 +57,7 @@ export function QuestionActions({
           </Button>
         ) : null}
       </div>
-      <FormMessage feedback={feedback} />
+      <FormMessage feedback={stale ? null : feedback} />
 
       <Dialog open={dialog === "cancel"} onClose={() => setDialog(null)} title="Annuler la question ?">
         <p className="text-[15px] text-ink-2">

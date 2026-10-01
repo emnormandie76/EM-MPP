@@ -6,15 +6,26 @@ import { TIME_ZONE } from "./game/time";
 const paris = tz(TIME_ZONE);
 
 const numberFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
+/** Thousands separator: Intl gives a narrow no-break space, too thin to see in the site's fonts. */
+const NARROW_NBSP = " ";
+const NBSP = " ";
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const WEEK_MS = 7 * DAY_MS;
 
-/** "2 450", "2 450,5" (narrow no-break space, decimal comma). */
+/**
+ * "2 450", "2 450,5": decimal comma, and a no-break space between thousands. The narrow one that
+ * Intl gives could not be seen ("1027" for 1 027; test report of 01/10/2026, R-07).
+ */
 export function formatNumber(n: number): string {
-  return numberFormat.format(n);
+  return numberFormat.format(n).replaceAll(NARROW_NBSP, NBSP);
+}
+
+/** The first letter in lower case: a reason after a colon (« pas publiée : la clôture… », R-06). */
+export function lowerFirst(text: string): string {
+  return text.charAt(0).toLocaleLowerCase("fr-FR") + text.slice(1);
 }
 
 const percentFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
@@ -36,13 +47,18 @@ export function formatDate(date: Date): string {
   return `${formatDayMonth(date)} ${format(date, "yyyy", { in: paris })}`;
 }
 
-/** "mer. 21 oct. à 18 h", "dim. 15 nov. à 18 h 30" (Paris time). */
-export function formatDateTime(date: Date): string {
+/**
+ * "mer. 21 oct. à 18 h", "dim. 15 nov. à 18 h 30" (Paris time). Given `now`, a date of another
+ * year carries it: "sam. 29 nov. 2025 à 23 h" (past seasons; test report of 01/10/2026, R-08).
+ */
+export function formatDateTime(date: Date, now?: Date): string {
   const weekday = format(date, "EEE", { locale: fr, in: paris });
   const hour = format(date, "H", { in: paris });
   const minutes = format(date, "mm", { in: paris });
   const time = minutes === "00" ? `${hour} h` : `${hour} h ${minutes}`;
-  return `${weekday} ${formatDayMonth(date)} à ${time}`;
+  const year = format(date, "yyyy", { in: paris });
+  const day = now && year !== format(now, "yyyy", { in: paris }) ? formatDate(date) : formatDayMonth(date);
+  return `${weekday} ${day} à ${time}`;
 }
 
 /** "il y a 2 h", or the Paris date after a week. Future dates read "à l'instant". */

@@ -2,7 +2,7 @@
 
 > **Version 1.1 du 30/09/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
-> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6). Précisé pendant l'É8 (01/10/2026) : bordure `line-strong` foncée à #7E8796 (§8.1), classement compact sur téléphone (§8.3, §8.4), conteneur défilant des tableaux et squelettes de chargement (§2, §8.3, §8.4), page d'erreur globale (§8.3), contrôle de visibilité dans le layout de `/questions/[id]` (§7.4, §8.3), tests à 390 px (§9.4), streaming (§14).
+> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6). Précisé pendant l'É8 (01/10/2026) : bordure `line-strong` foncée à #7E8796 (§8.1), classement compact sur téléphone (§8.3, §8.4), conteneur défilant des tableaux et squelettes de chargement (§2, §8.3, §8.4), page d'erreur globale (§8.3), contrôle de visibilité dans le layout de `/questions/[id]` (§7.4, §8.3), tests à 390 px (§9.4), streaming (§14). Précisé après la recette par un agent (01/10/2026, rapport `docs/recette/rapport-recette-2026-10-01.md`) : prono Juste Prix qui dépasse hors de l'écart moyen (§5.5, §5.6), étiquette « TOI » à côté du point (§5.7, §8.2), jokers masqués dans l'historique avant la clôture (§6.6), titre des pages d'admin caché aux joueurs (§6.4), confirmation de la désactivation (§6.3), messages de résultat et grilles à 390 px (§8.4, §8.5), espace des milliers et année des dates (§8.6).
 > - Règles fonctionnelles : [cahier des charges v1.1](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
@@ -667,13 +667,13 @@ La page règlement affiche ces mêmes constantes : règlement et calcul ne peuve
 3. **Juste Prix** : un prono strictement supérieur à la valeur réelle (`P > R`) → 0 point, pas de podium, pas de « Dans le mille ». Les autres sont notés normalement.
 4. **Podium** : parmi les pronos éligibles (écart fini ; pour le Juste Prix, ceux qui ne dépassent pas), rang = 1 + nombre de pronos éligibles au `D` strictement plus petit (classement avec ex æquo : 1, 1, 3…). Bonus selon le rang : 1 → +20, 2 → +10, 3 → +5, au-delà → 0. Le bonus est attribué même si le barème donne 0.
 5. « Dans le mille » : points de barème = 100.
-6. Écart relatif (pour le départage et les statistiques) : `D / |R|` en nombre flottant ; infini si `R = 0` et `P ≠ 0`.
+6. Écart relatif (pour le départage et les statistiques) : `D / |R|` en nombre flottant ; infini si `R = 0` et `P ≠ 0`. Il est affiché pour tout prono, même un prono Juste Prix qui dépasse, mais ce dernier ne compte pas dans l'écart moyen du départage (§5.6 ; décision du 01/10/2026).
 
 **Question à choix** : bonne réponse → 50, sinon 0. Pas de podium, pas d'écart.
 
 **Total** = (barème + bonus podium) × coefficient × (2 si joker).
 
-`scoreQuestion(question, predictions)` renvoie, par prono : `basePoints`, `podiumRank | null`, `podiumBonus`, `bullseye`, `relativeError | null`, `total`.
+`scoreQuestion(question, predictions)` renvoie, par prono : `basePoints`, `podiumRank | null`, `podiumBonus`, `bullseye`, `relativeError | null`, `wentOver` (Juste Prix : le prono dépasse la valeur réelle), `total`.
 
 **Vecteurs, question à nombre, valeur réelle 250, coefficient 1, sans joker (barème seul)**
 
@@ -725,7 +725,7 @@ La page règlement affiche ces mêmes constantes : règlement et calcul ne peuve
 - **Par joueur** :
   - `points` : somme des totaux ;
   - `bullseyes` : nombre de « Dans le mille » ;
-  - `meanError` : moyenne des écarts relatifs finis sur les questions à nombre (Juste Prix compris), ou `null` ;
+  - `meanError` : moyenne des écarts relatifs finis sur les questions à nombre (Juste Prix compris), ou `null`. **Un prono Juste Prix qui dépasse n'y compte pas** : il ne rapporte rien, il ne doit pas non plus aider au départage (décision du 01/10/2026, après la recette ; avant, un dépassement de 0,4 % améliorait l'écart moyen) ;
   - `questionsPlayed` : nombre de questions résolues avec un prono.
 - **Tri** : points décroissants, puis `bullseyes` décroissants, puis `meanError` croissant (`null` en dernier). À égalité parfaite (écart moyen égal à 1e-12 près), même rang ; l'affichage départage alors par nom (ordre alphabétique français).
 - **Rang** : classement avec ex æquo (1, 1, 3).
@@ -739,6 +739,7 @@ La page règlement affiche ces mêmes constantes : règlement et calcul ne peuve
 | C4 | après la 2e question résolue, A passe de 3e à 1er | `delta` de A = +2 |
 | C5 | une seule question résolue | tous les `delta` valent `null` |
 | C6 | joueur actif sans prono | présent avec 0 point |
+| C7 | Juste Prix (réel 250) : A 251 (0), B 245 (100) ; nombre (réel 1 000) : A seul à 970 (100) | 100 points chacun ; écart moyen A 3 % (le 251 ne compte pas), B 2 % : B 1er |
 
 **Saison affichée par défaut** (classement et accueil), fonction `defaultSeason(now, seasons)` qui renvoie une saison ou `null` : la saison qui contient `now` (`seasonAt`, §5.1). Si elle n'a encore aucune question résolue, que la précédente a au moins une question publiée et qu'elle n'est pas proclamée, on affiche la précédente. S'il n'existe encore aucune saison (ou si `now` précède la première), on affiche l'état vide. Un sélecteur liste les saisons ayant au moins une question publiée.
 
@@ -750,6 +751,7 @@ La page règlement affiche ces mêmes constantes : règlement et calcul ne peuve
   - domaine = min et max des pronos, de la valeur réelle et de la moyenne, élargi de 8 % de chaque côté ; si min = max, ±10 % (±1 si la valeur est 0) ;
   - graduations « rondes » : pas = 1, 2 ou 5 × 10ⁿ pour environ 4 intervalles ; bornes arrondies au multiple du pas ;
   - placement : pronos triés par valeur, chaque point placé sur la première des 4 rangées où il est à au moins 14 px du point précédent de cette rangée ; si aucune ne convient, sur la rangée où l'écart est le plus grand ;
+  - étiquette « TOI » (paramètre `viewerIndex`) : à côté du point du joueur, à droite, ou à gauche au-delà de 85 % de la largeur. Elle occupe 28 px sur la rangée du joueur : à droite, le point suivant de la rangée vient 28 px plus loin ; à gauche, le point du joueur demande 28 px de plus après le précédent. Posée au-dessus du point, elle cachait le point de la rangée suivante (recette du 01/10/2026, R-03) ;
   - positions renvoyées en pourcentage de la largeur, rangées en index (0 à 3).
 
 | # | Cas | Attendu |
@@ -922,7 +924,7 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
 ### 6.3 Gestion des comptes (admin)
 
 - **Mise en œuvre** (décision du 30/09/2026) : les services de `src/lib/services/players.ts` écrivent eux-mêmes ce qu'écrirait l'API admin de Better Auth (champs de bannissement, suppression des sessions, mot de passe haché par `better-auth/crypto`). Cette API exige la session HTTP de l'admin, incompatible avec la signature `(db, actor, input, now)` des services (§7.1).
-- **Désactiver** : bannissement Better Auth, sans date de fin, ce qui révoque les sessions. **Réactiver** : levée du bannissement.
+- **Désactiver** : bannissement Better Auth, sans date de fin, ce qui révoque les sessions ; après une confirmation, puisque la session du joueur tombe aussitôt (décision du 01/10/2026). **Réactiver** : levée du bannissement, sans confirmation.
 - **Mot de passe provisoire** :
   - 12 caractères aléatoires, alphabet sans caractères ambigus (pas de `0 O o 1 l I`) ;
   - haché comme le fait Better Auth et enregistré sur le compte « credential » du joueur ;
@@ -946,7 +948,7 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
 
 1. **Proxy/middleware** (redirection rapide, pas une sécurité) : sans cookie de session Better Auth, toute route sauf `/connexion`, `/inscription`, `/api/auth/*`, `/api/health` et les fichiers statiques redirige vers `/connexion`.
 2. **Layout `(jeu)`** : `requireUser()`. Sans session valide, redirection vers `/connexion`. Un compte désactivé n'a plus de session.
-3. **Layout `admin`** : `requireAdmin()`. Un joueur non admin reçoit la page 404 (on ne révèle pas l'existence du back-office).
+3. **Layout `admin`** : `requireAdmin()`. Un joueur non admin reçoit la page 404 (on ne révèle pas l'existence du back-office). Next résout les métadonnées d'une page même quand son layout répond 404 : les pages d'admin donnent leur titre par `generateMetadata`, qui passe par `adminMetadata(titre)` (`requireAdmin()` d'abord). Sinon, l'onglet d'un joueur affichait « Back-office · Le Bon Chiffre » (recette du 01/10/2026, R-02).
 4. **Chaque Server Action** appelle `requireUser()` ou `requireAdmin()` et renvoie une erreur `NOT_AUTHENTICATED` ou `FORBIDDEN`, jamais une exception non gérée.
 5. **Chaque service** revérifie le rôle de l'acteur qu'il reçoit (défense en profondeur).
 
@@ -972,7 +974,7 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
 | Mon prono | — | visible | visible | visible |
 | Les pronos des autres (joueur) | — | **jamais** | valeurs, jokers, noms | + écarts, points |
 | Les pronos des autres (admin) | — | **états seulement** : à faire, enregistré, validé | valeurs | + points |
-| Historique des événements (admin) | — | types et horaires, **sans valeurs** | avec valeurs | avec valeurs |
+| Historique des événements (admin) | — | types et horaires, **sans valeurs ni jokers** (l'admin joue aussi ; décision du 01/10/2026) | avec valeurs et jokers | avec valeurs et jokers |
 | Sagesse de la foule, graphique | — | non | oui | oui, avec la valeur réelle |
 
 Une seule fonction de `src/lib/data/` lit les pronos d'une question pour l'affichage : `getQuestionPredictionsForViewer(db, viewer, questionId, now)`. Elle applique ce tableau. Aucun composant ne lit la table `prediction` directement.
@@ -1163,7 +1165,7 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
   - hauteur 112 px, axe `line` de 2 px ;
   - valeur réelle : trait `ink` de 2 px avec l'étiquette « RÉEL 250 » ;
   - moyenne : pointillés `hot` ;
-  - points de 12 px en `dots` ; le mien fait 16 px en `accent`, avec un halo de 4 px `accent-soft` et l'étiquette « TOI » ;
+  - points de 12 px en `dots` ; le mien fait 16 px en `accent`, avec un halo de 4 px `accent-soft` et l'étiquette « TOI » à côté (et non au-dessus, comme sur la maquette : elle cachait un point ; §5.7) ;
   - graduations en `muted` 12 px ;
   - légende sous le graphique.
   - Accessibilité : `<figure>` avec `<figcaption>`, et un tableau des pronos disponible sous le graphique pour les lecteurs d'écran.
@@ -1317,12 +1319,13 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
   - les tuiles passent en grille de 2 colonnes ;
   - les tableaux défilent horizontalement dans leur conteneur (`TableScroll`) : il est `relative`, pour que les textes réservés aux lecteurs d'écran ne débordent pas de la page, et devient une région nommée accessible au clavier tant que son tableau dépasse (É8) ; seul `/classement` affiche à la place la liste compacte, sous 640 px (§8.3) ;
   - le compte à rebours passe en version compacte.
-- À 390 px de large : aucun défilement horizontal de la page, toutes les actions restent accessibles. Points relevés à l'É8 : un `<input>` ou un `<fieldset>` impose sa largeur propre à son conteneur (`w-0` ou `min-w-0` le libère), et les tuiles « Réel, médiane, moyenne » passent sur deux lignes.
+- À 390 px de large : aucun défilement horizontal de la page, toutes les actions restent accessibles. Points relevés à l'É8 : un `<input>` ou un `<fieldset>` impose sa largeur propre à son conteneur (`w-0` ou `min-w-0` le libère), et les tuiles « Réel, médiane, moyenne » passent sur deux lignes. Relevé à la recette (R-01) : une grille qui ne définit ses colonnes qu'à partir d'une largeur (`lg:grid-cols-12`) a, en dessous, une colonne implicite `auto`, qui prend la largeur du plus long nom ; toute grille de mise en page porte donc `grid-cols-1` (`minmax(0, 1fr)`). `e2e/responsive.spec.ts` vérifie les pages avec un nom de 30 caractères.
 
 ### 8.5 Accessibilité
 
 - `<html lang="fr">`, un seul `h1` par page, titres hiérarchisés.
 - Tous les champs ont un `<label>`, les erreurs sont reliées par `aria-describedby`, les résultats d'actions annoncés par `aria-live`.
+- Un message de résultat décrit la dernière action : il disparaît dès qu'une autre action commence sur la page (envoi d'un formulaire, ou clic sur un bouton hors de sa zone ; `useStaleResult`, appliqué par `useFormAction` et par les composants d'admin). Un message venu de l'adresse (`?creee=1`) quitte l'adresse une fois affiché (`DropSearchParams`). Décision du 01/10/2026 (recette, R-04).
 - Vrais `<button>` et `<a href>` ; jamais un `onClick` sur une `div`.
 - Navigation complète au clavier, focus visible (§8.1), ordre de tabulation logique, `<dialog>` avec le focus piégé.
 - Les couleurs ne portent jamais seules l'information : ▲▼ et libellés pour l'évolution, textes pour les statuts.
@@ -1332,8 +1335,9 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 
 - Tutoiement, français, phrases courtes.
 - Vocabulaire : **pronostic, prono, points, joker, classement**. Jamais « pari », « parier », « mise », « miser », « parieur » (vérifié par un test, §9.3).
-- Nombres au format français (« 2 450 »), décimales avec une virgule.
-- Dates : « mer. 21 oct. à 18 h », « à 18 h 30 » quand il y a des minutes ; date relative pour les annonces.
+- Nombres au format français (« 2 450 »), décimales avec une virgule. Les milliers sont séparés par une espace insécable ordinaire (U+00A0) : l'espace fine que donne `Intl` ne se voyait pas dans les polices du site (recette, R-07).
+- Dates : « mer. 21 oct. à 18 h », « à 18 h 30 » quand il y a des minutes ; avec l'année quand la date n'est pas de l'année en cours, heure de Paris (« sam. 29 nov. 2025 à 23 h » ; `formatDateTime(date, now)`, recette R-08) ; date relative pour les annonces.
+- Une raison après un deux-points commence par une minuscule (« pas publiée : la clôture est déjà passée. » ; `lowerFirst`, recette R-06).
 - Tous les textes de l'interface sont en français ; le code, les identifiants et les messages de commit sont en anglais.
 
 ---

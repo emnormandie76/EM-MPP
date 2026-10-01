@@ -10,9 +10,10 @@ import { ResultForm } from "@/components/admin/ResultForm";
 import { UnlockButton } from "@/components/admin/UnlockButton";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
+import { DropSearchParams } from "@/components/ui/DropSearchParams";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { TableScroll } from "@/components/ui/TableScroll";
-import { requireAdmin } from "@/lib/auth/session";
+import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { type AdminQuestion, getAdminQuestion, getQuestionHistory, type HistoryEvent, type HistoryEventType, type TrackingRow } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
 import { formatCount, formatDateTime, formatNumber } from "@/lib/format";
@@ -22,7 +23,9 @@ import type { PredictionState } from "@/lib/game/prediction-state";
 import { utcToParisLocalInput } from "@/lib/game/time";
 import { QUESTION_KIND_LABELS } from "@/lib/validation/question";
 
-export const metadata: Metadata = { title: "Question" };
+export async function generateMetadata(): Promise<Metadata> {
+  return adminMetadata("Question");
+}
 
 const SECTION_TITLE = "font-display text-[26px] font-extrabold uppercase leading-none";
 const TH = "px-3 py-2 font-display text-[13px] font-bold uppercase tracking-[0.08em] text-muted";
@@ -93,7 +96,7 @@ function answerText(answer: TrackingRow["answer"], detail: AdminQuestion): strin
   return detail.options.find(({ id }) => id === optionId)?.label ?? "—";
 }
 
-function Tracking({ detail, rows }: { detail: AdminQuestion; rows: TrackingRow[] }) {
+function Tracking({ detail, rows, now }: { detail: AdminQuestion; rows: TrackingRow[]; now: Date }) {
   const revealed = rows.some(({ answer }) => answer !== null);
   // Unlocking is possible while the question is open, on a validated prediction (§5.4).
   const canUnlock = detail.question.computedStatus === "open";
@@ -148,7 +151,7 @@ function Tracking({ detail, rows }: { detail: AdminQuestion; rows: TrackingRow[]
                 <td className={TD}>
                   <StateLabel state={row.state} />
                 </td>
-                <td className={`${TD} whitespace-nowrap text-muted`}>{row.validatedAt ? formatDateTime(row.validatedAt) : "—"}</td>
+                <td className={`${TD} whitespace-nowrap text-muted`}>{row.validatedAt ? formatDateTime(row.validatedAt, now) : "—"}</td>
                 {canUnlock ? (
                   <td className={TD}>
                     {row.state === "validated" && row.predictionId !== null ? (
@@ -180,7 +183,7 @@ const EVENT_LABELS: Record<HistoryEventType, string> = {
 };
 
 /** History of the predictions (§8.3): without values before the closing (§6.6). */
-function History({ detail, events }: { detail: AdminQuestion; events: HistoryEvent[] }) {
+function History({ detail, events, now }: { detail: AdminQuestion; events: HistoryEvent[]; now: Date }) {
   const revealed = events.some(({ answer }) => answer !== null);
   return (
     <Card as="section" className="flex flex-col gap-4">
@@ -206,7 +209,7 @@ function History({ detail, events }: { detail: AdminQuestion; events: HistoryEve
               <tbody>
                 {events.map((event) => (
                   <tr key={event.id} className="border-b border-line last:border-b-0">
-                    <td className={`${TD} whitespace-nowrap text-muted`}>{formatDateTime(event.createdAt)}</td>
+                    <td className={`${TD} whitespace-nowrap text-muted`}>{formatDateTime(event.createdAt, now)}</td>
                     <td className={`${TD} font-semibold`}>{event.ownerName}</td>
                     <td className={TD}>
                       {EVENT_LABELS[event.type]}
@@ -282,12 +285,13 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
         {q.cancelledAt ? (
           // White background: `hot` text reaches 4.9:1 on it, but only 4.2:1 on the page background.
           <p className="self-start rounded-field border border-hot bg-surface px-3 py-1.5 text-[15px] font-semibold text-hot">
-            Annulée le {formatDateTime(q.cancelledAt)}.
+            Annulée le {formatDateTime(q.cancelledAt, now)}.
           </p>
         ) : null}
       </header>
 
       <FormMessage feedback={notice ? { tone: "success", text: NOTICES[notice] } : null} />
+      {notice ? <DropSearchParams names={Object.keys(NOTICES)} /> : null}
       <QuestionActions
         questionId={q.id}
         canCancel={q.status === "published"}
@@ -300,9 +304,9 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
             Résultat
           </h2>
           <p className="text-[15px] text-ink-2">
-            {q.resolvedAt ? `Résolue le ${formatDateTime(q.resolvedAt)}.` : "La question est clôturée : saisis la valeur réelle dès qu'elle est connue."}
-            {q.correctedAt ? ` Résultat corrigé le ${formatDateTime(q.correctedAt)}.` : ""}
-            {!q.resolvedAt && q.expectedResultAt ? ` Résultat prévu le ${formatDateTime(q.expectedResultAt)}.` : ""}
+            {q.resolvedAt ? `Résolue le ${formatDateTime(q.resolvedAt, now)}.` : "La question est clôturée : saisis la valeur réelle dès qu'elle est connue."}
+            {q.correctedAt ? ` Résultat corrigé le ${formatDateTime(q.correctedAt, now)}.` : ""}
+            {!q.resolvedAt && q.expectedResultAt ? ` Résultat prévu le ${formatDateTime(q.expectedResultAt, now)}.` : ""}
           </p>
           <p className="text-[15px] text-ink-2">Source : {q.source}</p>
           <ResultForm
@@ -317,8 +321,8 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
         </Card>
       ) : null}
 
-      {detail.tracking ? <Tracking detail={detail} rows={detail.tracking} /> : null}
-      {history ? <History detail={detail} events={history} /> : null}
+      {detail.tracking ? <Tracking detail={detail} rows={detail.tracking} now={now} /> : null}
+      {history ? <History detail={detail} events={history} now={now} /> : null}
 
       <QuestionForm
         key={q.id}

@@ -57,12 +57,25 @@ test("an anonymous visitor is sent to /connexion", async ({ page }) => {
   }
 });
 
-test("a player gets the 404 page on the back office", async ({ page }) => {
+test("a player gets the 404 page on the back office, without the title of the page", async ({ page }) => {
   await signIn(page, ACCOUNTS.sarah);
-  for (const url of ["/admin", "/admin/joueurs"]) {
+  // Every back-office page, with its tab title: none may reach the player (test report of 01/10/2026, R-02).
+  for (const [url, title] of [
+    ["/admin", "Back-office"],
+    ["/admin/questions", "Questions"],
+    ["/admin/questions/nouvelle", "Nouvelle question"],
+    ["/admin/questions/1", "Question"],
+    ["/admin/joueurs", "Joueurs"],
+    ["/admin/categories", "Catégories"],
+    ["/admin/saisons", "Saisons et lots"],
+    ["/admin/annonces", "Annonces"],
+  ]) {
     const response = await page.goto(url);
     expect(response?.status()).toBe(404);
     await expect(page.getByRole("heading", { level: 1, name: "Cette page n'existe pas." })).toBeVisible();
+    // The same tab title as an unknown address.
+    await expect(page).toHaveTitle("Le Bon Chiffre");
+    expect(await response!.text(), url).not.toContain(`${title} · Le Bon Chiffre`);
   }
 });
 
@@ -70,8 +83,10 @@ test("the admin reaches /admin/joueurs from the header", async ({ page }) => {
   await signIn(page, ACCOUNTS.admin);
   await page.getByRole("banner").getByRole("link", { name: "Admin" }).click();
   await expect(page).toHaveURL("/admin");
+  await expect(page).toHaveTitle("Back-office · Le Bon Chiffre");
   await page.getByRole("navigation", { name: "Back-office" }).getByRole("link", { name: "Joueurs" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Joueurs" })).toBeVisible();
+  await expect(page).toHaveTitle("Joueurs · Le Bon Chiffre");
   const accounts = page.getByRole("table", { name: "Comptes des joueurs" });
   await expect(accounts.getByRole("row").filter({ hasText: ACCOUNTS.sarah })).toContainText("Joueur");
   await expect(accounts.getByRole("row").filter({ hasText: ACCOUNTS.admin })).toContainText("C'est toi");
@@ -158,4 +173,26 @@ test("a temporary password lets the player in, who then changes it in the profil
 
   await signOut(page);
   await signIn(page, ACCOUNTS.hugo);
+});
+
+// A disabled player loses their session at once: the button asks first (decision of 01/10/2026).
+test("disabling an account asks for a confirmation, and the account can be enabled again", async ({ page }) => {
+  await signIn(page, ACCOUNTS.admin);
+  await page.goto("/admin/joueurs");
+  const row = page.getByRole("table", { name: "Comptes des joueurs" }).getByRole("row").filter({ hasText: "joueur3@example.test" });
+  const confirm = page.getByRole("dialog", { name: "Désactiver Inès ?" });
+
+  // Cancelled: nothing changes.
+  await row.getByRole("button", { name: "Désactiver" }).click();
+  await expect(confirm).toContainText("sa session ouverte sera fermée");
+  await confirm.getByRole("button", { name: "Annuler" }).click();
+  await expect(confirm).toBeHidden();
+  await expect(row.getByRole("button", { name: "Désactiver" })).toBeVisible();
+
+  // Confirmed, then enabled again for the other tests.
+  await row.getByRole("button", { name: "Désactiver" }).click();
+  await confirm.getByRole("button", { name: "Désactiver" }).click();
+  await expect(row.getByRole("button", { name: "Réactiver" })).toBeVisible();
+  await row.getByRole("button", { name: "Réactiver" }).click();
+  await expect(row.getByRole("button", { name: "Désactiver" })).toBeVisible();
 });

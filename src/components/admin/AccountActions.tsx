@@ -15,11 +15,14 @@ import type { Result } from "@/lib/services/result";
 
 export type AccountSummary = { id: string; name: string; role: "player" | "admin"; banned: boolean };
 
-type OpenDialog = null | "confirm-password" | "confirm-anonymize" | { password: string };
+type OpenDialog = null | "confirm-disable" | "confirm-password" | "confirm-anonymize" | { password: string };
 
 const ICON = { "aria-hidden": true, size: 16, strokeWidth: 2.4 } as const;
 
-/** Actions on one account (§6.3): role, disable or enable, temporary password, anonymize. */
+/**
+ * Actions on one account (§6.3): role, disable (with a confirmation: it closes the player's session;
+ * decision of 01/10/2026) or enable, temporary password, anonymize.
+ */
 export function AccountActions({ account }: { account: AccountSummary }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +71,7 @@ export function AccountActions({ account }: { account: AccountSummary }) {
             Réactiver
           </Button>
         ) : (
-          <Button variant="danger" pending={pending} onClick={() => run(() => disableUserAction(account.id))}>
+          <Button variant="danger" pending={pending} onClick={() => setDialog("confirm-disable")}>
             <Ban {...ICON} />
             Désactiver
           </Button>
@@ -85,6 +88,21 @@ export function AccountActions({ account }: { account: AccountSummary }) {
       <p aria-live="polite" className="text-sm font-medium text-hot">
         {error}
       </p>
+
+      <Dialog open={dialog === "confirm-disable"} onClose={() => setDialog(null)} title={`Désactiver ${account.name} ?`}>
+        <p className="text-[15px] text-ink-2">
+          {account.name} ne pourra plus se connecter, et sa session ouverte sera fermée. Ses pronos restent comptés au
+          classement, avec la mention « inactif ». Tu pourras réactiver le compte à tout moment.
+        </p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDialog(null)}>
+            Annuler
+          </Button>
+          <Button variant="danger" pending={pending} onClick={() => run(() => disableUserAction(account.id), () => setDialog(null))}>
+            Désactiver
+          </Button>
+        </div>
+      </Dialog>
 
       <Dialog open={dialog === "confirm-password"} onClose={() => setDialog(null)} title="Mot de passe provisoire">
         <p className="text-[15px] text-ink-2">

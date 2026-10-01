@@ -30,8 +30,9 @@ async function createQuestion(
   }
   await page.getByLabel("Source").fill("Tableau BI « JPO », feuilles d'émargement");
   await page.getByRole("button", { name: "Enregistrer le brouillon" }).click();
-  await expect(page).toHaveURL(/\/admin\/questions\/\d+\?creee=1$/);
+  // The page of the new question, with its notice; `?creee=1` leaves the address once shown (R-04).
   await expect(page.getByText("Question créée en brouillon.")).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/questions\/\d+$/);
   return Number(/\/admin\/questions\/(\d+)/.exec(page.url())![1]);
 }
 
@@ -84,8 +85,8 @@ test("dates in series in Paris time, publication, and the scheduled question sta
   await expect(page.getByText("2 questions publiées.")).toBeVisible();
 
   // The dates shown are the Paris times that were typed, whatever the server's time zone (UTC).
-  const opensLabel = formatDateTime(parisLocalToUtc(opensAt));
-  const closesLabel = formatDateTime(parisLocalToUtc(closesAt));
+  const opensLabel = formatDateTime(parisLocalToUtc(opensAt), new Date());
+  const closesLabel = formatDateTime(parisLocalToUtc(closesAt), new Date());
   expect(opensLabel).toMatch(/ à 9 h$/);
   expect(closesLabel).toMatch(/ à 18 h 30$/);
   await page.goto("/admin/questions?statut=programmee");
@@ -109,6 +110,26 @@ test("dates in series in Paris time, publication, and the scheduled question sta
     const response = await page.goto(`/questions/${id}`);
     expect(response?.status()).toBe(404);
   }
+});
+
+// Test report of 01/10/2026: once published, the page still said « Question créée en brouillon.
+// Complète ses dates, puis publie-la. » (R-04); a refusal had a capital after its colon (R-06).
+test("on the page of a new question, « Publier » explains a refusal, then drops the creation message", async ({ page }) => {
+  await signIn(page, ACCOUNTS.admin);
+  await createQuestion(page, { title: "Combien de visiteurs au salon de Caen ?", unit: "visiteurs" });
+
+  await page.getByRole("button", { name: "Publier", exact: true }).click();
+  await expect(
+    page.getByText("Question enregistrée, mais pas publiée : il manque la date d'ouverture. Il manque la date de clôture."),
+  ).toBeVisible();
+
+  await page.getByLabel("Ouverture").fill(parisLocal(10, "09:00"));
+  await page.getByLabel("Clôture").fill(parisLocal(17, "18:30"));
+  await page.getByRole("button", { name: "Publier", exact: true }).click();
+  await expect(page.getByText("Question enregistrée et publiée.")).toBeVisible();
+  await expect(page.getByText("Question créée en brouillon.")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/admin\/questions\/\d+$/);
+  await expect(page.getByText("Programmée", { exact: true })).toBeVisible();
 });
 
 test("the admin enters, then corrects, the result of the seeded closed question", async ({ page }) => {

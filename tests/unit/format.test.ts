@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, formatDate, formatDateTime, formatNumber, formatPercent, formatRelative, rankSuffix } from "@/lib/format";
+import { formatCount, formatDate, formatDateTime, formatNumber, formatPercent, formatRelative, lowerFirst, rankSuffix } from "@/lib/format";
 
-const NARROW_NBSP = " ";
+const NBSP = " ";
 
 describe("formatNumber", () => {
-  it("groups thousands with a narrow no-break space", () => {
-    expect(formatNumber(2450)).toBe(`2${NARROW_NBSP}450`);
+  it("groups thousands with a no-break space, not the narrow one, too thin to see (R-07)", () => {
+    expect(formatNumber(2450)).toBe(`2${NBSP}450`);
+    expect(formatNumber(1234567)).toBe(`1${NBSP}234${NBSP}567`);
+    expect(formatNumber(1027)).not.toContain(" ");
   });
 
   it("uses a decimal comma and at most 2 decimals", () => {
-    expect(formatNumber(2450.5)).toBe(`2${NARROW_NBSP}450,5`);
+    expect(formatNumber(2450.5)).toBe(`2${NBSP}450,5`);
     expect(formatNumber(12.345)).toBe("12,35");
   });
 
@@ -35,6 +37,28 @@ describe("formatDateTime", () => {
   it("uses the Paris date, not the UTC date, around midnight", () => {
     // 22:30 UTC on 30 Sept is 00:30 on 1 Oct in Paris.
     expect(formatDateTime(new Date("2026-09-30T22:30:00Z"))).toBe("jeu. 1er oct. à 0 h 30");
+  });
+
+  it("given now, shows the year of a date from another year only (R-08)", () => {
+    const now = new Date("2026-10-01T10:00:00Z");
+    expect(formatDateTime(new Date("2025-11-29T22:00:00Z"), now)).toBe("sam. 29 nov. 2025 à 23 h");
+    expect(formatDateTime(new Date("2027-01-15T17:30:00Z"), now)).toBe("ven. 15 janv. 2027 à 18 h 30");
+    expect(formatDateTime(new Date("2026-10-21T16:00:00Z"), now)).toBe("mer. 21 oct. à 18 h");
+  });
+
+  it("compares the years in Paris time", () => {
+    // 31 Dec 2026 23:30 UTC is already 1 Jan 2027 in Paris.
+    const newYear = new Date("2026-12-31T23:30:00Z");
+    expect(formatDateTime(newYear, new Date("2027-01-02T12:00:00Z"))).toBe("ven. 1er janv. à 0 h 30");
+    expect(formatDateTime(newYear, new Date("2026-12-31T12:00:00Z"))).toBe("ven. 1er janv. 2027 à 0 h 30");
+  });
+});
+
+describe("lowerFirst", () => {
+  it("puts the first letter in lower case, for a reason after a colon (R-06)", () => {
+    expect(lowerFirst("La clôture est déjà passée. Il manque la date d'ouverture.")).toBe("la clôture est déjà passée. Il manque la date d'ouverture.");
+    expect(lowerFirst("Écris un nombre.")).toBe("écris un nombre.");
+    expect(lowerFirst("")).toBe("");
   });
 });
 

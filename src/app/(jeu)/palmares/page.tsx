@@ -22,7 +22,7 @@ const PODIUM_RANKS = 3;
 function Podium({ season }: { season: PalmaresSeason }) {
   const podium = season.rows.filter(({ rank }) => rank <= PODIUM_RANKS);
   return (
-    <ol aria-label={`Podium de la saison ${season.label}`} className="grid gap-3 sm:grid-cols-3">
+    <ol aria-label={`Podium de la saison ${season.label}`} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {podium.map((row) => (
         <li
           key={row.userId}

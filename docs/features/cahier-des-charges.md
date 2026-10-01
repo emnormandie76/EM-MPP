@@ -157,7 +157,7 @@ Bonne réponse : 50 points. Mauvaise réponse : 0 point. Pas de bonus podium. Po
 
 ### 5.4 Départage au classement
 1. Le plus grand nombre de « Dans le mille ».
-2. Puis l'écart relatif moyen le plus faible sur les questions à nombre.
+2. Puis l'écart relatif moyen le plus faible sur les questions à nombre. Un prono Juste Prix qui dépasse la valeur réelle n'y compte pas : il ne rapporte aucun point, il ne doit pas non plus aider au départage (précision du 01/10/2026, après la recette).
 3. Sinon, ex æquo.
 
 ### 5.5 Cas particuliers

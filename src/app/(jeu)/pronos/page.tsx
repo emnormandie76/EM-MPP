@@ -34,7 +34,7 @@ const EMPTY_TAB: Record<PredictionState, string> = {
 function QuestionRow({ question: q, serverNow }: { question: PlayerQuestion; serverNow: number }) {
   const titleId = `prono-${q.id}-titre`;
   return (
-    <article aria-labelledby={titleId} className="grid gap-5 rounded-card border border-line bg-surface p-5 lg:grid-cols-2 lg:px-6.5">
+    <article aria-labelledby={titleId} className="grid grid-cols-1 gap-5 rounded-card border border-line bg-surface p-5 lg:grid-cols-2 lg:px-6.5">
       <div className="flex min-w-0 flex-col gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <Chip>{q.categoryName}</Chip>

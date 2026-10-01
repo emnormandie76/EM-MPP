@@ -6,13 +6,15 @@ import { ProclaimButton } from "@/components/admin/ProclaimButton";
 import { SeasonActions, SeasonCreateForm } from "@/components/admin/SeasonForms";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
-import { requireAdmin } from "@/lib/auth/session";
+import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { type AdminSeason, getSeasonsAdmin } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { utcToParisLocalDate } from "@/lib/game/time";
 
-export const metadata: Metadata = { title: "Saisons et lots" };
+export async function generateMetadata(): Promise<Metadata> {
+  return adminMetadata("Saisons et lots");
+}
 
 const SECTION_TITLE = "font-display text-[26px] font-extrabold uppercase leading-none";
 
@@ -84,7 +86,7 @@ export default async function SeasonsAdminPage() {
             <h2 className={SECTION_TITLE}>Saison {season.label}</h2>
             {season.isCurrent ? <Chip tone="accent">En cours</Chip> : null}
           </div>
-          <dl className="grid gap-x-8 gap-y-1 text-[15px] sm:grid-cols-[auto_1fr]">
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-1 text-[15px] sm:grid-cols-[auto_1fr]">
             <dt className="text-muted">Dates</dt>
             <dd>{datesOf(season, now)}</dd>
             <dt className="text-muted">Questions résolues</dt>
@@ -92,7 +94,7 @@ export default async function SeasonsAdminPage() {
               {season.questionsResolved} / {season.questionsTotal}
             </dd>
             <dt className="text-muted">Classement final</dt>
-            <dd>{season.proclaimedAt ? `Proclamé le ${formatDateTime(season.proclaimedAt)}` : "Pas encore proclamé"}</dd>
+            <dd>{season.proclaimedAt ? `Proclamé le ${formatDateTime(season.proclaimedAt, now)}` : "Pas encore proclamé"}</dd>
           </dl>
           <ProclaimButton
             seasonId={season.id}

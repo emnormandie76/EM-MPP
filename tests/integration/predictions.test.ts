@@ -143,8 +143,8 @@ describe("savePrediction (§5.4)", () => {
 
   it("returns the message of parseNumberInput for a value it cannot read", async () => {
     const q = await openQuestion();
-    // Grouped like formatNumber, with a narrow no-break space.
-    const message = "Écris 2450 ou 2 450 (pas de point pour les milliers).";
+    // Grouped like formatNumber, with a no-break space (the narrow one could not be seen; R-07).
+    const message = "Écris 2450 ou 2 450 (pas de point pour les milliers).";
     expect(await savePrediction(db, player, { questionId: q.id, rawValue: "2.450" }, now)).toEqual({
       ok: false,
       code: "INVALID_VALUE",

@@ -102,7 +102,7 @@ export default async function HomePage() {
         </dl>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <section aria-labelledby="cloture-imminente" className="flex flex-col gap-2.5 lg:col-span-8">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="cloture-imminente" className={SECTION_TITLE}>
@@ -145,7 +145,7 @@ export default async function HomePage() {
 /** Block 4 (§8.3): the latest resolved question, as a compact ResultPanel. */
 function LatestResult({ latest }: { latest: HomeData["latestResult"] }) {
   return (
-    <section aria-labelledby="dernier-resultat" className="grid gap-2.5 lg:grid-cols-12">
+    <section aria-labelledby="dernier-resultat" className="grid grid-cols-1 gap-2.5 lg:grid-cols-12">
       <h2 id="dernier-resultat" className={`${SECTION_TITLE} lg:col-span-12`}>
         Dernier résultat
       </h2>

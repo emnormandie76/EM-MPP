@@ -69,12 +69,13 @@ export async function getQuestionResults(db: Database, viewer: PlayerViewer, q: 
     ? scoreQuestion(
         { type: q.type, priceIsRight: q.priceIsRight, coefficient: q.coefficient, resultNumber: q.result.valueNumber, resultOptionId: q.result.optionId },
         answered.map(({ answer }) => answer),
-      ).map(({ basePoints, podiumRank, podiumBonus, bullseye, relativeError, total }) => ({
+      ).map(({ basePoints, podiumRank, podiumBonus, bullseye, relativeError, wentOver, total }) => ({
         basePoints,
         podiumRank,
         podiumBonus,
         bullseye,
         relativeError,
+        wentOver,
         total,
       }))
     : answered.map(() => null);

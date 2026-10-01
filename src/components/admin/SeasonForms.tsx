@@ -1,12 +1,13 @@
 "use client";
 
 import { Pencil, Plus, Trash } from "lucide-react";
-import { type FormEvent, useState, useTransition } from "react";
+import { type FormEvent, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Field } from "@/components/ui/Field";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { useFormAction } from "@/components/ui/useFormAction";
+import { useStaleResult } from "@/components/ui/useStaleResult";
 import { createSeasonAction, deleteSeasonAction, updateSeasonAction } from "@/lib/actions/content";
 import type { FormState } from "@/lib/actions/form-state";
 import { seasonStartFromLocalDate, suggestedSeasonLabel } from "@/lib/game/time";
@@ -40,7 +41,9 @@ function suggestionFor(startsOn: string): string | null {
 
 /**
  * New season: name and start day. The name follows the start day ("2027-2028") until the admin
- * types their own; once the season is created, the form offers the next one.
+ * types their own; once the season is created, the form offers the next one. When the seasons
+ * change elsewhere on the page (a season deleted or moved), an untouched form follows the new
+ * suggestion (test report of 01/10/2026, R-05: it kept a date based on the deleted season).
  */
 export function SeasonCreateForm({ suggestedStart, suggestedLabel }: { suggestedStart: string; suggestedLabel: string }) {
   const [state, onSubmit, pending] = useFormAction<FormState>(createSeasonAction, null);
@@ -48,12 +51,20 @@ export function SeasonCreateForm({ suggestedStart, suggestedLabel }: { suggested
   const [label, setLabel] = useState(suggestedLabel);
   const [labelTyped, setLabelTyped] = useState(false);
   const [handled, setHandled] = useState<FormState>(null);
+  const [offered, setOffered] = useState({ start: suggestedStart, label: suggestedLabel });
   if (state !== handled) {
     setHandled(state);
     if (state?.ok) {
       setStartsOn(suggestedStart);
       setLabel(suggestedLabel);
       setLabelTyped(false);
+    }
+  }
+  if (offered.start !== suggestedStart || offered.label !== suggestedLabel) {
+    setOffered({ start: suggestedStart, label: suggestedLabel });
+    if (startsOn === offered.start && !labelTyped) {
+      setStartsOn(suggestedStart);
+      setLabel(suggestedLabel);
     }
   }
 
@@ -120,6 +131,9 @@ export function SeasonActions({ season, deleteBlocked }: SeasonActionsProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const zone = useRef<HTMLDivElement>(null);
+  // « Saison modifiée. » goes once another action starts on the page (creation of a season, lots…).
+  const editStale = useStaleResult(editState, zone);
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -181,7 +195,7 @@ export function SeasonActions({ season, deleteBlocked }: SeasonActionsProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={zone} className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         <Button
           variant="secondary"
@@ -212,7 +226,7 @@ export function SeasonActions({ season, deleteBlocked }: SeasonActionsProps) {
       ) : null}
       <FormMessage
         feedback={
-          deleteError ? { tone: "error", text: deleteError } : editState?.ok ? { tone: "success", text: editState.message } : null
+          deleteError ? { tone: "error", text: deleteError } : editState?.ok && !editStale ? { tone: "success", text: editState.message } : null
         }
       />
 

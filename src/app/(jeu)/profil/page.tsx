@@ -19,7 +19,7 @@ export default async function ProfilePage() {
   return (
     <>
       <h1 className="font-display text-[44px] font-extrabold uppercase leading-none">Mon compte</h1>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card as="section" className="flex flex-col gap-4">
           <h2 className={SECTION_TITLE}>Mon nom</h2>
           <DisplayNameForm name={viewer.name} />

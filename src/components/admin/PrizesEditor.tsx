@@ -1,9 +1,10 @@
 "use client";
 
 import { ArrowDown, ArrowUp, Plus, Trash } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { useStaleResult } from "@/components/ui/useStaleResult";
 import { savePrizesAction } from "@/lib/actions/content";
 import type { FormState } from "@/lib/actions/form-state";
 import { PRIZE_DESCRIPTION_MAX, PRIZE_RANK_MAX, PRIZES_MAX } from "@/lib/validation/content";
@@ -25,6 +26,8 @@ export function PrizesEditor({
   const [nextKey, setNextKey] = useState(initial.length);
   const [state, setState] = useState<FormState>(null);
   const [pending, startTransition] = useTransition();
+  const zone = useRef<HTMLDivElement>(null);
+  const stale = useStaleResult(state, zone);
   const idOf = (row: Row, field: string) => `prize-${seasonId}-${row.key}-${field}`;
 
   function update(key: number, patch: Partial<Row>) {
@@ -51,11 +54,12 @@ export function PrizesEditor({
   }
 
   let feedback: { tone: "success" | "error"; text: string } | null = null;
-  if (state?.ok) feedback = { tone: "success", text: state.message };
+  if (stale) feedback = null;
+  else if (state?.ok) feedback = { tone: "success", text: state.message };
   else if (state) feedback = { tone: "error", text: Object.values(state.fieldErrors ?? {})[0] ?? state.message };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={zone} className="flex flex-col gap-3">
       {rows.length === 0 ? <p className="text-[15px] text-ink-2">Aucun lot pour cette saison.</p> : null}
       <ol className="flex flex-col gap-2">
         {rows.map((row, index) => (

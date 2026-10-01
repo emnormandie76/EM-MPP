@@ -7,7 +7,7 @@ export default function PronosLoading() {
       <Bone className="h-11 w-64 max-w-full" />
       <Bone className="h-10 w-full max-w-xl" />
       {[0, 1, 2].map((index) => (
-        <BoneCard key={index} className="grid gap-5 lg:grid-cols-2">
+        <BoneCard key={index} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div className="flex flex-col gap-2.5">
             <Bone className="h-6 w-40" />
             <Bone className="h-6 w-full" />

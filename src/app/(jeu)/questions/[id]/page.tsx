@@ -29,12 +29,12 @@ function answerText(q: QuestionDetail, answer: { valueNumber: number | null; opt
 }
 
 /** Closed, waiting for the result: my prediction and the expected result date. */
-function MyClosedPrediction({ q }: { q: QuestionDetail }) {
+function MyClosedPrediction({ q, now }: { q: QuestionDetail; now: Date }) {
   return (
     <Card as="section" className="flex flex-col gap-4">
       <p className="text-[15px] text-ink-2">
         La question est clôturée.
-        {q.expectedResultAt ? ` Résultat attendu le ${formatDateTime(q.expectedResultAt)}.` : " Le résultat sera publié dès qu'il sera connu."}
+        {q.expectedResultAt ? ` Résultat attendu le ${formatDateTime(q.expectedResultAt, now)}.` : " Le résultat sera publié dès qu'il sera connu."}
       </p>
       <div className="flex flex-col gap-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -62,17 +62,17 @@ function MyClosedPrediction({ q }: { q: QuestionDetail }) {
  * After the closing (§8.3): the wisdom of the crowd and everyone's predictions; once resolved, the
  * real value, the viewer's points and everyone's points.
  */
-function AfterClosing({ q, results }: { q: QuestionDetail; results: QuestionResults }) {
+function AfterClosing({ q, results, now }: { q: QuestionDetail; results: QuestionResults; now: Date }) {
   const resolved = q.status === "resolved";
   return (
     <>
-      {resolved ? null : <MyClosedPrediction q={q} />}
+      {resolved ? null : <MyClosedPrediction q={q} now={now} />}
       <Card as="section" aria-labelledby="resultat" className="flex flex-col gap-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="resultat" className={SECTION_TITLE}>
             {resolved ? "Résultat" : "Sagesse de la foule"}
           </h2>
-          {resolved && q.correctedAt ? <p className="text-sm text-muted">Résultat corrigé le {formatDateTime(q.correctedAt)}.</p> : null}
+          {resolved && q.correctedAt ? <p className="text-sm text-muted">Résultat corrigé le {formatDateTime(q.correctedAt, now)}.</p> : null}
         </div>
         <ResultPanel question={q} results={results} withChartTable={false} />
       </Card>
@@ -117,7 +117,7 @@ export default async function QuestionPage({ params }: PageProps<"/questions/[id
         <h1 className="font-display text-[32px] leading-[1.05] font-extrabold uppercase">{q.title}</h1>
         {q.description ? <p className="text-base whitespace-pre-line text-ink-2">{q.description}</p> : null}
         <p className="text-sm text-muted">Source : {q.source}</p>
-        {q.status === "open" ? <p className="text-sm text-muted">Clôture {formatDateTime(q.closesAt)}</p> : null}
+        {q.status === "open" ? <p className="text-sm text-muted">Clôture {formatDateTime(q.closesAt, now)}</p> : null}
       </header>
 
       {q.status === "cancelled" ? (
@@ -126,14 +126,14 @@ export default async function QuestionPage({ params }: PageProps<"/questions/[id
           Question annulée : aucun point n&apos;est attribué et les jokers sont rendus.
         </p>
       ) : q.status === "open" ? (
-        <div className={`grid gap-5 ${hasHelp(q.help) ? "lg:grid-cols-2" : ""}`}>
+        <div className={`grid grid-cols-1 gap-5 ${hasHelp(q.help) ? "lg:grid-cols-2" : ""}`}>
           <Card as="section" className="flex flex-col gap-4">
             <PredictionForm {...predictionFormProps(q)} />
           </Card>
           <HelpPanel help={q.help} />
         </div>
       ) : results ? (
-        <AfterClosing q={q} results={results} />
+        <AfterClosing q={q} results={results} now={now} />
       ) : null}
     </>
   );

@@ -149,8 +149,8 @@ export default async function RulesPage() {
 
       <Section id="juste-prix" title="Juste Prix">
         <p>
-          Un prono supérieur à la valeur réelle rapporte 0 point et ne joue pas le podium. Les autres sont notés avec le barème,
-          et le bonus podium se joue entre eux.
+          Un prono supérieur à la valeur réelle rapporte 0 point, ne joue pas le podium et ne compte pas dans l&apos;écart moyen
+          du départage. Les autres sont notés avec le barème, et le bonus podium se joue entre eux.
         </p>
       </Section>
 
@@ -179,7 +179,7 @@ export default async function RulesPage() {
         <p>À égalité de points au classement :</p>
         <ol className="flex list-decimal flex-col gap-1.5 pl-5">
           <li>le plus grand nombre de « Dans le mille » ;</li>
-          <li>puis l&apos;écart relatif moyen le plus faible sur les questions à nombre ;</li>
+          <li>puis l&apos;écart relatif moyen le plus faible sur les questions à nombre (sans les pronos Juste Prix qui dépassent) ;</li>
           <li>sinon, ex æquo.</li>
         </ol>
       </Section>

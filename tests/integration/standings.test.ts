@@ -67,14 +67,16 @@ describe("getStandings on the seed (§5.6)", () => {
       ["Thomas", 2, 225, 0, 0.2, 2, +4],
       ["Sarah", 3, 185, 0, 0.03, 3, -2],
       ["Inès", 4, 150, 0, 0.06, 2, 0],
-      // Perfect tie: same rank, shown in French alphabetical order.
-      ["Hugo", 5, 100, 0, null, 1, +3],
-      ["Nora", 5, 100, 0, null, 1, +3],
+      // Perfect tie: same rank, shown in French alphabetical order. Before the latest result, they were
+      // tied at rank 7 with Admin and Mehdi (0 point, no mean error).
+      ["Hugo", 5, 100, 0, null, 1, +2],
+      ["Nora", 5, 100, 0, null, 1, +2],
       ["Léa", 7, 55, 0, 0.08, 1, -4],
       ["Camille", 8, 50, 0, 0.06, 2, -4],
-      // Same points: the lowest mean error first, a player without error last.
-      ["Mehdi", 9, 0, 0, 0.004, 1, -2],
-      ["Admin", 10, 0, 0, null, 1, -2],
+      // Perfect tie again: Mehdi went over the Juste Prix by 0,4 %, which no longer counts in the mean
+      // error (decision of 01/10/2026; before, it put him ahead of Admin).
+      ["Admin", 9, 0, 0, null, 1, -2],
+      ["Mehdi", 9, 0, 0, null, 1, -2],
     ]);
     expect(standings.rows.filter(({ isViewer }) => isViewer).map(({ name }) => name)).toEqual(["Sarah"]);
   });
@@ -100,8 +102,8 @@ describe("getStandings on the seed (§5.6)", () => {
     const viewer = { id: ids.Sarah, role: "player" as const };
 
     const current = await getStandings(db, viewer, {}, MID_SEASON);
-    // 0 point and no error, like Admin: tied at rank 10.
-    expect(current.rows.find(({ userId }) => userId === newcomer.id)).toMatchObject({ points: 0, rank: 10, questionsPlayed: 0 });
+    // 0 point and no error, like Admin and Mehdi: tied at rank 9.
+    expect(current.rows.find(({ userId }) => userId === newcomer.id)).toMatchObject({ points: 0, rank: 9, questionsPlayed: 0 });
     const before = await getStandings(db, viewer, { seasonId: previous.id }, MID_SEASON);
     expect(before.rows.map(({ userId }) => userId)).not.toContain(newcomer.id);
     expect(before.rows).toHaveLength(9);
@@ -124,10 +126,12 @@ describe("getStandings on the seed (§5.6)", () => {
       ["Sarah", 4, 195, 0, (0.04 + 0.02 + 0.28) / 3, 4, -1],
       ["Hugo", 5, 170, 0, 0.048, 2, 0],
       ["Nora", 6, 100, 0, null, 1, -1],
-      ["Mehdi", 7, 75, 0, (0.004 + 0.04) / 2, 2, +2],
+      // Studyrama only: his Juste Prix went over.
+      ["Mehdi", 7, 75, 0, 0.04, 2, +2],
       ["Camille", 8, 75, 0, (0.06 + 0.18) / 2, 3, 0],
       ["Léa", 9, 55, 0, 0.08, 1, -2],
-      ["Admin", 10, 0, 0, null, 1, 0],
+      // Tied at rank 9 with Mehdi before this result, alone at the bottom after it.
+      ["Admin", 10, 0, 0, null, 1, -1],
     ]);
   });
 });

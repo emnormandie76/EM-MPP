@@ -9,7 +9,7 @@ import { Field } from "@/components/ui/Field";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { TableScroll } from "@/components/ui/TableScroll";
 import { duplicateQuestionsAction, publishQuestionsAction, setQuestionDatesAction } from "@/lib/actions/questions";
-import { formatCount } from "@/lib/format";
+import { formatCount, lowerFirst } from "@/lib/format";
 import type { QuestionStatus } from "@/lib/game/question-status";
 import type { BatchReport } from "@/lib/services/questions";
 import { QuestionStatusChip } from "./QuestionStatusChip";
@@ -41,7 +41,7 @@ const ICON = { "aria-hidden": true, size: 16, strokeWidth: 2.4 } as const;
 function reportOf(report: BatchReport, done: (n: number) => string): Report {
   const lines = [done(report.succeeded.length)];
   if (report.unchanged.length > 0) lines.push(`${formatCount(report.unchanged.length, "déjà publiée")}.`);
-  for (const { title, reasons } of report.failed) lines.push(`« ${title} » : ${reasons.join(" ")}`);
+  for (const { title, reasons } of report.failed) lines.push(`« ${title} » : ${lowerFirst(reasons.join(" "))}`);
   return { tone: report.failed.length > 0 ? "error" : "success", lines };
 }
 

@@ -2,7 +2,8 @@
 
 export type NumberInputResult = { ok: true; value: number } | { ok: false; message: string };
 
-const NARROW_NBSP = " ";
+/** Thousands separator, as in `formatNumber`: a no-break space (the narrow one could not be seen). */
+const NBSP = " ";
 
 /** Largest accepted value, 999 999 999,99: at most 9 digits before the decimal separator. */
 const MAX_INTEGER_DIGITS = 9;
@@ -17,7 +18,7 @@ function fail(message: string): NumberInputResult {
 
 /** "1234567" → "1 234 567", grouped like `formatNumber` does. */
 function groupThousands(digits: string): string {
-  return digits.replace(/\B(?=(\d{3})+$)/g, NARROW_NBSP);
+  return digits.replace(/\B(?=(\d{3})+$)/g, NBSP);
 }
 
 export function parseNumberInput(raw: string): NumberInputResult {

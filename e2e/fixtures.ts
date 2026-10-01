@@ -9,6 +9,7 @@ export const ACCOUNTS = {
   sarah: "joueur1@example.test",
   julien: "joueur2@example.test",
   camille: "joueur4@example.test",
+  thomas: "joueur5@example.test",
   mehdi: "joueur6@example.test",
   lea: "joueur7@example.test",
   hugo: "joueur8@example.test",

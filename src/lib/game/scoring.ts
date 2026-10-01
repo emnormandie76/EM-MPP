@@ -30,6 +30,11 @@ export type PredictionScore<P extends ScoringPrediction = ScoringPrediction> = {
   bullseye: boolean;
   /** |prediction − real| / |real| for a number question (infinite if real = 0 ≠ prediction); else null. */
   relativeError: number | null;
+  /**
+   * Juste Prix: the prediction went over the real value. Its relative error is shown, but it stays out
+   * of the mean error of the tie-break, like its points (decision of 01/10/2026).
+   */
+  wentOver: boolean;
   total: number;
 };
 
@@ -71,6 +76,7 @@ function scoreChoice<P extends ScoringPrediction>(question: ScoringQuestion, pre
       podiumBonus: 0,
       bullseye: false,
       relativeError: null,
+      wentOver: false,
       total: total(basePoints, 0, question.coefficient, prediction.joker),
     };
   });
@@ -81,10 +87,11 @@ type NumberEvaluation = {
   relativeError: number | null;
   /** Distance in hundredths, when the prediction competes for the podium. */
   podiumDistance: number | null;
+  wentOver: boolean;
 };
 
 function evaluateNumber(question: ScoringQuestion, real: number, value: number | null): NumberEvaluation {
-  if (value === null) return { basePoints: 0, relativeError: null, podiumDistance: null };
+  if (value === null) return { basePoints: 0, relativeError: null, podiumDistance: null, wentOver: false };
   const guess = toHundredths(value);
   const distance = Math.abs(guess - real);
   // Real value 0: the relative error does not exist; only 0 scores (100 points, from the scale).
@@ -95,6 +102,7 @@ function evaluateNumber(question: ScoringQuestion, real: number, value: number |
     basePoints: over ? 0 : scalePoints(distance, real),
     relativeError,
     podiumDistance: over || !Number.isFinite(relativeError) ? null : distance,
+    wentOver: over,
   };
 }
 
@@ -105,7 +113,7 @@ function scoreNumber<P extends ScoringPrediction>(question: ScoringQuestion, pre
   const distances = evaluations.flatMap(({ podiumDistance }) => (podiumDistance === null ? [] : [podiumDistance]));
 
   return predictions.map((prediction, index) => {
-    const { basePoints, relativeError, podiumDistance } = evaluations[index];
+    const { basePoints, relativeError, podiumDistance, wentOver } = evaluations[index];
     const podiumRank =
       podiumDistance === null ? null : 1 + distances.filter((distance) => distance < podiumDistance).length;
     const bonus = podiumBonus(podiumRank);
@@ -116,6 +124,7 @@ function scoreNumber<P extends ScoringPrediction>(question: ScoringQuestion, pre
       podiumBonus: bonus,
       bullseye: basePoints === BULLSEYE_POINTS,
       relativeError,
+      wentOver,
       total: total(basePoints, bonus, question.coefficient, prediction.joker),
     };
   });

@@ -5,12 +5,14 @@ import { Avatar } from "@/components/avatars/Avatar";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
-import { requireAdmin } from "@/lib/auth/session";
+import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { getAdminDashboard } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
 import { formatCount, formatDateTime } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Back-office" };
+export async function generateMetadata(): Promise<Metadata> {
+  return adminMetadata("Back-office");
+}
 
 const SECTION_TITLE = "font-display text-[26px] font-extrabold uppercase leading-none";
 const QUESTION_LINK = "text-[17px] font-semibold text-ink hover:text-accent-text hover:underline";
@@ -18,7 +20,8 @@ const QUESTION_LINK = "text-[17px] font-semibold text-ink hover:text-accent-text
 /** Dashboard (architecture §8.3): open questions to follow, questions to resolve, next openings. */
 export default async function AdminPage() {
   const viewer = await requireAdmin();
-  const { open, toResolve, upcoming } = await getAdminDashboard(getDb(), viewer, new Date());
+  const now = new Date();
+  const { open, toResolve, upcoming } = await getAdminDashboard(getDb(), viewer, now);
 
   return (
     <>
@@ -44,7 +47,7 @@ export default async function AdminPage() {
                       </Link>
                       <p className="flex items-center gap-1.5 text-sm text-muted">
                         <Clock aria-hidden size={14} strokeWidth={2.2} />
-                        Clôture {formatDateTime(q.closesAt)}
+                        Clôture {formatDateTime(q.closesAt, now)}
                       </p>
                     </div>
                     <p className="font-display text-[26px] font-extrabold tabular-nums leading-none">
@@ -80,7 +83,7 @@ export default async function AdminPage() {
         )}
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card as="section" className="flex flex-col gap-4">
           <h2 className={SECTION_TITLE}>À résoudre</h2>
           {toResolve.length === 0 ? (
@@ -94,8 +97,8 @@ export default async function AdminPage() {
                       {q.title}
                     </Link>
                     <p className="text-sm text-muted">
-                      Clôturée {formatDateTime(q.closesAt)}
-                      {q.expectedResultAt ? ` · résultat prévu ${formatDateTime(q.expectedResultAt)}` : ""}
+                      Clôturée {formatDateTime(q.closesAt, now)}
+                      {q.expectedResultAt ? ` · résultat prévu ${formatDateTime(q.expectedResultAt, now)}` : ""}
                     </p>
                   </div>
                   <Link
@@ -125,7 +128,7 @@ export default async function AdminPage() {
                       {q.title}
                     </Link>
                     <p className="text-sm text-muted">
-                      Ouverture {formatDateTime(q.opensAt)} · clôture {formatDateTime(q.closesAt)}
+                      Ouverture {formatDateTime(q.opensAt, now)} · clôture {formatDateTime(q.closesAt, now)}
                     </p>
                   </li>
                 ))}

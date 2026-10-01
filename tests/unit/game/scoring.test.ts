@@ -106,9 +106,18 @@ describe("scoreQuestion: Juste Prix (real value 250)", () => {
     expect(scores.C).toMatchObject({ basePoints: 45, podiumRank: 2, podiumBonus: 10, total: 55 });
   });
 
-  it("keeps the relative error of a prediction that goes over (it counts in the mean error)", () => {
+  it("keeps the relative error of a prediction that goes over, for the display, and marks it", () => {
     const [score] = scoreQuestion(numberQuestion(250, { priceIsRight: true }), [guess("A", 275)]);
     expect(score.relativeError).toBeCloseTo(0.1, 12);
+    expect(score.wentOver).toBe(true);
+  });
+
+  it("marks only the predictions above the real value of a Juste Prix question", () => {
+    const juste = scoresOf(numberQuestion(250, { priceIsRight: true }), [guess("A", 251), guess("B", 250), guess("C", 230)]);
+    expect([juste.A.wentOver, juste.B.wentOver, juste.C.wentOver]).toEqual([true, false, false]);
+    // Above the real value of an ordinary number question: scored normally, not marked.
+    const [ordinary] = scoreQuestion(numberQuestion(250), [guess("A", 251)]);
+    expect(ordinary).toMatchObject({ basePoints: 100, wentOver: false });
   });
 
   it("the exact value does not go over", () => {

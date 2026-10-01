@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getActor } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/client";
+import { lowerFirst } from "@/lib/format";
 import {
   type BatchReport,
   cancelQuestion,
@@ -79,7 +80,7 @@ export async function saveQuestionAction(_: FormState, formData: FormData): Prom
   if (!published.ok) return failure(published);
   const failed = published.data.failed[0];
   if (failed) {
-    return { ok: false, message: `Question enregistrée, mais pas publiée : ${failed.reasons.join(" ")}` };
+    return { ok: false, message: `Question enregistrée, mais pas publiée : ${lowerFirst(failed.reasons.join(" "))}` };
   }
   return { ok: true, message: "Question enregistrée et publiée." };
 }

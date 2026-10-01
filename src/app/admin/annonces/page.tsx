@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { AnnouncementCreateForm, AnnouncementItem } from "@/components/admin/AnnouncementForms";
 import { Card } from "@/components/ui/Card";
-import { requireAdmin } from "@/lib/auth/session";
+import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { getAnnouncements } from "@/lib/data/content";
 import { getDb } from "@/lib/db/client";
 import { formatRelative } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Annonces" };
+export async function generateMetadata(): Promise<Metadata> {
+  return adminMetadata("Annonces");
+}
 
 const SECTION_TITLE = "font-display text-[26px] font-extrabold uppercase leading-none";
 

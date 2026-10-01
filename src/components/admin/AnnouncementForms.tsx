@@ -1,11 +1,12 @@
 "use client";
 
 import { Pencil, Plus, Trash } from "lucide-react";
-import { type FormEvent, useState, useTransition } from "react";
+import { type FormEvent, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { TextAreaField } from "@/components/ui/Field";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { useStaleResult } from "@/components/ui/useStaleResult";
 import { createAnnouncementAction, deleteAnnouncementAction, updateAnnouncementAction } from "@/lib/actions/content";
 import type { FormState } from "@/lib/actions/form-state";
 import { ANNOUNCEMENT_MAX } from "@/lib/validation/content";
@@ -39,8 +40,12 @@ function BodyField({ id, label, value, onChange, error }: {
 function useSubmit(action: (state: FormState, formData: FormData) => Promise<FormState>, onSuccess: () => void) {
   const [state, setState] = useState<FormState>(null);
   const [pending, startTransition] = useTransition();
+  const form = useRef<HTMLFormElement | null>(null);
+  // Once another action starts on the page, the message no longer describes the last one.
+  const stale = useStaleResult(state, form);
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    form.current = event.currentTarget;
     const formData = new FormData(event.currentTarget);
     startTransition(async () => {
       const result = await action(null, formData);
@@ -48,7 +53,7 @@ function useSubmit(action: (state: FormState, formData: FormData) => Promise<For
       if (result?.ok) onSuccess();
     });
   }
-  return { state, setState, pending, onSubmit };
+  return { state: stale ? null : state, setState, pending, onSubmit };
 }
 
 const errorOf = (state: FormState) => (state && !state.ok ? (state.fieldErrors?.body ?? state.message) : undefined);

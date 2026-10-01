@@ -1,10 +1,11 @@
 "use client";
 
 import { Trophy } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { type FormFeedback, FormMessage } from "@/components/ui/FormMessage";
+import { useStaleResult } from "@/components/ui/useStaleResult";
 import { proclaimSeasonAction } from "@/lib/actions/content";
 
 /**
@@ -29,6 +30,8 @@ export function ProclaimButton({
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState<FormFeedback>(null);
   const [pending, startTransition] = useTransition();
+  const zone = useRef<HTMLDivElement>(null);
+  const stale = useStaleResult(feedback, zone);
   const reasonId = `season-${seasonId}-proclaim-blocked`;
 
   function proclaim() {
@@ -40,7 +43,7 @@ export function ProclaimButton({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={zone} className="flex flex-col gap-2">
       {proclaimed ? null : (
         <>
           <Button
@@ -62,7 +65,7 @@ export function ProclaimButton({
           ) : null}
         </>
       )}
-      <FormMessage feedback={feedback} />
+      <FormMessage feedback={stale ? null : feedback} />
 
       <Dialog open={open} onClose={() => setOpen(false)} title="Proclamer le classement final ?">
         <p className="text-[15px] text-ink-2">

@@ -18,7 +18,7 @@ export default function HomeLoading() {
           <BoneCard className="h-34 lg:w-50" />
         </div>
       </div>
-      <div className="grid gap-4 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="flex flex-col gap-2.5 lg:col-span-8">
           <Bone className="h-7 w-60" />
           <BoneCard className="h-40" />

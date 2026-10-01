@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { QuestionForm } from "@/components/admin/QuestionForm";
-import { requireAdmin } from "@/lib/auth/session";
+import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { getActiveCategories, hasSeasons } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
 import { NO_SEASON_YET } from "@/lib/validation/question";
 
-export const metadata: Metadata = { title: "Nouvelle question" };
+export async function generateMetadata(): Promise<Metadata> {
+  return adminMetadata("Nouvelle question");
+}
 
 /** New question, saved as a draft (architecture §5.11, §8.3). */
 export default async function NewQuestionPage() {

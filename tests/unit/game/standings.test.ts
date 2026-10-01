@@ -135,10 +135,37 @@ describe("computeStandings: totals per player", () => {
     expect([byId.A.questionsPlayed, byId.B.questionsPlayed, byId.D.questionsPlayed, byId.E.questionsPlayed]).toEqual([3, 2, 1, 2]);
   });
 
-  it("averages the relative errors of number questions, Juste Prix included", () => {
+  it("averages the relative errors of number questions, Juste Prix included, except a prediction that goes over", () => {
     const byId = Object.fromEntries(computeStandings(input).map((row) => [row.userId, row]));
-    expect(byId.A.meanError).toBeCloseTo((10 / 250 + 1 / 250) / 2, 12);
+    // A went over on the Juste Prix (251): 0 point, and out of the tie-break (decision of 01/10/2026).
+    expect(byId.A.meanError).toBeCloseTo(10 / 250, 12);
+    // C stayed under (230): counted.
+    expect(byId.C.meanError).toBeCloseTo((15 / 250 + 20 / 250) / 2, 12);
     expect(byId.D.meanError).toBeCloseTo(15 / 250, 12);
+  });
+
+  it("a player whose only number prediction went over a Juste Prix has no mean error", () => {
+    const rows = computeStandings({ questions: [q2], predictions: [guess(2, "A", 251), guess(2, "B", 245)], players: [player("A"), player("B")] });
+    const byId = Object.fromEntries(rows.map((row) => [row.userId, row]));
+    expect(byId.A.meanError).toBeNull();
+    expect(byId.B.meanError).toBeCloseTo(5 / 250, 12);
+  });
+
+  it("test report of 01/10/2026: going over a Juste Prix by 0,4 % no longer wins the tie-break", () => {
+    // Juste Prix (real 250): A 251, over by 0,4 % (0 point); B 245 (80 + 20 = 100). Number question
+    // (real 1 000): A alone, 970 (80 + 20 = 100). 100 points each, no Dans le mille. Counting the 0,4 %,
+    // A would win on the mean error (1,7 % against 2 %); without it, B wins (2 % against 3 %).
+    const rows = computeStandings({
+      questions: [q2, numberQuestion(4, 1000, day(4))],
+      predictions: [guess(2, "A", 251), guess(2, "B", 245), guess(4, "A", 970)],
+      players: [player("A"), player("B")],
+    });
+    const byId = Object.fromEntries(rows.map((row) => [row.userId, row]));
+    expect([byId.A.points, byId.B.points]).toEqual([100, 100]);
+    expect([byId.A.bullseyes, byId.B.bullseyes]).toEqual([0, 0]);
+    expect(byId.A.meanError).toBeCloseTo(0.03, 12);
+    expect(byId.B.meanError).toBeCloseTo(0.02, 12);
+    expect(ranks(rows)).toEqual([["B", 1], ["A", 2]]);
   });
 
   it("ranks the players", () => {

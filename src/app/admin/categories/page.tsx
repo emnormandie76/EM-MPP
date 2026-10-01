@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import { CategoryActions, CategoryCreateForm } from "@/components/admin/CategoryForms";
 import { Card } from "@/components/ui/Card";
 import { TableScroll } from "@/components/ui/TableScroll";
-import { requireAdmin } from "@/lib/auth/session";
+import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { getCategoriesAdmin } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
 import { formatCount } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Catégories" };
+export async function generateMetadata(): Promise<Metadata> {
+  return adminMetadata("Catégories");
+}
 
 const TH = "px-3 py-2 font-display text-[13px] font-bold uppercase tracking-[0.08em] text-muted";
 const TD = "px-3 py-2.5 align-middle";

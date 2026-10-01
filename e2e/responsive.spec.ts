@@ -100,6 +100,56 @@ test("a player profile does not scroll sideways at 390 px", async ({ page }) => 
   await expectNoSidewaysScroll(page);
 });
 
+/** Renames the signed-in player from /profil. */
+async function rename(page: Page, name: string): Promise<void> {
+  await page.goto("/profil");
+  await page.getByLabel("Nom affiché").fill(name);
+  await page.getByRole("button", { name: "Enregistrer le nom" }).click();
+  await expect(page.getByText("Nom enregistré.")).toBeVisible();
+}
+
+// The seeded names are short. A long one (30 characters, the maximum, or « Ancien joueur 1 (inactif) »
+// after an anonymization) widened the home page to 424 px (test report of 01/10/2026, R-01).
+test("with a 30-character name, the pages that show it do not scroll sideways at 390 px", async ({ page, browser, extraHTTPHeaders }) => {
+  const longName = "Wilhelmina-Maximiliana Wolfson";
+  await signIn(page, ACCOUNTS.thomas);
+  await rename(page, longName);
+  try {
+    // The home page always shows the viewer's row in the standings, with « (toi) ».
+    for (const url of ["/", "/classement", "/profil"]) {
+      await page.goto(url);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoSidewaysScroll(page);
+    }
+    await page.goto(await questionHref(page, "?onglet=resolues", "Combien de participants à la JPO de septembre ?"));
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Combien de participants à la JPO de septembre ?");
+    await expectNoSidewaysScroll(page);
+    await page.goto("/classement");
+    await page.getByRole("link", { name: longName }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(longName);
+    await expectNoSidewaysScroll(page);
+
+    // The back office lists the name too: dashboard, accounts, follow-up of an open question.
+    const admin = await browser.newContext({ baseURL: test.info().project.use.baseURL, extraHTTPHeaders, viewport: { width: 390, height: 844 } });
+    const adminPage = await admin.newPage();
+    await signIn(adminPage, ACCOUNTS.admin);
+    for (const url of ["/admin", "/admin/joueurs"]) {
+      await adminPage.goto(url);
+      await expect(adminPage.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(adminPage.getByText(longName).first()).toBeAttached();
+      await expectNoSidewaysScroll(adminPage);
+    }
+    await adminPage.goto("/admin/questions");
+    await adminPage.goto((await adminPage.getByRole("link", { name: "Combien de participants à la JPO du 15 novembre ?" }).getAttribute("href"))!);
+    await expect(adminPage.getByText(longName).first()).toBeAttached();
+    await expectNoSidewaysScroll(adminPage);
+    await admin.close();
+  } finally {
+    // Back to the seeded name, for the other tests.
+    await rename(page, "Thomas");
+  }
+});
+
 test("the back-office pages do not scroll sideways at 390 px", async ({ page }) => {
   await signIn(page, ACCOUNTS.admin);
   for (const url of ["/admin", "/admin/joueurs", "/admin/questions", "/admin/questions/nouvelle", "/admin/categories", "/admin/saisons", "/admin/annonces"]) {

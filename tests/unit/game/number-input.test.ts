@@ -34,7 +34,7 @@ describe("parseNumberInput: vectors N1 to N11", () => {
   });
 
   it("N5: '2.450' is refused (point used for thousands)", () => {
-    expect(error("2.450")).toBe(`Écris 2450 ou 2${NARROW_NBSP}450 (pas de point pour les milliers).`);
+    expect(error("2.450")).toBe(`Écris 2450 ou 2${NBSP}450 (pas de point pour les milliers).`);
   });
 
   it("N6: '12,345' is refused (3 decimals)", () => {
@@ -80,8 +80,8 @@ describe("parseNumberInput: other cases", () => {
   });
 
   it("gives the right advice for grouped thousands with points", () => {
-    expect(error("1.234.567")).toBe(`Écris 1234567 ou 1${NARROW_NBSP}234${NARROW_NBSP}567 (pas de point pour les milliers).`);
-    expect(error("12.500")).toBe(`Écris 12500 ou 12${NARROW_NBSP}500 (pas de point pour les milliers).`);
+    expect(error("1.234.567")).toBe(`Écris 1234567 ou 1${NBSP}234${NBSP}567 (pas de point pour les milliers).`);
+    expect(error("12.500")).toBe(`Écris 12500 ou 12${NBSP}500 (pas de point pour les milliers).`);
   });
 
   it("refuses more than 2 decimals when it cannot be thousands", () => {

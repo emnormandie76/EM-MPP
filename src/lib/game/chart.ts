@@ -4,6 +4,14 @@
 export const CHART_ROWS = 4;
 export const MIN_POINT_GAP_PX = 14;
 export const DEFAULT_CHART_WIDTH = 440;
+/**
+ * Room taken by the « TOI » label beside the viewer's dot, on its row: no other dot of that row comes
+ * closer than this plus the usual gap (test report of 01/10/2026, R-03: a label above the dot hid
+ * the dot of the next row).
+ */
+export const VIEWER_LABEL_PX = 28;
+/** From this position (in percent of the width), the label goes on the left of the dot. */
+const VIEWER_LABEL_LEFT_FROM = 85;
 
 /** Margin added on each side of the values, as a share of their range. */
 const DOMAIN_MARGIN = 0.08;
@@ -50,6 +58,11 @@ export function niceTicks(min: number, max: number): ChartTicks {
   return { min: ticks[0], max: ticks[ticks.length - 1], step, ticks };
 }
 
+/** The « TOI » label is on the right of the viewer's dot, or on its left near the right edge. */
+export function viewerLabelSide(x: number): "left" | "right" {
+  return x > VIEWER_LABEL_LEFT_FROM ? "left" : "right";
+}
+
 function domainOf(values: readonly number[]): { low: number; high: number } {
   const low = Math.min(...values);
   const high = Math.max(...values);
@@ -63,16 +76,20 @@ function domainOf(values: readonly number[]): { low: number; high: number } {
 
 /**
  * Sorted by value, each dot goes on the first row where it is at least 14 px from the previous
- * dot of that row; if none fits, on the row with the widest gap.
+ * dot of that row; if none fits, on the row with the widest gap. The viewer's label takes room on
+ * the viewer's row: on the right, the next dot of the row comes after it; on the left, the viewer's
+ * dot needs that much room after the previous dot.
  */
-function placeDots(sorted: { index: number; value: number; x: number }[], width: number): ChartPoint[] {
+function placeDots(sorted: { index: number; value: number; x: number }[], width: number, viewerIndex: number | null): ChartPoint[] {
   const lastPx: (number | null)[] = Array.from({ length: CHART_ROWS }, () => null);
   return sorted.map((point) => {
     const px = (point.x / 100) * width;
+    const side = point.index === viewerIndex ? viewerLabelSide(point.x) : null;
+    const needed = MIN_POINT_GAP_PX + (side === "left" ? VIEWER_LABEL_PX : 0);
     const gaps = lastPx.map((last) => (last === null ? Number.POSITIVE_INFINITY : px - last));
-    const free = gaps.findIndex((gap) => gap >= MIN_POINT_GAP_PX);
+    const free = gaps.findIndex((gap) => gap >= needed);
     const row = free >= 0 ? free : gaps.indexOf(Math.max(...gaps));
-    lastPx[row] = px;
+    lastPx[row] = side === "right" ? px + VIEWER_LABEL_PX : px;
     return { ...point, row };
   });
 }
@@ -82,6 +99,8 @@ export function buildStripChart(
   real: number | null | undefined,
   mean: number,
   width = DEFAULT_CHART_WIDTH,
+  /** Index of the viewer's value, whose dot carries the « TOI » label. */
+  viewerIndex: number | null = null,
 ): StripChart {
   if (values.length === 0) throw new RangeError("A strip chart needs at least one value");
   const hasReal = real !== null && real !== undefined;
@@ -94,7 +113,7 @@ export function buildStripChart(
     .sort((a, b) => a.value - b.value || a.index - b.index);
   return {
     ...axis,
-    points: placeDots(sorted, width),
+    points: placeDots(sorted, width, viewerIndex),
     realX: hasReal ? toX(real) : null,
     meanX: toX(mean),
   };
