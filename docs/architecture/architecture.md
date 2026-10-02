@@ -1,9 +1,21 @@
 # Architecture et plan de construction — Les petits pronos de la promo
 
-> **Version 1.1 du 30/09/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
+> **Version 1.2 du 02/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
+> - **Changements de la v1.2** (demandés par l'utilisateur le 02/10/2026, cahier des charges v1.2), en deux étapes insérées avant l'É9 :
+>   - **É8c** :
+>     - barème en malus égal à l'écart brut, sans plafond ; le moins de malus gagne (§5.5, §5.6) ;
+>     - Juste Prix et bonus podium supprimés ;
+>     - malus d'une mauvaise réponse fixé sur chaque question à choix ;
+>     - malus du pire prono pour un absent ;
+>     - jokers autorisés ou non par saison, qui divisent le malus par deux (§5.4, §5.13) ;
+>     - prolongation d'une question pour un joueur absent (§5.14) ;
+>     - pronos des autres cachés, jusqu'au résultat, à qui n'a pas pronostiqué (§6.6) ;
+>     - couleur principale #0036B3 (§8.1).
+>   - **É8d** : chat général avec grille d'emojis et message automatique au résultat (§5.15).
+>   - Sections touchées : §1.1, §2, §4.3, §5, §6.4 à §6.6, §7.3, §7.4, §8, §9, §11, §13, annexes.
 > - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6). Précisé pendant l'É8 (01/10/2026) : bordure `line-strong` foncée à #7E8796 (§8.1), classement compact sur téléphone (§8.3, §8.4), conteneur défilant des tableaux et squelettes de chargement (§2, §8.3, §8.4), page d'erreur globale (§8.3), contrôle de visibilité dans le layout de `/questions/[id]` (§7.4, §8.3), tests à 390 px (§9.4), streaming (§14). Précisé après la recette par un agent (01/10/2026, rapport `docs/recette/rapport-recette-2026-10-01.md`) : prono Juste Prix qui dépasse hors de l'écart moyen (§5.5, §5.6), étiquette « TOI » à côté du point (§5.7, §8.2), jokers masqués dans l'historique avant la clôture (§6.6), titre des pages d'admin caché aux joueurs (§6.4), confirmation de la désactivation (§6.3), messages de résultat et grilles à 390 px (§8.4, §8.5), espace des milliers et année des dates (§8.6). Précisé à l'É8b (02/10/2026) : le site s'appelle « Les petits pronos de la promo », nom écrit une seule fois dans `APP_NAME` (`src/lib/app.ts`), logo sur deux lignes (§8.2), nouvelle adresse `les-petits-pronos-de-la-promo.vercel.app` (H-16), test de fumée en production lancé seul avec `BASE_URL` (§9.1).
-> - Règles fonctionnelles : [cahier des charges v1.1](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
+> - Règles fonctionnelles : [cahier des charges v1.2](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
 
@@ -82,11 +94,11 @@ Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tablea
 ### 1.1 Principes
 
 1. **Un seul projet Next.js et sa base de données, rien d'autre.** Pas d'email, pas de Power Automate, pas de service tiers en dehors de Vercel et Neon.
-2. **Le temps se déduit des dates.** Ouverture, clôture, validation automatique à la clôture et changement de saison ne sont jamais des événements déclenchés : le code compare l'heure actuelle aux dates enregistrées. Aucune tâche planifiée.
-3. **Les points ne sont jamais stockés.** Ils sont recalculés à partir des pronos et des résultats à chaque lecture. Seul le palmarès (classement final proclamé) est figé.
+2. **Le temps se déduit des dates.** Ouverture, clôture, fin d'une prolongation, validation automatique à la clôture et changement de saison ne sont jamais des événements déclenchés : le code compare l'heure actuelle aux dates enregistrées. Aucune tâche planifiée. (Le chat de l'É8d interroge le serveur depuis le navigateur pendant que sa page est ouverte : ce n'est pas une tâche planifiée, §5.15.)
+3. **Les malus ne sont jamais stockés.** Ils sont recalculés à partir des pronos et des résultats à chaque lecture. Seul le palmarès (classement final proclamé) est figé. (Jusqu'à la v1.1, on parlait de « points » ; le barème est un malus depuis la v1.2, §5.5.)
 4. **Les règles du jeu sont des fonctions pures**, sans accès à la base, dans `src/lib/game/`, couvertes à au moins 95 %.
 5. **L'heure est un paramètre.** Toute fonction qui dépend du temps reçoit `now: Date` en argument, ce qui rend chaque règle testable.
-6. **La visibilité des données est décidée au même endroit, côté serveur** (`src/lib/data/`). Les pronos des autres ne quittent jamais le serveur avant la clôture, pas même pour l'admin.
+6. **La visibilité des données est décidée au même endroit, côté serveur** (`src/lib/data/`). Les pronos des autres ne quittent jamais le serveur avant la clôture, pas même pour l'admin, ni avant le résultat pour qui n'a pas pronostiqué la question (v1.2, §6.6).
 7. **0 €** : offres gratuites de Vercel et Neon.
 
 ### 1.2 Stack
@@ -126,6 +138,7 @@ Vercel ── Next.js (région fra1)
    ├─ pages (Server Components) ─→ src/lib/data  ─→ src/lib/game (fonctions pures)
    ├─ Server Actions ────────────→ src/lib/services (contrôles + écriture + trace)
    ├─ /api/auth/[...all] ────────→ Better Auth
+   ├─ /api/chat ─────────────────→ nouveaux messages du chat (É8d, lecture seule)
    └─ /api/health ───────────────→ test de connexion à la base
    │
    ▼
@@ -203,7 +216,8 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
    │  │  ├─ profil/page.tsx       mon compte
    │  │  ├─ lots/page.tsx
    │  │  ├─ reglement/page.tsx
-   │  │  └─ palmares/page.tsx
+   │  │  ├─ palmares/page.tsx
+   │  │  └─ chat/page.tsx         chat général (É8d, §5.15)
    │  ├─ admin/
    │  │  ├─ layout.tsx            exige le rôle admin ; sous-navigation
    │  │  ├─ page.tsx              tableau de bord et suivi
@@ -216,6 +230,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
    │  │  └─ annonces/page.tsx
    │  └─ api/
    │     ├─ auth/[...all]/route.ts
+   │     ├─ chat/route.ts         GET : nouveaux messages et suppressions (É8d, §5.15)
    │     └─ health/route.ts
    ├─ proxy.ts                    (ou middleware.ts selon la version de Next, §14)
    ├─ components/
@@ -224,21 +239,25 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
    │  │                           HelpPanel, StandingsTable, StripChart,
    │  │                           ChoiceDistribution, ResultPanel, BadgeList…
    │  ├─ layout/                  AppHeader, AdminNav, Footer, VisitTracker
+   │  ├─ chat/                    ChatRoom (client, interrogation périodique), ChatMessage,
+   │  │                           ChatComposer, EmojiPalette (É8d)
    │  └─ avatars/                 16 maillots SVG + Avatar
    └─ lib/
       ├─ game/                    règles pures (§5), aucune dépendance à Next ou à la base
       │  ├─ constants.ts
       │  ├─ time.ts               fuseau, conversions, saison d'une date (§5.1)
       │  ├─ number-input.ts       lecture des nombres saisis
-      │  ├─ question-status.ts
+      │  ├─ question-status.ts    statut d'une question, et pour un joueur prolongé (§5.2)
       │  ├─ prediction-state.ts
-      │  ├─ scoring.ts
+      │  ├─ scoring.ts            malus (v1.2, §5.5)
       │  ├─ standings.ts
       │  ├─ crowd.ts              moyenne, médiane, répartition
       │  ├─ chart.ts              échelle et placement des points
       │  ├─ badges.ts
       │  ├─ visits.ts             pastille « Nouveau »
       │  └─ countdown.ts
+      ├─ chat/                    emojis.ts (palette), polling.ts (règle pure de l'interrogation
+      │                           périodique), result-message.ts (texte du message de résultat) (É8d)
       ├─ format.ts                nombres et dates en français
       ├─ db/
       │  ├─ schema/               auth.ts (généré), app.ts, index.ts
@@ -247,8 +266,9 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
       │  ├─ auth.ts               createAuth(db) + instance
       │  ├─ auth-client.ts        client navigateur
       │  └─ session.ts            getViewer, requireUser, requireAdmin
-      ├─ services/                écritures métier (db, actor, input, now)
-      ├─ data/                    lectures + règles de visibilité (import 'server-only')
+      ├─ services/                écritures métier (db, actor, input, now) ; extensions.ts (É8c),
+      │                           chat.ts (É8d)
+      ├─ data/                    lectures + règles de visibilité (import 'server-only') ; chat.ts (É8d)
       ├─ actions/                 Server Actions ('use server'), fines couches sur services
       └─ validation/              schémas Zod partagés
 ```
@@ -338,8 +358,8 @@ Sur Vercel, `build:vercel` applique les migrations en attente **avant** `next bu
 - Tables de l'application : identifiant `integer` généré (`generatedAlwaysAsIdentity`), ce qui donne des adresses lisibles (`/questions/12`).
 - Tables Better Auth : identifiant `text` (généré par Better Auth).
 - Dates : `timestamp with time zone`, toujours en UTC.
-- Nombres saisis (pronos, résultats) : `numeric(14, 2)` lu en `number` (mode `number` de Drizzle).
-- Points : jamais stockés, sauf dans le palmarès (`integer`).
+- Nombres saisis (pronos, résultats, malus d'une mauvaise réponse) : `numeric(14, 2)` lu en `number` (mode `number` de Drizzle).
+- Malus : jamais stockés, sauf dans le palmarès (`numeric(16, 2)`, v1.2). Jusqu'à la v1.1, les points du palmarès étaient un `integer`.
 
 ### 4.2 Tables Better Auth
 
@@ -379,6 +399,7 @@ Seule clé utilisée : `environment`, qui vaut `production` sur la base de produ
 | `id` | integer identity | PK |
 | `label` | text | nom affiché, 2 à 40 caractères (ex. `2026-2027`) ; unique sans tenir compte de la casse (index sur `lower(label)`) |
 | `starts_at` | timestamptz | début, un jour à 00:00 heure de Paris ; unique |
+| `jokers_enabled` | boolean | non nul, défaut `true` ; jokers autorisés pendant la saison (v1.2, §5.13) |
 | `proclaimed_at` | timestamptz | nullable |
 | `created_at` | timestamptz | défaut `now()` |
 
@@ -401,7 +422,8 @@ Une saison n'a pas de date de fin enregistrée : elle se termine au début de la
 | `season_id` | integer | → `season.id`, nullable tant que la question n'est pas publiée (pas de clôture, ou clôture avant la première saison) |
 | `category_id` | integer | → `category.id`, non nul |
 | `type` | enum `question_type` (`number`, `choice`) | non nul |
-| `price_is_right` | boolean | défaut `false` ; seulement si `type = number` |
+| `price_is_right` | boolean | défaut `false`. **Juste Prix supprimé en v1.2** : la colonne reste (la supprimer serait une migration destructive, §0.4), toujours `false` (`CHECK (NOT price_is_right)`), et le code ne la lit plus |
+| `wrong_answer_malus` | numeric(14,2) | malus d'une mauvaise réponse (v1.2, §5.5) ; renseigné si et seulement si `type = choice`, > 0 |
 | `title` | text | énoncé, 5 à 200 caractères |
 | `description` | text | nullable, précisions, 2 000 caractères au plus |
 | `unit` | text | nullable ; pour `number` (ex. « candidatures ») |
@@ -424,6 +446,10 @@ Une saison n'a pas de date de fin enregistrée : elle se termine au début de la
 | `created_at`, `updated_at` | timestamptz | |
 
 Contraintes : `CHECK (opens_at IS NULL OR closes_at IS NULL OR opens_at < closes_at)` ; `CHECK (status <> 'published' OR (opens_at IS NOT NULL AND closes_at IS NOT NULL AND season_id IS NOT NULL))`. La contrainte `question_season_of_closing` ajoutée à l'É3 (saison obligatoire dès qu'il y a une clôture) est supprimée à l'É5b : un brouillon peut clôturer à une date qu'aucune saison ne couvre encore.
+
+Ajouts de l'É8c (v1.2), par une migration qui n'ajoute que des colonnes, des tables et des contraintes :
+- `question_wrong_answer_malus` : `CHECK ((type = 'choice') = (wrong_answer_malus IS NOT NULL))` et `CHECK (wrong_answer_malus > 0)`. Avant d'ajouter la contrainte, la migration renseigne `50` sur les questions à choix existantes : il y en a sur `dev` (seed), aucune en production (vérifié le 02/10/2026, à revérifier au début de l'É8c).
+- `question_price_is_right_removed` : `CHECK (NOT price_is_right)`, qui remplace `question_price_is_right_number`. La migration remet d'abord `price_is_right` à `false` (une question du seed sur `dev` ; aucune en production au 02/10/2026).
 
 **`question_option`** : réponses possibles d'une question à choix.
 
@@ -464,6 +490,20 @@ Contraintes : `UNIQUE (question_id, user_id)` ; `CHECK ((value_number IS NULL) <
 | `joker` | boolean | état du joker après l'événement |
 | `created_at` | timestamptz | |
 
+**`question_extension`** : prolongation d'une question pour un joueur (É8c, v1.2, §5.14).
+
+| Colonne | Type | Contraintes |
+|---|---|---|
+| `question_id` | integer | → `question.id` |
+| `user_id` | text | → `user.id` ; le joueur prolongé |
+| `closes_at` | timestamptz | non nul ; sa date limite personnelle |
+| `granted_by` | text | → `user.id` ; l'admin qui l'a accordée |
+| `granted_at` | timestamptz | non nul |
+| `updated_by` | text | → `user.id`, nullable ; dernier admin à avoir changé la date ou terminé la prolongation |
+| `updated_at` | timestamptz | nullable |
+
+Clé primaire `(question_id, user_id)` : une prolongation au plus par joueur et par question ; la changer met à jour la ligne. `CHECK (user_id <> granted_by)` (on ne se prolonge pas soi-même). Index `(user_id)`.
+
 **`prize`** : lots.
 
 | Colonne | Type | Contraintes |
@@ -483,6 +523,29 @@ Contraintes : `UNIQUE (question_id, user_id)` ; `CHECK ((value_number IS NULL) <
 | `created_by` | text | → `user.id` |
 | `created_at`, `updated_at` | timestamptz | |
 
+**`chat_message`** : messages du chat général (É8d, v1.2, §5.15). Enum `chat_message_kind` (`message`, `result`).
+
+| Colonne | Type | Contraintes |
+|---|---|---|
+| `id` | integer identity | PK ; l'ordre des messages est celui des identifiants |
+| `kind` | enum `chat_message_kind` | non nul ; `message` (écrit par un joueur) ou `result` (message automatique au résultat) |
+| `user_id` | text | → `user.id` ; l'auteur, non nul pour `message`, nul pour `result` |
+| `question_id` | integer | → `question.id` ; non nul pour `result`, nul pour `message` |
+| `body` | text | texte d'un `message`, 1 à 500 caractères ; nul pour `result` (texte calculé à la lecture) et pour un message supprimé (le contenu est effacé) |
+| `created_at` | timestamptz | non nul |
+| `deleted_at` | timestamptz | nullable |
+| `deleted_by` | text | → `user.id`, nullable |
+
+Contraintes : `CHECK ((kind = 'message') = (user_id IS NOT NULL))`, `CHECK ((kind = 'result') = (question_id IS NOT NULL))`, `CHECK (kind = 'message' OR body IS NULL)`, `CHECK (kind <> 'message' OR deleted_at IS NOT NULL OR char_length(body) BETWEEN 1 AND 500)`, `CHECK (deleted_at IS NULL OR body IS NULL)` ; index unique partiel `(question_id) WHERE kind = 'result'` (un seul message de résultat par question) ; index `(user_id, created_at)` (limite de 10 messages par minute).
+
+**`chat_read`** : dernier message lu par chaque compte (pastille de l'onglet Chat, É8d).
+
+| Colonne | Type | Contraintes |
+|---|---|---|
+| `user_id` | text | PK, → `user.id` |
+| `last_read_id` | integer | non nul ; identifiant du dernier message lu (pas de clé étrangère, pour ne pas bloquer une suppression) |
+| `updated_at` | timestamptz | non nul |
+
 **`season_standing`** : classement final figé, c'est-à-dire le palmarès.
 
 | Colonne | Type | Contraintes |
@@ -490,7 +553,8 @@ Contraintes : `UNIQUE (question_id, user_id)` ; `CHECK ((value_number IS NULL) <
 | `season_id` | integer | → `season.id` |
 | `user_id` | text | → `user.id` |
 | `rank` | integer | classement avec ex æquo (1, 1, 3…) |
-| `points` | integer | |
+| `points` | integer | **nullable depuis la v1.2** ; points des saisons proclamées avec le barème de la v1.1 (aucune en production au 02/10/2026). Plus jamais écrit |
+| `malus` | numeric(16,2) | nullable ; malus total de la saison (v1.2), écrit par toute nouvelle proclamation. `CHECK (malus IS NOT NULL OR points IS NOT NULL)`. Ajouter une colonne plutôt que renommer `points` évite une migration destructive (§0.4), le malus ayant des décimales |
 | `bullseyes` | integer | nombre de « Dans le mille » |
 | `mean_error` | numeric(18,6) | nullable ; (18,6) et non (10,6) : un écart supérieur à 9 999 (faute de frappe) ferait échouer la proclamation (décision du 30/09/2026) |
 | `questions_played` | integer | |
@@ -503,13 +567,15 @@ Clé primaire `(season_id, user_id)`.
 - `prediction (user_id)` et `prediction (question_id)` (en plus de l'unicité).
 - `question (season_id, status)` et `question (closes_at)`.
 - `prediction_event (question_id, created_at)`.
+- `question_extension (user_id)` (É8c) ; `chat_message (user_id, created_at)` (É8d).
 
 ### 4.5 Règles d'intégrité tenues par les services
 
 - `question.season_id` est recalculé à chaque changement de `closes_at`, et à chaque création, changement de date de début ou suppression d'une saison (§5.1, §5.13). Une question qui a des pronos ne change jamais de saison : ses jokers restent comptés dans la bonne saison.
 - `result_option_id` et `option_id` appartiennent toujours à la question concernée.
-- `price_is_right` et `unit` n'ont de sens que pour `type = number`. `question_option` n'existe que pour `type = choice` (au moins 2 options).
-- On ne supprime jamais un utilisateur ayant des pronos : on l'anonymise (§6.3).
+- `unit` n'a de sens que pour `type = number`, `wrong_answer_malus` que pour `type = choice`. `question_option` n'existe que pour `type = choice` (au moins 2 options).
+- Une prolongation ne concerne qu'un joueur sans prono au moment où elle est accordée, sur une question publiée, non annulée et sans résultat (§5.14). Aucun résultat n'est saisi tant qu'une prolongation court.
+- On ne supprime jamais un utilisateur ayant des pronos : on l'anonymise (§6.3). Ses messages du chat sont alors effacés (§5.15).
 
 ---
 
@@ -568,6 +634,17 @@ L'ouverture est **incluse** (`now = opens_at` → ouverte), la clôture **exclue
 | S6 | annulée avec `resolved_at` renseigné | `cancelled` |
 | S7 | brouillon avec dates passées | `draft` |
 
+**Statut pour un joueur** (É8c, v1.2, prolongations §5.14) : `questionStatusFor(q, extension: { closesAt: Date } | null, now)`. Si `questionStatus(q, now)` vaut `open` ou `closed`, et qu'une prolongation du joueur court encore (`now < extension.closesAt`, fin exclue comme pour la clôture), la question est `open` pour lui. Sinon, le statut est celui de la question. Partout où le statut d'une question compte pour un joueur (ses pronos, ses questions ouvertes, ce qu'il voit), on utilise ce statut-là : celui du propriétaire du prono pour les services, celui de la personne qui regarde pour les lectures.
+
+| Vecteur | Données | Attendu |
+|---|---|---|
+| E1 | question clôturée, prolongation jusqu'à `now` + 1 h | `open` |
+| E2 | question clôturée, `now` = fin de la prolongation | `closed` |
+| E3 | question résolue, prolongation échue | `resolved` |
+| E4 | question annulée, prolongation en cours | `cancelled` |
+| E5 | question clôturée, sans prolongation | `closed` |
+| E6 | question programmée, prolongation en cours (impossible par les services, mais la fonction reste sûre) | `scheduled` |
+
 ### 5.3 Lecture des nombres saisis (`number-input.ts`)
 
 `parseNumberInput(raw: string): { ok: true; value: number } | { ok: false; message: string }`
@@ -599,10 +676,12 @@ L'ouverture est **incluse** (`now = opens_at` → ouverte), la clôture **exclue
 
 ### 5.4 Pronos
 
-**État affiché** (`prediction-state.ts`) : `predictionState(prediction | null, questionStatus)` renvoie `'todo'` (aucun prono), `'saved'` (prono, pas validé, question ouverte) ou `'validated'` (validé, **ou** question clôturée, résolue ou annulée avec un prono). Un prono enregistré compte donc comme validé dès la clôture, sans aucune écriture en base.
+**État affiché** (`prediction-state.ts`) : `predictionState(prediction | null, questionStatus)` renvoie `'todo'` (aucun prono), `'saved'` (prono, pas validé, question ouverte) ou `'validated'` (validé, **ou** question clôturée, résolue ou annulée avec un prono). Un prono enregistré compte donc comme validé dès la clôture, sans aucune écriture en base. Le statut passé est celui du propriétaire du prono (`questionStatusFor`, §5.2) : un prono enregistré pendant une prolongation compte comme validé à la fin de celle-ci.
+
+**Question ouverte pour le joueur** (É8c, v1.2) : dans les quatre services ci-dessous, « question `open` » veut dire `questionStatusFor(question, prolongation du propriétaire du prono, now) = 'open'`. Un joueur prolongé enregistre, valide et pose un joker sur une question clôturée pour les autres ; un autre joueur reçoit toujours `QUESTION_NOT_OPEN`.
 
 **Enregistrer** `savePrediction(db, actor, { questionId, rawValue? | optionId? }, now)`
-- Conditions : acteur connecté et non désactivé ; question `open` à `now` ; prono pas encore validé ; valeur valide (§5.3) ou option appartenant à la question.
+- Conditions : acteur connecté et non désactivé ; question `open` pour lui à `now` ; prono pas encore validé ; valeur valide (§5.3) ou option appartenant à la question.
 - Effet : crée ou met à jour le prono ; événement `saved` avec la valeur.
 
 **Valider** `validatePrediction(db, actor, { questionId, rawValue? | optionId? }, now)`
@@ -611,15 +690,23 @@ L'ouverture est **incluse** (`now = opens_at` → ouverte), la clôture **exclue
 - Effet : `validated_at = now` ; événements `saved` (si valeur) puis `validated`.
 
 **Joker** `setJoker(db, actor, { questionId, enabled }, now)`
-- Conditions : question `open` ; prono existant et non validé (sinon « Enregistre d'abord ton prono. ») ; pour activer, moins de `JOKERS_PER_SEASON` (2) jokers déjà posés par le joueur sur les questions **non annulées de la même saison** (celle de la question).
+- Conditions : question `open` pour le joueur ; la saison de la question autorise les jokers (`season.jokers_enabled`, v1.2 ; sinon `JOKERS_DISABLED`, pour poser comme pour retirer) ; prono existant et non validé (sinon « Enregistre d'abord ton prono. ») ; pour activer, moins de `JOKERS_PER_SEASON` (2) jokers déjà posés par le joueur sur les questions **non annulées de la même saison** (celle de la question).
 - Le comptage et l'écriture se font dans une transaction qui verrouille la ligne `user` du joueur (`SELECT … FOR NO KEY UPDATE`), pour qu'un double clic ne dépasse pas la limite.
+- Effet du joker sur le malus : divisé par `JOKER_DIVISOR` (2) (§5.5).
 
-**Verrous** (décision du 30/09/2026) : les quatre services prennent leurs verrous dans le même ordre, en une transaction : la question (`FOR SHARE` : ni l'admin ni une saison ne la modifie pendant qu'un prono arrive), puis la ligne `user` du propriétaire du prono (`FOR NO KEY UPDATE` : les écritures d'un même joueur passent l'une après l'autre), puis le prono (`FOR UPDATE`). `NO KEY UPDATE` plutôt que `UPDATE` : ce verrou ne bloque pas les contrôles de clé étrangère des événements écrits au même moment pour ce joueur, ce qui évite un interblocage avec un déverrouillage. Une question inconnue ou qui n'est pas ouverte renvoie `QUESTION_NOT_OPEN`, sans révéler si elle existe.
+**Verrous** (décision du 30/09/2026, complétée en v1.2) : les quatre services prennent leurs verrous dans le même ordre, en une transaction :
+1. `setJoker` seulement : les saisons (`FOR SHARE`, comme `seasonsForQuestions` des services de questions, §5.13), pour lire `jokers_enabled` sans croiser un `updateSeason` qui retirerait les jokers ;
+2. la question (`FOR SHARE` : ni l'admin ni une saison ne la modifie pendant qu'un prono arrive) ;
+3. la prolongation du propriétaire du prono sur cette question, si elle existe (`FOR SHARE`, É8c) ;
+4. la ligne `user` du propriétaire du prono (`FOR NO KEY UPDATE` : les écritures d'un même joueur passent l'une après l'autre) ;
+5. le prono (`FOR UPDATE`).
+
+`NO KEY UPDATE` plutôt que `UPDATE` : ce verrou ne bloque pas les contrôles de clé étrangère des événements écrits au même moment pour ce joueur, ce qui évite un interblocage avec un déverrouillage. Une question inconnue ou qui n'est pas ouverte pour le joueur renvoie `QUESTION_NOT_OPEN`, sans révéler si elle existe.
 - Un joker posé sur une question ensuite annulée n'est plus compté : il est rendu automatiquement.
 - Événement `joker_on` ou `joker_off`.
 
 **Déverrouiller** `unlockPrediction(db, admin, { predictionId }, now)`
-- Conditions : acteur admin ; question `open` ; prono validé.
+- Conditions : acteur admin ; question `open` pour le propriétaire du prono (y compris pendant sa prolongation) ; prono validé.
 - Effet : `validated_at = null` ; événement `unlocked` avec l'admin comme `actor_id`.
 
 **Messages d'erreur** (codes pour les tests, textes pour l'interface) :
@@ -635,116 +722,127 @@ L'ouverture est **incluse** (`now = opens_at` → ouverte), la clôture **exclue
 | `INVALID_OPTION` | « Réponse inconnue. » |
 | `NO_PREDICTION` | « Enregistre d'abord ton prono. » |
 | `NO_JOKER_LEFT` | « Tu as déjà utilisé tes 2 jokers cette saison. » |
+| `JOKERS_DISABLED` | « Pas de joker cette saison. » (v1.2) |
 | `NOT_VALIDATED` | « Ce prono n'est pas validé. » |
 
-### 5.5 Barème (`scoring.ts`, `constants.ts`)
+### 5.5 Malus (`scoring.ts`, `constants.ts`)
+
+> **v1.2 (É8c)** : remplace le barème de la v1.0, qui disparaît (paliers `SCORE_TIERS`, bonus podium, 50 points pour une bonne réponse, joker ×2, variante Juste Prix). Décision de l'utilisateur du 02/10/2026, cahier des charges §5. Le classement va désormais du plus petit malus au plus grand. L'écart brut est voulu par l'utilisateur, en connaissance de cause : une question sur un grand nombre pèse bien plus qu'une question sur un petit nombre. Ne pas le « corriger » en écart relatif ni ajouter de plafond (l'agent l'avait proposé, l'utilisateur l'a refusé).
 
 **Constantes**
 
 ```ts
-export const SCORE_TIERS = [
-  { maxPercent: 1, points: 100 },   // « Dans le mille »
-  { maxPercent: 3, points: 80 },
-  { maxPercent: 5, points: 65 },
-  { maxPercent: 10, points: 45 },
-  { maxPercent: 20, points: 25 },
-  { maxPercent: 35, points: 10 },
-] as const;                         // au-delà : 0
-export const PODIUM_BONUS = [20, 10, 5] as const;
-export const CHOICE_POINTS = 50;
-export const JOKER_MULTIPLIER = 2;
-export const JOKERS_PER_SEASON = 2;
+export const JOKER_DIVISOR = 2;        // un joker divise le malus par 2
+export const JOKERS_PER_SEASON = 2;    // si la saison autorise les jokers (§5.13)
 export const COEFFICIENTS = [1, 2, 3] as const;
+export const BULLSEYE_PERCENT = 1;     // « Dans le mille » : écart relatif ≤ 1 %
+export const PODIUM_SIZE = 3;          // les 3 pronos les plus proches (badges, message de résultat), sans bonus
 ```
 
-La page règlement affiche ces mêmes constantes : règlement et calcul ne peuvent pas diverger.
+`SCORE_TIERS`, `PODIUM_BONUS`, `CHOICE_POINTS`, `JOKER_MULTIPLIER` et `BULLSEYE_POINTS` disparaissent. La page règlement affiche ces constantes et des exemples calculés par `scoreQuestion` : règlement et calcul ne peuvent pas diverger.
 
-**Calcul exact, sans virgule flottante.** Les valeurs ont au plus 2 décimales. On passe en centièmes entiers : `P = round(prono × 100)`, `R = round(réel × 100)`, `D = |P − R|`. Un prono est dans le palier `t` (en %) si et seulement si `D × 100 ≤ t × |R|`. Ainsi, 252,5 pour 250 fait exactement 1 % et vaut 100 points.
+**Calcul exact, sans virgule flottante.** Pronos, valeurs réelles et malus d'une mauvaise réponse ont au plus 2 décimales. On calcule en **centièmes entiers** :
+- `P = round(prono × 100)` ;
+- `R = round(réel × 100)` ;
+- `W = round(malus d'une mauvaise réponse × 100)`.
+
+Les malus restent en centièmes entiers jusqu'à l'affichage, sommes du classement comprises. Seule l'interface les convertit, avec `formatNumber` (2 décimales au plus).
 
 **Question à nombre**
-1. Barème : premier palier satisfait, sinon 0.
-2. Valeur réelle nulle (`R = 0`) : prono 0 → 100 points ; tout autre prono → 0 point et écart infini.
-3. **Juste Prix** : un prono strictement supérieur à la valeur réelle (`P > R`) → 0 point, pas de podium, pas de « Dans le mille ». Les autres sont notés normalement.
-4. **Podium** : parmi les pronos éligibles (écart fini ; pour le Juste Prix, ceux qui ne dépassent pas), rang = 1 + nombre de pronos éligibles au `D` strictement plus petit (classement avec ex æquo : 1, 1, 3…). Bonus selon le rang : 1 → +20, 2 → +10, 3 → +5, au-delà → 0. Le bonus est attribué même si le barème donne 0.
-5. « Dans le mille » : points de barème = 100.
-6. Écart relatif (pour le départage et les statistiques) : `D / |R|` en nombre flottant ; infini si `R = 0` et `P ≠ 0`. Il est affiché pour tout prono, même un prono Juste Prix qui dépasse, mais ce dernier ne compte pas dans l'écart moyen du départage (§5.6 ; décision du 01/10/2026).
+1. Malus de base = `D = |P − R|` : l'écart brut, sans plafond.
+2. « Dans le mille » : `D × 100 ≤ BULLSEYE_PERCENT × |R|` (1 % ou moins). Si `R = 0`, seul le prono 0 est dans le mille. Il ne change pas le malus.
+3. Écart relatif (départage et statistiques) : `D / |R|` en nombre flottant ; 0 si `R = 0` et `P = 0` ; infini si `R = 0` et `P ≠ 0` (il ne compte alors pas dans l'écart moyen).
+4. Rang de proximité (`podiumRank`, pour les badges et le message de résultat) : 1 + le nombre de pronos de la question dont le `D` est strictement plus petit (ex æquo : 1, 1, 3…). Il ne donne plus aucun bonus.
 
-**Question à choix** : bonne réponse → 50, sinon 0. Pas de podium, pas d'écart.
+**Question à choix** : malus de base = 0 pour la bonne réponse, `W` sinon. Pas de rang de proximité, pas d'écart.
 
-**Total** = (barème + bonus podium) × coefficient × (2 si joker).
+**Malus d'une question** = malus de base × coefficient, divisé par `JOKER_DIVISOR` s'il y a un joker. La division arrondit au centième, la moitié vers le haut : en centièmes, `x` devient `floor((x + 1) / 2)`.
 
-`scoreQuestion(question, predictions)` renvoie, par prono : `basePoints`, `podiumRank | null`, `podiumBonus`, `bullseye`, `relativeError | null`, `wentOver` (Juste Prix : le prono dépasse la valeur réelle), `total`.
+**Malus d'absence** (`absentMalus`) : le malus d'un joueur du classement (§5.6) qui n'a pas de prono sur une question résolue (décision du 02/10/2026 : « le malus du pire prono »).
+- Question à nombre : le plus grand `D` parmi les pronos de la question, × coefficient. C'est le pire écart, sans tenir compte des jokers des autres.
+- Question à choix : `W` × coefficient. Pas de réponse = mauvaise réponse, même si tous les autres ont trouvé (précision de l'agent, contestable).
+- Question sans aucun prono : 0, tout le monde étant à égalité.
 
-**Vecteurs, question à nombre, valeur réelle 250, coefficient 1, sans joker (barème seul)**
+`scoreQuestion(question, predictions)` reçoit `{ type, coefficient, resultNumber, resultOptionId, wrongAnswerMalus }` et renvoie `{ scores, absentMalus }`. Chaque élément de `scores` contient `baseMalus`, `total` (en centièmes), `bullseye`, `relativeError | null` et `podiumRank | null`. Les champs `basePoints`, `podiumBonus` et `wentOver` disparaissent, comme `priceIsRight`.
 
-| # | Prono | Écart | Barème |
+**Vecteurs, question à nombre, valeur réelle 1 000, coefficient 1, sans joker**
+
+| # | Prono | Malus | « Dans le mille » |
 |---|---|---|---|
-| B1 | 250 | 0 % | 100 |
-| B2 | 252,5 | 1 % | 100 |
-| B3 | 247 | 1,2 % | 80 |
-| B4 | 257,5 | 3 % | 80 |
-| B5 | 240 | 4 % | 65 |
-| B6 | 262,5 | 5 % | 65 |
-| B7 | 225 | 10 % | 45 |
-| B8 | 300 | 20 % | 25 |
-| B9 | 337,5 | 35 % | 10 |
-| B10 | 340 | 36 % | 0 |
+| M1 | 1 000 | 0 | oui |
+| M2 | 500 | 500 | non |
+| M3 | 1 500 | 500 | non |
+| M4 | 1 010 | 10 | oui (1 %) |
+| M5 | 989,99 | 10,01 | non (1,001 %) |
+| M6 | 0 | 1 000 | non |
+| M7 | 25 000 | 24 000 (pas de plafond) | non |
 
-**Vecteurs podium (valeur réelle 250)**
+**Vecteurs, coefficient et joker**
 
-| # | Pronos | Attendu |
+| # | Cas | Malus |
 |---|---|---|
-| P1 | A 240, B 262, C 235, D 235, E 300 | A rang 1 (+20), B rang 2 (+10), C et D rang 3 (+5 chacun), E rang 5 (0) |
-| P2 | A 245, B 255, C 240 | A et B rang 1 (+20 chacun), C rang 3 (+5) |
-| P3 | un seul prono : 400 | rang 1, barème 0, bonus +20, total 20 |
+| K1 | réel 1 000, prono 1 501, joker | 501 ÷ 2 = 250,5 |
+| K2 | réel 1 000, prono 800, coefficient 3 ; puis avec joker | 600 ; 300 |
+| K3 | réel 12,5, prono 12,6 ; puis avec joker | 0,1 ; 0,05 |
+| K4 | réel 10, prono 10,01, joker | 0,01 ÷ 2 = 0,005, arrondi à 0,01 |
+| K5 | réel 0 : pronos 0 et 5 | 0 (« Dans le mille ») et 5 ; écart relatif infini pour 5 |
 
-**Vecteurs Juste Prix (valeur réelle 250)**
+**Vecteurs, question à choix (malus d'une mauvaise réponse : 200)**
 
-| # | Pronos | Attendu |
+| # | Cas | Malus |
 |---|---|---|
-| J1 | 251 | 0 point, pas de podium, pas de « Dans le mille » |
-| J2 | 245 | 80 (2 %) |
-| J3 | A 251, B 245, C 230 | A 0 ; B rang 1 → 80 + 20 = 100 ; C rang 2 → 45 + 10 = 55 |
+| Q1 | bonne réponse, joker | 0 |
+| Q2 | mauvaise réponse | 200 |
+| Q3 | mauvaise réponse, coefficient 2, joker | 200 × 2 ÷ 2 = 200 |
 
-**Autres vecteurs**
+**Vecteurs, rang de proximité (valeur réelle 250 ; aucun bonus)**
+
+| # | Pronos | Rangs |
+|---|---|---|
+| P1 | A 240, B 262, C 235, D 235, E 300 | A 1, B 2, C 3, D 3, E 5 |
+| P2 | A 245, B 255, C 240 | A 1, B 1, C 3 |
+
+**Vecteurs, malus d'absence**
 
 | # | Cas | Attendu |
 |---|---|---|
-| X1 | nombre, 240 le plus proche, coefficient 2, joker | (65 + 20) × 2 × 2 = 340 |
-| X2 | choix, bonne réponse, coefficient 3, joker | 50 × 3 × 2 = 300 |
-| X3 | choix, mauvaise réponse, joker | 0 |
-| X4 | réel 0 : pronos 0 et 5 | 0 → 100 + 20 = 120 ; 5 → 0, pas de podium |
-| X5 | réel 12,5 (%) : prono 12,6 | écart 0,8 % → 100 |
-| X6 | aucun prono | liste vide, pas d'erreur |
+| A1 | réel 1 000, coefficient 2 : A 900, B 1 300 avec joker, C sans prono | A 200 ; B 300 (600 ÷ 2) ; C 600 (pire écart 300 × 2 ; le joker de B n'y change rien) |
+| A2 | choix, malus 200, coefficient 1 : tous les pronos sont justes, C sans prono | C 200 |
+| A3 | question sans aucun prono | malus d'absence 0 |
+| A4 | réel 1 000, un seul prono : 1 000 | malus d'absence 0 (le pire écart est 0) |
+| X6 | liste de pronos vide | pas d'erreur |
 
 ### 5.6 Classement (`standings.ts`)
 
 `computeStandings({ questions, predictions, players })`, où `questions` sont les questions **publiées, résolues et non annulées** de la saison.
 
-- **Joueurs listés** : tous les comptes non désactivés, plus les comptes désactivés ayant au moins un prono dans la saison (marqués `inactive`, affichés avec « (inactif) »). Les comptes anonymisés gardent leur nom anonymisé. **Seulement les comptes créés avant la fin de la saison** (le début de la suivante ; la dernière saison n'a pas de fin), plus ceux qui y ont un prono : un collègue arrivé après une saison n'apparaît ni dans son classement recalculé ni dans son palmarès, même si la proclamation a lieu après son arrivée ; un joueur arrivé en cours de saison y figure, même à 0 (décision du 30/09/2026, fonction `seasonPlayers`).
-- **Par joueur** :
-  - `points` : somme des totaux ;
+- **Joueurs listés** : tous les comptes non désactivés, plus les comptes désactivés ayant au moins un prono dans la saison (marqués `inactive`, affichés avec « (inactif) »). Les comptes anonymisés gardent leur nom anonymisé. **Seulement les comptes créés avant la fin de la saison** (le début de la suivante ; la dernière saison n'a pas de fin), plus ceux qui y ont un prono : un collègue arrivé après une saison n'apparaît ni dans son classement recalculé ni dans son palmarès, même si la proclamation a lieu après son arrivée (décision du 30/09/2026, fonction `seasonPlayers`). Un joueur arrivé en cours de saison y figure, et prend le malus d'absence des questions résolues qu'il n'a pas pu jouer, y compris celles résolues avant son arrivée (v1.2 ; sinon il serait premier).
+- **Par joueur** (v1.2) :
+  - `malus` : somme des malus de ses pronos et des malus d'absence des questions où il n'a pas de prono (en centièmes entiers) ;
   - `bullseyes` : nombre de « Dans le mille » ;
-  - `meanError` : moyenne des écarts relatifs finis sur les questions à nombre (Juste Prix compris), ou `null`. **Un prono Juste Prix qui dépasse n'y compte pas** : il ne rapporte rien, il ne doit pas non plus aider au départage (décision du 01/10/2026, après la recette ; avant, un dépassement de 0,4 % améliorait l'écart moyen) ;
+  - `meanError` : moyenne des écarts relatifs finis de ses pronos sur les questions à nombre, ou `null`. Les absences n'y comptent pas. La règle du 01/10/2026 sur les pronos Juste Prix qui dépassent disparaît avec le Juste Prix ;
   - `questionsPlayed` : nombre de questions résolues avec un prono.
-- **Tri** : points décroissants, puis `bullseyes` décroissants, puis `meanError` croissant (`null` en dernier). À égalité parfaite (écart moyen égal à 1e-12 près), même rang ; l'affichage départage alors par nom (ordre alphabétique français).
+- **Tri** (v1.2) : `malus` **croissant**, puis `bullseyes` décroissants, puis `meanError` croissant (`null` en dernier). Le départage est celui de la v1.1, confirmé par l'utilisateur le 02/10/2026. À égalité parfaite (même malus, même nombre de « Dans le mille », écart moyen égal à 1e-12 près), même rang ; l'affichage départage alors par nom (ordre alphabétique français).
 - **Rang** : classement avec ex æquo (1, 1, 3).
 - **Évolution** (`withMovement`) : on recalcule le classement sans la dernière question résolue (la plus grande `resolved_at`, puis le plus grand `id`). `delta = rang précédent − rang actuel` (positif = montée). S'il n'y a qu'une question résolue, `delta = null` pour tous (pas de flèches).
 
 | # | Cas | Attendu |
 |---|---|---|
-| C1 | A et B à 200 points ; A a 2 « Dans le mille », B 1 | A 1er, B 2e |
-| C2 | A et B à 200 points et 1 « Dans le mille » ; écart moyen A 3 %, B 5 % | A 1er |
+| C1 | A et B à 300 de malus ; A a 2 « Dans le mille », B 1 | A 1er, B 2e |
+| C2 | A et B à 300 de malus et 1 « Dans le mille » ; écart moyen A 3 %, B 5 % | A 1er |
 | C3 | A et B strictement identiques, C derrière | A et B rang 1, C rang 3 |
 | C4 | après la 2e question résolue, A passe de 3e à 1er | `delta` de A = +2 |
 | C5 | une seule question résolue | tous les `delta` valent `null` |
-| C6 | joueur actif sans prono | présent avec 0 point |
-| C7 | Juste Prix (réel 250) : A 251 (0), B 245 (100) ; nombre (réel 1 000) : A seul à 970 (100) | 100 points chacun ; écart moyen A 3 % (le 251 ne compte pas), B 2 % : B 1er |
+| C6 | joueur actif sans prono ; deux questions à nombre résolues (coefficient 1) dont les pires écarts sont 120 et 40 | présent avec 160 de malus, 0 question jouée, écart moyen `null` |
+| C7 | A 100 de malus sans « Dans le mille », B 150 avec 2 | A 1er (le malus passe avant le départage) |
+| C8 | compte créé après la résolution d'une question de la saison (avant la fin de la saison) | il prend le malus d'absence de cette question |
+| C9 | compte désactivé sans prono dans la saison ; compte désactivé avec un prono | le premier n'est pas listé ; le second est listé (inactif), avec le malus d'absence des autres questions |
 
 **Saison affichée par défaut** (classement et accueil), fonction `defaultSeason(now, seasons)` qui renvoie une saison ou `null` : la saison qui contient `now` (`seasonAt`, §5.1). Si elle n'a encore aucune question résolue, que la précédente a au moins une question publiée et qu'elle n'est pas proclamée, on affiche la précédente. S'il n'existe encore aucune saison (ou si `now` précède la première), on affiche l'état vide. Un sélecteur liste les saisons ayant au moins une question publiée.
 
 ### 5.7 Sagesse de la foule et graphiques (`crowd.ts`, `chart.ts`)
 
+- **Pronos pris en compte** (v1.2) : ceux que la personne qui regarde a le droit de voir (§6.6). Avant le résultat, le prono d'un joueur dont la prolongation court n'entre ni dans la moyenne, ni dans la répartition, ni dans le graphique.
 - **Nombre** : moyenne arithmétique et médiane de tous les pronos de la question (médiane d'un nombre pair de pronos = moyenne des deux du milieu). Affichage arrondi à l'entier si toutes les valeurs sont entières, sinon à 2 décimales. Après résolution, on affiche aussi l'écart de la moyenne et de la médiane à la valeur réelle.
 - **Choix** : pour chaque réponse, nombre de pronos et pourcentage entier. Les pourcentages sont arrondis par la méthode du plus fort reste, pour que leur somme fasse 100.
 - **Graphique en points** (`buildStripChart(values, real?, mean, width = 440)`) :
@@ -769,18 +867,20 @@ Tous les badges sont **déduits** des pronos résolus et du palmarès, sans stoc
 |---|---|---|---|
 | `first_bullseye` | Premier « Dans le mille » | au moins un « Dans le mille », toutes saisons confondues | une fois |
 | `nostradamus` | Nostradamus | au moins 3 « Dans le mille » dans une même saison | par saison |
-| `sharpshooter` | Tireur d'élite | rang 1 du podium sur une question à nombre | par question (compteur) |
-| `joker_win` | Joker gagnant | joker sur une question où l'on finit sur le podium (nombre) ou avec la bonne réponse (choix) | par question (compteur) |
+| `sharpshooter` | Tireur d'élite | rang de proximité 1 sur une question à nombre (§5.5) | par question (compteur) |
+| `joker_win` | Joker gagnant | joker sur une question où l'on finit parmi les `PODIUM_SIZE` (3) plus proches (nombre) ou avec la bonne réponse (choix) | par question (compteur) |
 | `assiduous` | Assidu | un prono sur chaque question non annulée d'une saison **proclamée** | par saison |
 | `champion` | Champion | rang 1 dans `season_standing` | par saison |
 
 Sortie : `{ key, count, lastEarnedAt }[]`. Le profil affiche les 6 badges : obtenus en couleur avec leur compteur, les autres grisés.
 
+v1.2 : les conditions ne changent pas. Le « podium » est désormais le rang de proximité de §5.5, sans bonus, et tous les pronos d'une question à nombre y participent (le Juste Prix, qui en excluait certains, a disparu). Dans une saison sans jokers, « Joker gagnant » ne peut pas être obtenu.
+
 ### 5.9 Pastille « Nouveau » (`visits.ts`)
 
 - `NEW_VISIT_GAP_MS = 30 minutes`.
 - `newReference(user, now)` : si `last_seen_at` est nul → `null` (pas de pastille). Si `now − last_seen_at > 30 min`, c'est une nouvelle visite → référence = `last_seen_at`. Sinon, on est dans la même visite → référence = `previous_visit_at`.
-- Une question ouverte porte la pastille si `opens_at > référence`.
+- Une question ouverte porte la pastille si `opens_at > référence`. Une question ouverte pour le joueur grâce à sa prolongation porte à la place la pastille « PROLONGÉE POUR TOI » (v1.2, §5.14).
 - `recordVisit(db, actor, now)` (service de `profile.ts`, avec le contrôle d'accès commun : l'acteur est le compte qui visite ; décision du 30/09/2026), appelée à chaque page vue par le composant client `VisitTracker`, monté dans l'enveloppe commune des pages connectées (pages de l'admin comprises), après l'affichage : si `now − last_seen_at > 30 min`, alors `previous_visit_at = last_seen_at` ; puis toujours `last_seen_at = now`. Écrire après l'affichage évite que la pastille disparaisse avant d'avoir été vue.
 
 | # | Données | Attendu |
@@ -795,10 +895,16 @@ Sortie : `{ key, count, lastEarnedAt }[]`. Le profil affiche les 6 badges : obte
 - `countdownParts(ms)` renvoie `{ d, h, m, s }`, avec heures, minutes et secondes sur 2 chiffres, et un libellé `« 3 j 07:45:10 »`. Une durée négative vaut 0.
 - `URGENT_THRESHOLD_MS = 48 h` : en dessous, le compte à rebours passe en couleur « hot ».
 - Côté client (§8.2), le premier affichage utilise l'heure du serveur transmise par la page, pour éviter tout écart entre serveur et navigateur ; le décompte démarre ensuite. À zéro, la page se rafraîchit une fois (`router.refresh()`).
+- Pour un joueur prolongé, le compte à rebours va jusqu'à sa date limite personnelle (v1.2, §5.14).
 
 ### 5.11 Questions : règles du back-office
 
-**Création** (`draft`) : catégorie, type, énoncé et source obligatoires. Pour `number` : unité recommandée, `price_is_right` possible. Pour `choice` : au moins 2 réponses, libellés non vides et uniques (insensible à la casse). Le modèle « oui/non » crée les réponses « Oui » et « Non ».
+**Création** (`draft`) : catégorie, type, énoncé et source obligatoires. Pour `number` : unité recommandée (le Juste Prix n'existe plus depuis la v1.2). Pour `choice` : au moins 2 réponses, libellés non vides et uniques (insensible à la casse), et **malus d'une mauvaise réponse** obligatoire (v1.2) :
+- lu comme un prono (§5.3), strictement positif, sans valeur par défaut ;
+- refusé s'il est absent : « Indique le malus d'une mauvaise réponse. » ;
+- refusé s'il vaut 0 : « Le malus doit être supérieur à 0. ».
+
+Le formulaire rappelle de le comparer aux écarts attendus sur les questions à nombre (par exemple quelques dizaines pour une JPO, quelques centaines pour des candidatures). Le modèle « oui/non » crée les réponses « Oui » et « Non ». Passer un brouillon de nombre à choix demande ce malus ; passer de choix à nombre l'efface.
 
 **Publication** (`published`), vérifications :
 - `opens_at` et `closes_at` renseignés, `opens_at < closes_at`, `closes_at > now` ;
@@ -815,7 +921,7 @@ Une question publiée avec `opens_at` dans le futur est « programmée » : l'ad
 
 | Champ | Sans prono | Avec au moins un prono | Après la clôture |
 |---|---|---|---|
-| type, énoncé, description, unité, Juste Prix, réponses, source, coefficient | oui | **non** | non |
+| type, énoncé, description, unité, réponses, malus d'une mauvaise réponse, source, coefficient | oui | **non** | non |
 | catégorie | oui | oui | oui |
 | aide (lien BI, valeur de l'an dernier, indice) | oui | oui | oui |
 | ouverture | oui | non si déjà ouverte | non |
@@ -826,36 +932,42 @@ Pour changer un champ verrouillé, l'admin annule la question et en crée une no
 
 **Suppression** : uniquement un brouillon sans prono. Sinon, annulation.
 
-**Annulation** : possible à tout moment, avec confirmation ; `cancelled_at = now`. La question sort du calcul des points, et les jokers posés dessus sont rendus.
+**Annulation** : possible à tout moment, avec confirmation ; `cancelled_at = now`. La question sort du calcul des malus (personne, absents compris, n'en prend sur elle), et les jokers posés dessus sont rendus.
 
-**Résultat** : saisissable seulement si la question est `closed` ou `resolved`.
+**Résultat** : saisissable seulement si la question est `closed` ou `resolved`, **et si aucune prolongation ne court** sur la question (v1.2, §5.14). Sinon, refus `EXTENSION_RUNNING` : « Un joueur a une prolongation jusqu'au … : attends sa fin ou annule-la. ». `resolveQuestion` verrouille la question (`FOR UPDATE`) avant de lire ses prolongations.
 - Question à nombre : même lecture que les pronos (§5.3).
 - Question à choix : une réponse de la question.
 - Première saisie : `resolved_at = now`. Saisies suivantes : `corrected_at = now`, et la page de la question affiche « Résultat corrigé le … ».
+- À partir de l'É8d, la première saisie écrit aussi, dans la même transaction, le message de résultat du chat (§5.15). Une correction n'en écrit pas de nouveau : le texte est calculé à la lecture et reflète donc la valeur corrigée.
 
 **Saison** : à chaque enregistrement de `closes_at`, `season_id` devient l'identifiant de la saison de cette date (§5.1), ou `null` si aucune saison ne la couvre. Les services ne créent plus de saison (v1.1 : `ensureSeason` disparaît). La publication (et les dates en série sur une question publiée) exige une saison : « Aucune saison ne couvre cette date de clôture : crée d'abord la saison dans Saisons et lots. » Une question qui a des pronos ne peut pas changer de saison (décision du 30/09/2026).
 
-**Duplication** : copie catégorie, type, Juste Prix, énoncé, description, unité, source, aide, coefficient et réponses, en brouillon sans dates, avec `duplicated_from_id`. Si l'originale est résolue, `help_last_year` est prérempli avec son résultat formaté (nombre + unité, ou libellé de la bonne réponse).
+**Duplication** : copie catégorie, type, énoncé, description, unité, source, aide, coefficient, réponses et malus d'une mauvaise réponse, en brouillon sans dates, avec `duplicated_from_id`. Les prolongations ne sont pas copiées. Si l'originale est résolue, `help_last_year` est prérempli avec son résultat formaté (nombre + unité, ou libellé de la bonne réponse).
 
 ### 5.12 Proclamation et palmarès
 
 - **Conditions** : acteur admin ; la saison a au moins une question publiée ; toutes ses questions publiées non annulées sont résolues ; saison pas encore proclamée.
-- **Effet**, en une transaction : calcul du classement (§5.6), puis insertion dans `season_standing` (rang, points, « Dans le mille », écart moyen, questions jouées, nom affiché à cet instant), puis `proclaimed_at = now`.
+- **Effet**, en une transaction : calcul du classement (§5.6), puis insertion dans `season_standing` (rang, malus, « Dans le mille », écart moyen, questions jouées, nom affiché à cet instant), puis `proclaimed_at = now`. Depuis la v1.2, le malus total va dans la colonne `malus` et `points` reste nul (§4.3). Une prolongation en cours empêche déjà la résolution (§5.11) : une saison dont toutes les questions sont résolues n'en a plus.
 - **Irréversible** : aucune action d'annulation. Une correction de résultat ultérieure ne modifie pas le palmarès.
 - Le palmarès (`/palmares`) lit uniquement `season_standing`, jamais un recalcul.
 - **Mise en œuvre** (É7) : `proclaimSeason(db, admin, { seasonId }, now)` verrouille la table `season` (comme les autres services de saisons, §5.13), puis les questions publiées de la saison (`FOR SHARE`), vérifie les conditions (`proclamationBlocker`, qui donne aussi la raison affichée sous le bouton) et calcule le classement avec `computeStandings`, comme `/classement`. Codes de refus : `ALREADY_PROCLAIMED`, `NOT_PROCLAIMABLE`.
 - **Saison proclamée** (décision du 30/09/2026) : aucune question ne peut plus y être publiée ni y déplacer sa clôture (§5.11). Proclamer la dernière saison créée avant d'avoir créé la suivante bloque donc la publication des questions qui clôturent après son début ; la confirmation le rappelle.
 
-### 5.13 Saisons : règles du back-office (v1.1)
+### 5.13 Saisons : règles du back-office (v1.1, jokers v1.2)
 
 Les rentrées ne tombent pas toujours le même jour : l'admin crée chaque saison avec sa date de début, de préférence à l'avance. Services de `src/lib/services/seasons.ts`, chacun en une transaction.
 
 - **Nom** : 2 à 40 caractères après retrait des espaces, unique sans tenir compte de la casse (« Cette saison existe déjà. »). Modifiable à tout moment, même après la proclamation.
 - **Date de début** : un jour, à 00:00 heure de Paris (`<input type="date">`, `seasonStartFromLocalDate`). Deux saisons ne commencent pas le même jour.
-- **Créer** (`createSeason` : nom, date de début) : la nouvelle saison prend sa place dans la suite et reprend, dans la saison qui la précède, les questions dont la clôture tombe à partir de son début. Refusé :
+- **Jokers** (`jokers_enabled`, v1.2, É8c) : choisis à la création (case « Jokers autorisés », cochée par défaut) et modifiables ensuite (`updateSeason`).
+  - Les autoriser est toujours accepté, sauf sur une saison proclamée.
+  - Les retirer est refusé dès qu'un prono avec joker existe sur une question non annulée de la saison : `JOKERS_IN_USE`, « Des jokers sont déjà posés dans cette saison : impossible de les retirer. ». Un joker posé sur une question annulée a été rendu : il ne bloque rien.
+  - Saison proclamée : réglage figé, comme la date de début.
+  - La migration de l'É8c autorise les jokers sur les saisons existantes, dont 2026-2027 en production.
+- **Créer** (`createSeason` : nom, date de début, jokers autorisés) : la nouvelle saison prend sa place dans la suite et reprend, dans la saison qui la précède, les questions dont la clôture tombe à partir de son début. Refusé :
   - si l'une de ces questions a des pronos : « Des questions avec des pronos clôturent après cette date : elles changeraient de saison. » ;
   - si une question publiée ou annulée sortirait d'une saison proclamée (règle des saisons proclamées, ci-dessous).
-- **Modifier** (`updateSeason` : nom, date de début) : la date de début reste strictement entre celle de la saison précédente et celle de la suivante (on ne réordonne pas les saisons). Les questions qui changent de saison sont recalculées. Refusé :
+- **Modifier** (`updateSeason` : nom, date de début, jokers autorisés ; un champ absent garde sa valeur) : la date de début reste strictement entre celle de la saison précédente et celle de la suivante (on ne réordonne pas les saisons). Les questions qui changent de saison sont recalculées. Refusé :
   - si l'une d'elles a des pronos ;
   - si la saison est proclamée (le changement de date seulement ; le nom reste modifiable) ;
   - si une question publiée ou annulée entrerait dans une saison proclamée ou en sortirait ;
@@ -865,7 +977,7 @@ Les rentrées ne tombent pas toujours le même jour : l'admin crée chaque saiso
 - **Aucune saison** : tant qu'aucune saison n'existe, les brouillons s'enregistrent mais rien ne peut être publié ; `/admin/saisons` et le formulaire de question invitent à créer la première saison.
 - **Rappel** : quand la saison courante est la dernière créée, `/admin/saisons` rappelle de créer la suivante avant la prochaine rentrée.
 - **Lots** (`upsertPrizes`) : ceux d'une saison existante non proclamée (la v1.0 créait la saison courante au besoin : ce n'est plus le cas).
-- **Verrous** : `createSeason`, `updateSeason` et `deleteSeason` verrouillent la table `season` (`LOCK TABLE … IN EXCLUSIVE MODE`), puis les questions qui ont une clôture (`FOR UPDATE`) avant de compter leurs pronos. Les services de questions qui fixent une saison lisent les saisons avec `FOR SHARE` (`seasonsForQuestions`) **avant** de verrouiller leur question : une question ne reçoit jamais sa saison d'une liste en cours de modification, et les verrous sont toujours pris dans le même ordre (pas d'interblocage). Les services de pronos (É6, §5.4) prennent `FOR SHARE` sur la ligne de la question, sans lire les saisons : un prono ne peut pas arriver pendant qu'une question change de saison.
+- **Verrous** : `createSeason`, `updateSeason` et `deleteSeason` verrouillent la table `season` (`LOCK TABLE … IN EXCLUSIVE MODE`), puis les questions qui ont une clôture (`FOR UPDATE`) avant de compter leurs pronos. Les services de questions qui fixent une saison lisent les saisons avec `FOR SHARE` (`seasonsForQuestions`) **avant** de verrouiller leur question : une question ne reçoit jamais sa saison d'une liste en cours de modification, et les verrous sont toujours pris dans le même ordre (pas d'interblocage). Les services de pronos (É6, §5.4) prennent `FOR SHARE` sur la ligne de la question, sans lire les saisons : un prono ne peut pas arriver pendant qu'une question change de saison. Exception (v1.2) : `setJoker` lit d'abord les saisons en `FOR SHARE`, avant la question, pour que `updateSeason` ne retire pas les jokers pendant qu'un joker est posé.
 
 | # | Cas | Attendu |
 |---|---|---|
@@ -877,6 +989,122 @@ Les rentrées ne tombent pas toujours le même jour : l'admin crée chaque saiso
 | SA6 | supprimer une saison vide qui a des lots | acceptée, lots supprimés |
 | SA7 | publier une question qui clôture avant la première saison | refusé, message ci-dessus |
 | SA8 | saison proclamée : changer sa date de début ; la renommer | refusé ; accepté |
+| SA9 | retirer les jokers d'une saison sans joker posé | accepté ; `setJoker` y renvoie ensuite `JOKERS_DISABLED` |
+| SA10 | retirer les jokers d'une saison où un joueur en a posé un | refusé (`JOKERS_IN_USE`), rien ne change |
+| SA11 | retirer les jokers quand le seul joker posé l'est sur une question annulée | accepté |
+| SA12 | autoriser de nouveau les jokers | accepté ; `setJoker` fonctionne, avec la limite de 2 |
+| SA13 | saison proclamée : changer le réglage des jokers | refusé |
+
+### 5.14 Prolongations (v1.2, É8c)
+
+Un joueur absent n'a pas pu pronostiquer : l'admin rouvre la question pour lui seul, jusqu'à une date limite personnelle (cahier des charges §4.10). Services de `src/lib/services/extensions.ts`, chacun en une transaction.
+
+**Accorder ou changer** `setQuestionExtension(db, admin, { questionId, userId, closesAt }, now)`
+
+Conditions, avec leur code de refus :
+- l'acteur est admin ;
+- `userId` n'est pas l'acteur (`SELF_EXTENSION` : « Tu ne peux pas te prolonger toi-même : demande à l'autre admin. ») ;
+- la question est publiée, non annulée, sans résultat, et ouverte ou clôturée, pas programmée (`EXTENSION_NOT_ALLOWED` : « Prolongation impossible : la question doit être ouverte ou clôturée, sans résultat. ») ;
+- le compte visé existe et n'est pas désactivé ;
+- le joueur n'a pas de prono sur la question (`EXTENSION_HAS_PREDICTION` : « Ce joueur a déjà un prono sur cette question. »). Exception : si sa prolongation court encore, l'admin peut changer la date limite même si le joueur a déjà un prono ;
+- `closesAt` (heure de Paris saisie, `parisLocalToUtc`) est dans le futur et après la clôture de la question (`INVALID_EXTENSION_DATE` : « La date limite doit être dans le futur et après la clôture de la question. »).
+
+Effet : crée la ligne (`granted_by`, `granted_at`) ou change sa date (`updated_by`, `updated_at`). Une prolongation échue sur laquelle le joueur n'a pas de prono peut être relancée de la même façon. Une prolongation échue avec un prono ne se modifie plus : le prono est validé, et le joueur a pu voir ceux des autres depuis.
+
+**Annuler** `cancelQuestionExtension(db, admin, { questionId, userId }, now)`
+- Conditions : admin, pas sur soi-même (`SELF_EXTENSION`) ; une prolongation qui court (`NO_EXTENSION` : « Aucune prolongation en cours pour ce joueur. »).
+- Effet : si le joueur n'a pas de prono, la ligne est supprimée. S'il en a un, `closes_at = now` : la prolongation se termine et son prono compte comme validé (`predictionState`, §5.4).
+
+**Verrous** : la question (`FOR UPDATE`, ce qui attend les services de pronos en cours, qui la tiennent en `FOR SHARE`, et bloque `resolveQuestion`), puis la ligne de prolongation (`FOR UPDATE`), puis le prono du joueur (lecture). L'ordre question → prolongation est le même que dans les services de pronos (§5.4).
+
+**Effets ailleurs** :
+- **statut** de la question pour le joueur : `questionStatusFor` (§5.2) ;
+- **services de pronos** : ouverts pour lui jusqu'à sa date limite (§5.4) ;
+- **résultat** : refusé tant qu'une prolongation court (`EXTENSION_RUNNING`, §5.11) ;
+- **visibilité** : §6.6 ;
+- **compte à rebours** : jusqu'à sa date limite (§5.10) ;
+- **pastille** : « PROLONGÉE POUR TOI » (§5.9) ;
+- **dates de la question** : repousser sa clôture ne touche pas aux prolongations ;
+- **annulation de la question** : les prolongations ne servent plus à rien, mais restent en base.
+
+| # | Cas | Attendu |
+|---|---|---|
+| PR1 | question clôturée sans résultat, joueur sans prono, date limite dans 48 h | accordée ; le joueur enregistre, valide et pose un joker ; un autre joueur reçoit toujours `QUESTION_NOT_OPEN` |
+| PR2 | question résolue | refusée (`EXTENSION_NOT_ALLOWED`) |
+| PR3 | question programmée, ou annulée | refusée (`EXTENSION_NOT_ALLOWED`) |
+| PR4 | joueur qui a déjà un prono | refusée (`EXTENSION_HAS_PREDICTION`) |
+| PR5 | l'admin pour lui-même | refusée (`SELF_EXTENSION`) ; l'autre admin peut la lui accorder |
+| PR6 | date limite passée, ou avant la clôture de la question | refusée (`INVALID_EXTENSION_DATE`) |
+| PR7 | prolongation en cours : saisir le résultat | refusé (`EXTENSION_RUNNING`) ; accepté après la date limite ou après l'annulation |
+| PR8 | annuler sans prono ; annuler avec un prono enregistré | ligne supprimée ; prolongation terminée à `now`, prono compté comme validé |
+| PR9 | après la date limite, le joueur tente d'enregistrer | `QUESTION_NOT_OPEN` ; son prono enregistré compte comme validé |
+| PR10 | question encore ouverte (absence prévue), date limite après sa clôture | accordée ; après la clôture, le joueur pronostique jusqu'à sa date limite |
+
+### 5.15 Chat général (v1.2, É8d)
+
+Un fil unique pour toute l'équipe (cahier des charges §4.11). Les messages sont stockés en base (`chat_message`, §4.3) et conservés.
+
+**Arrivée des nouveaux messages** : Vercel ne garde pas de connexion ouverte (WebSocket), et le projet n'utilise aucun service tiers (§1.1). La page `/chat` interroge donc `GET /api/chat` toutes les `CHAT_POLL_MS` (10 s).
+- Elle ne le fait que si l'onglet est visible (`document.visibilityState`) et si la personne a agi dans les `CHAT_IDLE_MS` (5 min) précédentes : souris, clavier, défilement, focus.
+- Sinon elle se met en pause, et reprend aussitôt, avec une interrogation immédiate, dès que l'onglet redevient visible ou que la personne agit.
+- La règle est une fonction pure, `shouldPoll({ visible, lastActivityAt, now })`, dans `src/lib/chat/polling.ts`.
+- Sans cette pause, un onglet oublié toute la journée empêcherait la base Neon de se mettre en veille, et consommerait les quotas gratuits de Neon et de Vercel.
+
+**Écrire** `postChatMessage(db, actor, { body }, now)`
+- Compte connecté, non désactivé.
+- Texte :
+  - fins de ligne normalisées en `\n`, espaces retirés au début et à la fin, retours à la ligne intérieurs conservés ;
+  - longueur comptée en points de code Unicode (`[...texte].length`, comme `char_length` de PostgreSQL : un emoji simple compte pour 1) ;
+  - vide : `EMPTY_MESSAGE`, « Écris un message. » ;
+  - plus de 500 : `MESSAGE_TOO_LONG`, « 500 caractères au maximum. ».
+- Au plus `CHAT_MAX_PER_MINUTE` (10) messages par compte sur les 60 dernières secondes (ligne `user` verrouillée en `FOR NO KEY UPDATE`, puis comptage) : `CHAT_RATE_LIMITED`, « Doucement : 10 messages par minute au maximum. ».
+- Effet : insère un `message`.
+
+**Supprimer** `deleteChatMessage(db, actor, { messageId }, now)`
+- Un `message` non supprimé : par son auteur ou par un admin. Un message de résultat : par un admin seulement. Sinon `FORBIDDEN` ; message inconnu ou déjà supprimé : `MESSAGE_NOT_FOUND`, « Ce message n'existe plus. ».
+- Effet : `body = NULL` (le contenu est effacé, pas seulement masqué), `deleted_at = now`, `deleted_by = acteur`. L'affichage montre « Message supprimé. ». Pas de modification de message.
+
+**Marquer comme lu** `markChatRead(db, actor, { lastMessageId }, now)` : `chat_read.last_read_id = max(valeur actuelle, lastMessageId)`, en refusant un identifiant supérieur au plus grand message existant. Appelé par la page `/chat` quand elle affiche des messages, onglet visible.
+
+**Message de résultat** : `resolveQuestion` (§5.11) insère un `result` à la première saisie du résultat, avec la question. Le texte est calculé à la lecture par `src/lib/chat/result-message.ts`, une fonction pure et testée :
+- nombre : « Résultat : <énoncé> → <valeur> <unité>. Le plus proche : <nom> » (« Les plus proches : Léa et Hugo » à égalité au rang 1) ;
+- choix : « Résultat : <énoncé> → <bonne réponse>. <n> bonne(s) réponse(s) sur <m> pronos. » ;
+- sans aucun prono, la seconde phrase est omise ;
+- « (corrigé) » est ajouté si le résultat a été corrigé ;
+- le message porte un lien vers la question ;
+- si la question est annulée ensuite, il n'est plus affiché.
+
+**Anonymisation** (`anonymizeUser`, §6.3) : tous les messages du compte sont effacés comme une suppression (`deleted_by` = l'admin).
+
+**Lectures** (`src/lib/data/chat.ts`) :
+- `getChatMessages(db, viewer, { beforeId? }, now)` : les `CHAT_PAGE_SIZE` (50) messages précédant `beforeId`, ou les derniers. Chaque message contient l'identifiant, le type, la date, l'auteur (identifiant, nom, avatar, inactif), le texte ou « supprimé », le texte calculé d'un message de résultat, et `canDelete` ;
+- `getChatUpdates(db, viewer, { afterId, since }, now)` : les messages d'identifiant supérieur à `afterId` (100 au plus), les identifiants des messages supprimés depuis `since`, et `serverTime`, à repasser en `since` à l'appel suivant ;
+- `getUnreadChatCount(db, viewer)` : les messages d'identifiant supérieur à `chat_read.last_read_id` (ou tous, s'il n'a jamais ouvert le chat), hors les siens et hors les messages supprimés.
+
+**Route** `src/app/api/chat/route.ts` (`GET`, `after` et `since` en paramètres) :
+- lit la session (`getViewer`, en-têtes d'abord, §6.4) ;
+- sans session valide ou pour un compte désactivé : `401` avec `{ "error": "NOT_AUTHENTICATED" }`, et la page renvoie alors vers `/connexion` ;
+- sinon : `200` avec le JSON de `getChatUpdates` ;
+- `Cache-Control: no-store`, rendu dynamique ;
+- aucun effet de bord : marquer comme lu passe par une Server Action.
+
+**Emojis** : une grille de 48 emojis choisis, sans bibliothèque, dans `src/lib/chat/emojis.ts` (caractère et nom français, pour le libellé accessible) : 😀 visage souriant, 😂 rire aux larmes, 😅 sourire gêné, 😉 clin d'œil, 😍 yeux en cœur, 😎 lunettes de soleil, 🤔 qui réfléchit, 😮 bouche bée, 😱 cri d'effroi, 😢 larme, 😭 en pleurs, 😡 en colère, 🙄 yeux au ciel, 😬 grimace, 🤯 tête qui explose, 🥳 fête, 😴 qui dort, 🤞 doigts croisés, 👍 pouce levé, 👎 pouce baissé, 👏 applaudissements, 🙌 mains levées, 🙏 merci, 💪 biceps, 👀 yeux, 🤝 poignée de main, ✌️ victoire, 👋 coucou, 🎯 cible, 🏆 trophée, 🥇 médaille d'or, 🥈 médaille d'argent, 🥉 médaille de bronze, 🔥 feu, 💯 cent, ⭐ étoile, 🎉 cotillons, 🍀 trèfle, 🃏 joker, 📈 hausse, 📉 baisse, 📊 graphique, 🎓 diplômé, 📚 livres, ☕ café, 🍕 pizza, ❤️ cœur, 🚀 fusée. Le raccourci Windows Win + . reste utilisable dans le champ.
+
+**Sécurité** : le texte est affiché comme du texte (échappé par React, jamais `dangerouslySetInnerHTML`, aucun lien rendu cliquable) ; jamais journalisé ; validé par Zod côté serveur.
+
+| # | Cas | Attendu |
+|---|---|---|
+| CH1 | message de 500 points de code, dont des emojis ; message de 501 | accepté ; `MESSAGE_TOO_LONG` |
+| CH2 | message vide ou fait d'espaces | `EMPTY_MESSAGE` |
+| CH3 | 11e message en moins de 60 s ; puis un message 60 s après le premier | `CHAT_RATE_LIMITED` ; accepté |
+| CH4 | compte désactivé | `ACCOUNT_DISABLED` |
+| CH5 | un joueur supprime son message ; le message d'un autre ; un message de résultat | accepté (texte effacé) ; `FORBIDDEN` ; `FORBIDDEN` |
+| CH6 | un admin supprime le message d'un joueur ; un message de résultat | accepté ; accepté |
+| CH7 | `markChatRead` avec un identifiant plus petit que le dernier lu | rien ne change |
+| CH8 | non lus | n'incluent ni ses propres messages ni les messages supprimés |
+| CH9 | première saisie d'un résultat ; correction ; annulation de la question | un message de résultat ; pas de second message, texte corrigé ; message masqué |
+| CH10 | anonymisation d'un compte | tous ses messages effacés |
+| CH11 | `shouldPoll` : onglet caché ; visible et inactif depuis 6 min ; visible et actif il y a 1 min | non ; non ; oui |
 
 ---
 
@@ -937,8 +1165,9 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
   - `email = anonyme-<id>@invalid.local` ;
   - avatar par défaut, compte désactivé ;
   - adresse retirée de la liste blanche ;
-  - le nom est aussi remplacé dans le palmarès (`season_standing.name_snapshot`) ; rangs et points restent figés (décision du 30/09/2026) ;
-  - les pronos sont conservés, pour que le classement des autres reste juste.
+  - le nom est aussi remplacé dans le palmarès (`season_standing.name_snapshot`) ; rangs et malus restent figés (décision du 30/09/2026) ;
+  - les pronos sont conservés, pour que le classement des autres reste juste ;
+  - ses messages du chat sont effacés (v1.2, É8d, §5.15).
 - **Liste blanche** :
   - ajout en série (une adresse par ligne ; virgules et points-virgules acceptés) ;
   - bilan affiché : « 3 ajoutées, 1 déjà présente, 1 invalide » ;
@@ -946,7 +1175,7 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
 
 ### 6.4 Protection des routes
 
-1. **Proxy/middleware** (redirection rapide, pas une sécurité) : sans cookie de session Better Auth, toute route sauf `/connexion`, `/inscription`, `/api/auth/*`, `/api/health` et les fichiers statiques redirige vers `/connexion`.
+1. **Proxy/middleware** (redirection rapide, pas une sécurité) : sans cookie de session Better Auth, toute route sauf `/connexion`, `/inscription`, `/api/auth/*`, `/api/health`, `/api/chat` (É8d : la route répond elle-même `401` en JSON, une redirection n'aurait pas de sens pour un appel `fetch`) et les fichiers statiques redirige vers `/connexion`.
 2. **Layout `(jeu)`** : `requireUser()`. Sans session valide, redirection vers `/connexion`. Un compte désactivé n'a plus de session.
 3. **Layout `admin`** : `requireAdmin()`. Un joueur non admin reçoit la page 404 (on ne révèle pas l'existence du back-office). Next résout les métadonnées d'une page même quand son layout répond 404 : les pages d'admin donnent leur titre par `generateMetadata`, qui passe par `adminMetadata(titre)` (`requireAdmin()` d'abord). Sinon, l'onglet d'un joueur affichait « Back-office · Le Bon Chiffre » (recette du 01/10/2026, R-02).
 4. **Chaque Server Action** appelle `requireUser()` ou `requireAdmin()` et renvoie une erreur `NOT_AUTHENTICATED` ou `FORBIDDEN`, jamais une exception non gérée.
@@ -962,22 +1191,38 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
 | Voir le back-office | → /connexion | 404 | → /connexion | oui |
 | Enregistrer, valider un prono, poser un joker | refusé | oui (les siens) | refusé | oui (les siens) |
 | Déverrouiller un prono | refusé | refusé | refusé | oui |
+| Prolonger une question pour un joueur, annuler une prolongation (É8c) | refusé | refusé | refusé | oui, jamais pour soi-même |
 | Gérer questions, catégories, saisons, lots, annonces | refusé | refusé | refusé | oui |
 | Gérer liste blanche et comptes | refusé | refusé | refusé | oui |
 | Modifier son nom, son avatar, son mot de passe | refusé | oui | refusé | oui |
+| Lire et écrire dans le chat, marquer comme lu (É8d) | refusé (`401` pour `/api/chat`) | oui | refusé | oui |
+| Supprimer un message du chat (É8d) | refusé | les siens | refusé | tous, messages de résultat compris |
 
 ### 6.6 Visibilité des données
 
-| Donnée | Avant l'ouverture | Question ouverte | Clôturée | Résolue |
-|---|---|---|---|---|
-| La question elle-même (joueur) | invisible (404) | visible | visible | visible |
-| Mon prono | — | visible | visible | visible |
-| Les pronos des autres (joueur) | — | **jamais** | valeurs, jokers, noms | + écarts, points |
-| Les pronos des autres (admin) | — | **états seulement** : à faire, enregistré, validé | valeurs | + points |
-| Historique des événements (admin) | — | types et horaires, **sans valeurs ni jokers** (l'admin joue aussi ; décision du 01/10/2026) | avec valeurs et jokers | avec valeurs et jokers |
-| Sagesse de la foule, graphique | — | non | oui | oui, avec la valeur réelle |
+**Depuis la v1.2 (É8c)**, la visibilité se décide avec trois éléments :
+- le statut de la question **pour la personne qui regarde** (`questionStatusFor`, §5.2) : une question clôturée est « ouverte » pour un joueur dont la prolongation court ;
+- le fait que cette personne ait, ou non, un prono sur la question ;
+- les prolongations des autres joueurs.
 
-Une seule fonction de `src/lib/data/` lit les pronos d'une question pour l'affichage : `getQuestionPredictionsForViewer(db, viewer, questionId, now)`. Elle applique ce tableau. Aucun composant ne lit la table `prediction` directement.
+Le tableau vaut pour les pages du joueur comme pour le back-office (l'admin joue aussi).
+
+| Donnée | Avant l'ouverture | Ouverte pour moi (ouverte, ou ma prolongation court) | Clôturée, j'ai un prono | Clôturée, je n'ai pas de prono | Résolue |
+|---|---|---|---|---|---|
+| La question elle-même (joueur) | invisible (404) | visible | visible | visible | visible |
+| Mon prono | — | visible | visible | — | visible |
+| Les pronos des autres (joueur) | — | **jamais** | valeurs, jokers, noms, **sauf ceux des joueurs dont la prolongation court** | **non** : « Les pronos s'afficheront au résultat. » (décision du 02/10/2026) | tout, avec écarts et malus, absents compris |
+| Les pronos des autres (admin, back-office) | — | **états seulement** : à faire, enregistré, validé | valeurs, sauf les joueurs dont la prolongation court (leur état seulement) | **états seulement** | tout |
+| Historique des événements (admin) | — | types et horaires, **sans valeurs ni jokers** (l'admin joue aussi ; décision du 01/10/2026) | avec valeurs et jokers, sauf les événements des joueurs dont la prolongation court | sans valeurs ni jokers | avec valeurs et jokers |
+| Sagesse de la foule, graphique | — | non | oui, sans les pronos cachés | non | oui, avec la valeur réelle |
+| Prolongations en cours sur la question | — | — | « Prolongation en cours pour n joueur(s), jusqu'au … : son prono s'affichera ensuite. », sans nom (précision de l'agent, contestable) | idem | — |
+
+Conséquences :
+- un admin qui n'a pas pronostiqué une question clôturée ne voit plus les valeurs dans le back-office avant le résultat (jusqu'à la v1.1, il les voyait) : il peut ainsi recevoir une prolongation de l'autre admin sans avoir vu les réponses ;
+- un admin qui ne joue pas du tout ne voit les valeurs qu'au résultat ;
+- saisir le résultat ne demande pas de voir les pronos.
+
+Une seule fonction de `src/lib/data/` lit les pronos d'une question pour l'affichage : `getQuestionPredictionsForViewer(db, viewer, questionId, now)`. Elle applique ce tableau, et lit la prolongation de la personne qui regarde comme celles des autres. Aucun composant ne lit la table `prediction` directement. Les requêtes des cas « états seulement » ne sélectionnent aucune colonne de valeur (comme depuis l'É5).
 
 ---
 
@@ -1021,24 +1266,29 @@ type Result<T = void> =
 |---|---|
 | `predictions.ts` | `savePrediction`, `validatePrediction`, `setJoker`, `unlockPrediction` |
 | `questions.ts` | `createQuestion`, `updateQuestion`, `deleteDraftQuestion`, `publishQuestions`, `setQuestionDates`, `duplicateQuestion`, `cancelQuestion`, `resolveQuestion` |
+| `extensions.ts` (É8c) | `setQuestionExtension`, `cancelQuestionExtension` (§5.14) |
 | `categories.ts` | `createCategory`, `renameCategory`, `archiveCategory`, `unarchiveCategory` |
 | `seasons.ts` | `createSeason`, `updateSeason`, `deleteSeason`, `upsertPrizes`, `proclaimSeason` (v1.1 : `ensureSeason` disparaît, §5.13) |
 | `announcements.ts` | `createAnnouncement`, `updateAnnouncement`, `deleteAnnouncement` |
 | `players.ts` | `addAllowedEmails`, `removeAllowedEmail`, `setRole`, `disableUser`, `enableUser`, `setTemporaryPassword`, `anonymizeUser` |
 | `profile.ts` | `updateDisplayName`, `updateAvatar`, `recordVisit` (le changement de mot de passe passe par Better Auth) |
+| `chat.ts` (É8d) | `postChatMessage`, `deleteChatMessage`, `markChatRead` (§5.15) |
+
+La matrice d'autorisation (`tests/integration/authorization-matrix.test.ts`, §9.3) compte ces services : 34 jusqu'à l'É8b, 36 après l'É8c, 39 après l'É8d.
 
 ### 7.4 Liste des lectures
 
 | Fichier | Fonctions |
 |---|---|
-| `home.ts` | `getHomeData` : annonces (3 dernières), bienvenue, progression, rang, points, jokers restants, 5 prochaines clôtures, top 6 + ma ligne, dernier résultat |
-| `questions.ts` | `getOpenQuestionsForViewer`, `getQuestionsList(tab)`, `getQuestionDetail`, `getQuestionPredictionsForViewer`, `isQuestionVisible` (É8 : contrôle du layout de `/questions/[id]`, sans paramètre `viewer`, la réponse étant la même pour tous) |
-| `results.ts` (É7) | `getQuestionResults` (après la clôture : pronos de tous, sagesse de la foule, points une fois résolue, badges gagnés sur la question ; passe par `getQuestionPredictionsForViewer`), `getLatestResult` (accueil) |
-| `badges.ts` (É7) | `getPlayerResults` (pronos d'un joueur sur les questions résolues, avec leurs points), `getPlayerBadges`, `getBadgesOnQuestion` |
+| `home.ts` | `getHomeData` : annonces (3 dernières), bienvenue, progression, rang, malus, jokers restants (`null` si la saison n'autorise pas les jokers), 5 prochaines clôtures (y compris mes questions prolongées, à leur date limite), top 6 + ma ligne, dernier résultat |
+| `questions.ts` | `getOpenQuestionsForViewer` (y compris les questions ouvertes pour moi par une prolongation), `getQuestionsList(tab)` (une question que ma prolongation garde ouverte est dans « Ouvertes », pas dans « En attente du résultat »), `getQuestionDetail` (statut pour la personne qui regarde, sa date limite, prolongations en cours), `getQuestionPredictionsForViewer` (§6.6 v1.2), `isQuestionVisible` (É8 : contrôle du layout de `/questions/[id]`, sans paramètre `viewer`, la réponse étant la même pour tous), `getJokersLeft` (`null` si la saison n'autorise pas les jokers) |
+| `results.ts` (É7) | `getQuestionResults` (après la clôture : pronos visibles, sagesse de la foule, malus une fois résolue, **absents compris** avec leur malus d'absence, badges gagnés sur la question ; passe par `getQuestionPredictionsForViewer`), `getLatestResult` (accueil) |
+| `badges.ts` (É7) | `getPlayerResults` (questions résolues de la saison pour un joueur, avec son prono et son malus, ou « pas de prono » et le malus d'absence), `getPlayerBadges`, `getBadgesOnQuestion` |
 | `standings.ts` | `getStandings({ seasonId? })`, `getAvailableSeasons` |
 | `players.ts` | `getPlayerProfile({ userId, seasonId? })`, `getAllowedEmails`, `getAccounts` |
-| `admin.ts` | `getAdminDashboard`, `getAdminQuestion`, `getAdminQuestionsList(filters)`, `getSeasonsAdmin` (avec la raison de ne pas proclamer), `hasSeasons` (formulaire de question, §5.13) |
-| `content.ts` | `getAnnouncements`, `getPrizes(seasonId)`, `getPalmares`, `getCurrentSeason` (pied de page, `/lots`) |
+| `admin.ts` | `getAdminDashboard` (avec les prolongations en cours), `getAdminQuestion` (avec la prolongation de chaque joueur et ce que l'admin peut en faire), `getAdminQuestionsList(filters)`, `getSeasonsAdmin` (avec la raison de ne pas proclamer et le réglage des jokers), `hasSeasons` (formulaire de question, §5.13) |
+| `content.ts` | `getAnnouncements`, `getPrizes(seasonId)`, `getPalmares`, `getCurrentSeason` (pied de page, `/lots`, tuile Jokers ; avec `jokersEnabled`) |
+| `chat.ts` (É8d) | `getChatMessages`, `getChatUpdates`, `getUnreadChatCount` (§5.15) |
 
 ---
 
@@ -1059,17 +1309,17 @@ type Result<T = void> =
 | `--color-ink` | `#0B0E13` | texte principal |
 | `--color-ink-2` | `#2F3642` | texte secondaire, navigation inactive |
 | `--color-muted` | `#5B6472` | libellés, métadonnées |
-| `--color-accent` | `#1F5BFF` | boutons principaux, navigation active, sélection, ma ligne, mon point |
+| `--color-accent` | `#0036B3` | boutons principaux, navigation active, sélection, ma ligne, mon point, logo, contour du focus. **v1.2** : couleur choisie par l'utilisateur le 02/10/2026, à la place du `#1F5BFF` de la maquette |
 | `--color-accent-ink` | `#FFFFFF` | texte sur l'accent |
-| `--color-accent-text` | `#1A4FE0` | liens et chiffres en accent sur fond clair |
-| `--color-accent-soft` | `rgb(31 91 255 / 0.12)` | fond de ma ligne au classement, halo de mon point |
+| `--color-accent-text` | `#0036B3` | liens et chiffres en accent sur fond clair. v1.2 : la même valeur que l'accent, assez foncé pour le texte ; la maquette avait besoin d'une variante plus foncée (`#1A4FE0`) |
+| `--color-accent-soft` | `rgb(0 54 179 / 0.12)` | fond de ma ligne au classement, halo de mon point |
 | `--color-hot` | `#D2352B` | urgence (< 48 h), « À faire », moyenne de l'équipe, actions dangereuses |
 | `--color-warn` | `#A15C00` | « Enregistré » |
 | `--color-up` | `#15803D` | montée ▲, étiquette « Résultat » |
 | `--color-down` | `#C8321F` | descente ▼ |
 | `--color-dots` | `#A3ABB8` | points des autres joueurs sur le graphique |
 
-**Contrastes vérifiés** : `ink`, `ink-2`, `muted` et `accent-text` sur `surface` et sur `bg` ≥ 4,5:1 ; `accent-ink` sur `accent` ≈ 5,2:1. Tout nouveau couple de couleurs doit atteindre 4,5:1 (3:1 pour un texte ≥ 24 px ou ≥ 18,66 px en gras). Sur le fond de page `bg`, `hot` (4,3:1) et `up` (4,4:1) restent sous 4,5:1 : ces textes y sont posés sur un fond blanc (bouton `danger`, pastilles de statut, messages de `FormMessage`, « Annulée le … » de l'admin) ou écrits en grand texte (compte à rebours compact).
+**Contrastes vérifiés** : `ink`, `ink-2`, `muted` et `accent-text` sur `surface` et sur `bg` ≥ 4,5:1 ; `accent-ink` sur `accent` ≈ 9,6:1 (v1.2, `#0036B3` ; 5,2:1 avec l'ancien bleu). Pour `#0036B3`, calculé le 02/10/2026 : 9,6:1 sur `surface`, 8,4:1 sur `bg`, 7,6:1 environ sur la ligne teintée `accent-soft`. L'agent de l'É8c le revérifie avec axe et par une capture avant et après. Le maillot « bleu » des avatars (`#1F5BFF`, §8.2) ne change pas : c'est une couleur d'avatar, pas l'accent du site. Les fichiers de la maquette B5 restent tels quels (archive). Tout nouveau couple de couleurs doit atteindre 4,5:1 (3:1 pour un texte ≥ 24 px ou ≥ 18,66 px en gras). Sur le fond de page `bg`, `hot` (4,3:1) et `up` (4,4:1) restent sous 4,5:1 : ces textes y sont posés sur un fond blanc (bouton `danger`, pastilles de statut, messages de `FormMessage`, « Annulée le … » de l'admin) ou écrits en grand texte (compte à rebours compact).
 
 **Typographie** (`next/font/google`) :
 
@@ -1108,9 +1358,10 @@ type Result<T = void> =
 - `Award` : badges ;
 - `Crown` : champion ;
 - `Trophy` : palmarès ;
-- `LogOut`, `KeyRound`, `Ban`, `Copy`, `Pencil`, `Trash2`, `Plus`, `Check`, `X`, `TriangleAlert`, `Info`, `Menu`.
+- `LogOut`, `KeyRound`, `Ban`, `Copy`, `Pencil`, `Trash2`, `Plus`, `Check`, `X`, `TriangleAlert`, `Info`, `Menu` ;
+- v1.2 : `CalendarClock` (prolongation), `Smile` (bouton de la palette d'emojis), `MessageCircle` (chat, message de résultat).
 
-Aucun emoji dans l'interface.
+Aucun emoji dans l'interface, **sauf dans le chat** (v1.2) : messages des joueurs et palette d'emojis. Ils s'affichent avec la police d'emojis du système.
 
 ### 8.2 Composants
 
@@ -1119,13 +1370,13 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 - **AppHeader** :
   - hauteur 72 px, fond `bg`, bordure basse `line` ;
   - logo : carré de 34 px `accent`, légèrement penché (`skewX(-8deg)`), icône `Target` en `accent-ink`, suivi du nom du site (`APP_NAME`, `src/lib/app.ts`) en display 19 px 800 italique et capitales, sur deux lignes (« LES PETITS PRONOS / DE LA PROMO », `APP_NAME_LINES`) : en une ligne de 26 px, le nom ne tenait pas à 390 px (É8b) ;
-  - navigation : Accueil, Mes pronos, Classement, Palmarès, Règlement, en display 17 px 700 capitales, bloc arrondi de 6 px ; lien actif sur fond `accent` avec texte `accent-ink`, les autres en `ink-2`, survol sur fond `chip` ;
+  - navigation : Accueil, Mes pronos, Classement, Chat (É8d), Palmarès, Règlement, en display 17 px 700 capitales, bloc arrondi de 6 px ; lien actif sur fond `accent` avec texte `accent-ink`, les autres en `ink-2`, survol sur fond `chip`. « Chat » porte une pastille avec le nombre de messages non lus (« 9+ » au-delà de 9 ; nom accessible « Chat, 3 messages non lus »), calculée au rendu de la page (`getUnreadChatCount`), sans interrogation périodique hors de `/chat` ;
   - à droite : lien « ADMIN » pour les admins seulement, avatar de 36 px, nom, et un menu (Mon profil, Se déconnecter).
 - **AdminNav** : sous-navigation du back-office, avec Tableau de bord, Questions, Joueurs, Catégories, Saisons et lots, Annonces.
 - **AnnouncementBar** : carte `surface`, étiquette « ANNONCE » sur fond `accent`, texte en `ink-2` 15 px, date relative en `muted` 13 px (« il y a 2 h »).
 - **StatTile** : largeur 200 px, libellé en capitales `muted`, grand chiffre display 60 px, sous-ligne (évolution en `up`, ou texte `muted`).
 - **SegmentedProgress** : un segment par question ouverte (hauteur 10 px, espacés de 6 px), pleins en `accent`, vides en `line`. Au-delà de 20 questions, une barre continue.
-- **CategoryChip** : display 14 px 700 capitales, fond `chip`, texte `ink-2`. **NewChip** : « NOUVEAU » sur fond `accent`, texte `accent-ink`.
+- **CategoryChip** : display 14 px 700 capitales, fond `chip`, texte `ink-2`. **NewChip** : « NOUVEAU » sur fond `accent`, texte `accent-ink` ; variante « PROLONGÉE POUR TOI » (v1.2), avec l'icône `CalendarClock`, pour une question ouverte pour moi par une prolongation.
 - **StatusChip** (largeur 112 px, display 15 px 800 capitales) :
   - « À faire » : bordure et texte `hot` ;
   - « Enregistré » : bordure et texte `warn` ;
@@ -1136,12 +1387,12 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
   - variante compacte en ligne : « 3 j 07:45:10 » ;
   - après la clôture : « CLÔTURÉ » ;
   - `role="timer"` et un `aria-label` lisible.
-- **QuestionCard** : catégorie, pastille Nouveau, titre, métadonnées (« Nombre · coef. ×3 »), compte à rebours, statut, bouton (« Pronostiquer », « Modifier » ou « Voir »).
+- **QuestionCard** : catégorie, pastille Nouveau (ou « PROLONGÉE POUR TOI »), titre, métadonnées (« Nombre · coef. ×3 » ; pour un choix, v1.2 : « Choix · coef. ×2 · mauvaise réponse : 200 de malus »), compte à rebours (jusqu'à ma date limite si ma prolongation court), statut, bouton (« Pronostiquer », « Modifier » ou « Voir »).
 - **PredictionForm** :
   - **nombre** : champ de 62 px de haut, bordure de 2 px `accent`, fond `bg`, valeur en display 36 px, unité en suffixe `muted` ;
-  - **choix** : tuiles-boutons radio (bordure `line-strong`, sélection : bordure de 2 px `accent` et fond `accent-soft`) ; le oui/non affiche deux grandes tuiles ;
-  - **Juste Prix** : étiquette « JUSTE PRIX » et rappel « Le plus proche sans dépasser » ;
-  - **joker** : case dans un encadré en pointillés, « JOKER ×2 » en `accent-text`, suivi de « n restant(s) cette saison » ; désactivé s'il n'en reste plus ; la case pose ou retire le joker aussitôt (`setJoker`), et reste grisée avec « Enregistre d'abord ton prono. » tant qu'aucun prono n'est enregistré (décision du 30/09/2026) ;
+  - **choix** : tuiles-boutons radio (bordure `line-strong`, sélection : bordure de 2 px `accent` et fond `accent-soft`) ; le oui/non affiche deux grandes tuiles ; rappel « Mauvaise réponse : n de malus » (v1.2) ;
+  - ~~Juste Prix~~ : supprimé en v1.2 (étiquette et rappel retirés) ;
+  - **joker** : case dans un encadré en pointillés, « JOKER ÷2 » en `accent-text` (v1.2 ; « JOKER ×2 » avant), avec « Divise ton malus par deux » et « n restant(s) cette saison ». Désactivé s'il n'en reste plus. **Absent si la saison de la question n'autorise pas les jokers** (v1.2). La case pose ou retire le joker aussitôt (`setJoker`), et reste grisée avec « Enregistre d'abord ton prono. » tant qu'aucun prono n'est enregistré (décision du 30/09/2026) ;
   - boutons « ENREGISTRER » (secondaire) et « VALIDER » (principal) ;
   - note « Enregistré le … Une fois validé, ton prono est définitif. » ;
   - une fois validé : champ en lecture seule, statut Validé, plus de boutons.
@@ -1153,13 +1404,13 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
   - le focus va sur « Annuler », Échap ferme la fenêtre.
 - **HelpPanel** « POUR T'AIDER » : lien vers le tableau BI (ouverture dans un nouvel onglet, `rel="noopener noreferrer"`), « L'an dernier » en display 34 px, indice. Masqué si les trois champs sont vides.
 - **StandingsTable** :
-  - lignes sur fond `raised` : rang en display 24 px 800 (`accent-text` pour le 1er), avatar de 32 px, nom, évolution (▲n `up`, ▼n `down`, « = » `muted`, rien si nulle), points en display 22 px ;
+  - lignes sur fond `raised` : rang en display 24 px 800 (`accent-text` pour le 1er), avatar de 32 px, nom, évolution (▲n `up`, ▼n `down`, « = » `muted`, rien si nulle), malus en display 22 px (v1.2 : colonne « MALUS », du plus petit au plus grand ; « points » avant) ;
   - ma ligne : bordure de 1,5 px `accent` et fond `accent-soft` ;
   - page complète : colonnes « Dans le mille » et « Questions jouées » en plus.
 - **ResultPanel** :
   - tuiles « RÉEL » (fond `ink`, texte `bg`), « MÉDIANE » et « MOYENNE » (fond `raised`, moyenne en `hot`) ;
   - StripChart ;
-  - bandeau « Ton prono » (fond `accent`, texte `accent-ink`) avec écart, barème, bonus et total en display 44 px ;
+  - bandeau « Ton prono » (fond `accent`, texte `accent-ink`). v1.2 : écart brut (avec l'écart relatif en petit), coefficient, joker « ÷2 » le cas échéant, et malus en display 44 px. Sans prono : « Pas de prono : malus du pire prono », avec le malus d'absence ;
   - badges gagnés sur cette question.
 - **StripChart** :
   - hauteur 112 px, axe `line` de 2 px ;
@@ -1181,6 +1432,13 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 - **Tabs** : liens avec le compteur (« À FAIRE (3) »).
 - **EmptyState** : icône, phrase, action éventuelle.
 - **Footer** : « Les petits pronos de la promo · Saison 2026-2027 » (nom de la saison courante, rien s'il n'y en a pas) et liens Règlement, Lots, Palmarès.
+- **ExtensionDialog** (É8c, back-office) : `<dialog>` « Prolonger pour <nom> », champ date-heure (heure de Paris), prérempli 48 h plus tard à l'heure pile, et rappel « Le joueur ne verra pas les pronos des autres avant d'avoir répondu. Préviens-le toi-même. » ; boutons « Annuler » et « Prolonger ».
+- **Chat** (É8d) :
+  - `ChatRoom` (client) : liste et interrogation périodique (§5.15) ;
+  - `ChatMessage` : avatar de 32 px, nom relié au profil, heure (« à 14 h 32 »), texte en `white-space: pre-wrap` et coupure des mots longs ; bouton « Supprimer le message » (icône `Trash2`, confirmation) si `canDelete` ; « Message supprimé. » en `muted` italique ;
+  - message de résultat : carte `accent-soft` avec l'icône `MessageCircle`, le texte et le lien « Voir la question » ;
+  - `ChatComposer` : zone de texte libellée « Ton message », compteur « n / 500 », bouton `Smile` « Ajouter un emoji » (`aria-expanded`), bouton « ENVOYER ». Entrée envoie, Maj + Entrée va à la ligne (rappel affiché) ; bouton désactivé pendant l'envoi ;
+  - `EmojiPalette` : grille de 8 colonnes des 48 emojis de `src/lib/chat/emojis.ts`, chaque emoji est un `<button>` dont le nom accessible est son nom français. Un clic insère l'emoji à la position du curseur et rend le focus à la zone de texte ; Échap ferme la grille ; navigation au clavier.
 
 ### 8.3 Écrans
 
@@ -1202,7 +1460,7 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 
 **`/` Accueil**, dans l'ordre de la maquette :
 1. Annonces (jusqu'à 3).
-2. Rangée de bienvenue : « SALUT <NOM> », « Encore n pronos à valider sur les m questions ouvertes », barre de progression, puis les tuiles Position, Points et Jokers. Position vaut « — » avec « Après le premier résultat » s'il n'y a pas encore de classement.
+2. Rangée de bienvenue : « SALUT <NOM> », « Encore n pronos à valider sur les m questions ouvertes », barre de progression, puis les tuiles Position, Malus (v1.2, « Points » avant) et Jokers. Position vaut « — » avec « Après le premier résultat » s'il n'y a pas encore de classement. La tuile Jokers disparaît si la saison courante n'autorise pas les jokers (v1.2).
 3. Deux colonnes (8/12 et 4/12) :
    - « CLÔTURE IMMINENTE » : les 5 prochaines clôtures (QuestionCard) et un lien « Les n questions ouvertes » ;
    - classement : top 6, plus ma ligne si je suis au-delà, et un lien vers le classement complet.
@@ -1216,28 +1474,29 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 
 **`/questions` Questions**
 - Onglets : Ouvertes, En attente du résultat, Résolues, Annulées. Une question annulée avant son ouverture n'a jamais été vue des joueurs : elle reste invisible, comme une question programmée (404, absente de « Annulées » ; décision du 30/09/2026).
-- Cartes avec statut, date de clôture ou de résultat, et mes points une fois la question résolue.
+- Cartes avec statut, date de clôture ou de résultat, et mon malus une fois la question résolue.
 
 **`/questions/[id]` Détail**
-- En-tête : catégorie, coefficient, Juste Prix le cas échéant, compte à rebours ou état, titre en display 32 px, description, « Source : … ».
-- **Ouverte** : PredictionForm (ou le prono validé en lecture seule) et HelpPanel en deux colonnes.
-- **Clôturée** : mon prono, le tableau de tous les pronos (joueur, valeur, joker), la sagesse de la foule et le StripChart (ou ChoiceDistribution), sans valeur réelle. Mention « Résultat attendu le … ».
-- **Résolue** : ResultPanel complet, tableau avec écart, barème, bonus et total par joueur trié par total, et « Résultat corrigé le … » le cas échéant.
+- En-tête : catégorie, coefficient, malus d'une mauvaise réponse (choix, v1.2), compte à rebours ou état, titre en display 32 px, description, « Source : … ».
+- **Ouverte pour moi** (ouverte, ou clôturée avec ma prolongation en cours) : PredictionForm (ou le prono validé en lecture seule) et HelpPanel en deux colonnes. Pendant ma prolongation : pastille « PROLONGÉE POUR TOI » et compte à rebours jusqu'à ma date limite.
+- **Clôturée, j'ai un prono** : mon prono, le tableau des pronos visibles (joueur, valeur, joker), la sagesse de la foule et le StripChart (ou ChoiceDistribution), sans valeur réelle. Mention « Résultat attendu le … ». Si une prolongation court : « Prolongation en cours pour n joueur(s), jusqu'au … : son prono s'affichera ensuite. » (§6.6).
+- **Clôturée, je n'ai pas de prono** (v1.2) : « Tu n'as pas pronostiqué cette question : les pronos s'afficheront au résultat. », sans tableau ni graphique, et la mention « Résultat attendu le … ».
+- **Résolue** : ResultPanel complet ; tableau avec prono, écart, joker et malus par joueur, trié du plus petit malus au plus grand ; les joueurs du classement sans prono figurent en bas, « Pas de prono », avec leur malus d'absence (v1.2) ; « Résultat corrigé le … » le cas échéant.
 - **Annulée** : bandeau « Question annulée : aucun point n'est attribué et les jokers sont rendus. » Les pronos ne sont pas affichés.
 - **Brouillon ou programmée** : page 404 pour un joueur.
 
 **`/classement`**
 - Sélecteur de saison, StandingsTable complète.
-- Note : « Départage : nombre de Dans le mille, puis écart moyen le plus faible. »
+- Note (v1.2) : « Le moins de malus est en tête. Départage : nombre de Dans le mille, puis écart moyen le plus faible. »
 - EmptyState « Le classement démarre au premier résultat. »
 - Précisions de l'É7 : la saison choisie passe dans l'adresse (`?saison=<id>`, une saison inconnue donne la saison par défaut) ; le nom d'un joueur mène à son profil sur la même saison ; pour une saison proclamée, un lien renvoie au palmarès (le classement reste recalculé, le palmarès figé).
-- **Sur téléphone (sous 640 px)**, la liste compacte de l'accueil remplace le tableau : rang, joueur, évolution et points, les noms menant aux profils sur la même saison. Le tableau aurait poussé les points hors de l'écran. « Dans le mille » et « Questions jouées » restent sur le profil de chacun (décision du 01/10/2026).
+- **Sur téléphone (sous 640 px)**, la liste compacte de l'accueil remplace le tableau : rang, joueur, évolution et malus, les noms menant aux profils sur la même saison. Le tableau aurait poussé les points hors de l'écran. « Dans le mille » et « Questions jouées » restent sur le profil de chacun (décision du 01/10/2026).
 
 **`/joueurs/[id]` Profil public**
-- En-tête : avatar de 64 px, nom, rang et points de la saison affichée.
+- En-tête : avatar de 64 px, nom, rang et malus de la saison affichée.
 - Tuiles : écart moyen, « Dans le mille », pronos joués.
 - BadgeList (les 6 badges).
-- Historique des questions résolues : question, prono, réel, écart, points, joker.
+- Historique des questions résolues : question, prono, réel, écart, malus, joker. v1.2 : les questions sans prono y figurent aussi, « Pas de prono », avec le malus d'absence, pour que le total s'explique.
 - Précisions de l'É7 : la saison affichée est la saison par défaut (§5.6) ou celle de `?saison=<id>`, avec le même sélecteur que `/classement` ; tuiles et historique portent sur cette saison, les badges sur toutes les saisons. Un compte désactivé ou anonymisé garde son profil, marqué « (inactif) ».
 
 **`/profil` Mon compte**
@@ -1248,26 +1507,43 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 
 **`/lots`** : lots de la saison courante (rang et description). EmptyState « Les lots seront annoncés bientôt. » Lien vers le règlement.
 
-**`/reglement`** : page générée à partir des constantes (§5.5), avec les sections suivantes :
-- principe ;
-- types de questions ;
+**`/reglement`** : page générée à partir des constantes (§5.5), dont les exemples sont calculés par `scoreQuestion`. Sections (v1.2) :
+- principe : le moins de malus gagne ;
+- types de questions : nombre, choix, oui/non ;
 - enregistrement, validation et clôture ;
-- barème (tableau des paliers) ;
-- bonus podium ;
-- Juste Prix ;
-- questions à choix ;
+- malus d'une question à nombre : l'écart brut, sans plafond, avec l'exemple 500 et 1 500 pour 1 000, et la faute de frappe ;
+- « Dans le mille » ;
+- questions à choix : le malus d'une mauvaise réponse, fixé sur chaque question ;
 - coefficient ;
-- jokers ;
+- jokers : ÷2, selon la saison (« Cette saison : jokers autorisés » ou « pas de jokers ») ;
+- pas de prono : le malus du pire prono ;
+- prolongation pour un absent, et pourquoi on ne voit pas les pronos des autres sans avoir pronostiqué ;
 - départage ;
-- cas particuliers (cahier des charges §5.5) ;
+- cas particuliers (cahier des charges §5.7) ;
+- chat : « Ne donne pas ton prono dans le chat avant la clôture. » (É8d) ;
 - saisons et palmarès ;
 - lots.
 
-**`/palmares`** : pour chaque saison proclamée, du plus récent au plus ancien, le podium (3 premiers, avec leurs avatars), puis le classement complet dans une section dépliable et les lots attribués. EmptyState tant qu'aucune saison n'est proclamée.
+Les sections « barème (tableau des paliers) », « bonus podium » et « Juste Prix » disparaissent.
+
+**`/palmares`** : pour chaque saison proclamée, du plus récent au plus ancien, le podium (3 premiers, avec leurs avatars, et leur malus), puis le classement complet dans une section dépliable et les lots attribués. EmptyState tant qu'aucune saison n'est proclamée.
+
+**`/chat`** (É8d, §5.15)
+- Titre « CHAT » ; sous-titre « Le chat de toute l'équipe. Les nouveaux messages arrivent toutes les 10 secondes environ. »
+- Fil :
+  - `role="log"` ; seuls les messages arrivés après le chargement sont annoncés (`aria-live="polite"`) ;
+  - le plus récent en bas ;
+  - séparateurs de jour : « Aujourd'hui », « Hier », « mer. 21 oct. », avec l'année si besoin ;
+  - au chargement, défilement jusqu'en bas ; un nouveau message fait défiler seulement si l'on était déjà en bas, sinon un bouton « Nouveaux messages » apparaît ;
+  - en haut, le bouton « Messages plus anciens » charge les 50 précédents.
+- Champ d'écriture en bas de page (fixe sur téléphone), palette d'emojis.
+- EmptyState « Aucun message pour l'instant. Lance la discussion ! »
+- En cas d'erreur réseau, nouvel essai au tour suivant ; au troisième échec d'affilée, « Connexion perdue, nouvel essai… » discret. Une réponse `401` renvoie vers `/connexion`.
 
 **`/admin` Tableau de bord**
 - « Questions ouvertes » : pour chacune, « validés x / N », la liste des joueurs qui n'ont pas validé (pour relancer à la main) et le lien vers la question.
-- « À résoudre » : questions clôturées sans résultat, avec un bouton « Saisir le résultat ».
+- « À résoudre » : questions clôturées sans résultat, avec un bouton « Saisir le résultat ». Si une prolongation court, le bouton est désactivé, avec la raison (« Prolongation de <nom> jusqu'au … ») (v1.2).
+- « Prolongations en cours » (v1.2) : question, joueur, date limite, état de son prono (à faire, enregistré, validé).
 - « Prochaines ouvertures » : questions programmées.
 
 **`/admin/questions`**
@@ -1276,16 +1552,21 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 - Boutons « Nouvelle question » et « Dupliquer ».
 
 **`/admin/questions/nouvelle` et `/admin/questions/[id]`**, formulaire en sections :
-1. Question : type (Nombre, Nombre Juste Prix, Choix, Oui/Non), catégorie, énoncé, description, unité ou réponses (ajout, suppression, ordre), coefficient.
+1. Question : type (Nombre, Choix, Oui/Non ; « Nombre Juste Prix » disparaît en v1.2), catégorie, énoncé, description, unité ou réponses (ajout, suppression, ordre), malus d'une mauvaise réponse (choix et oui/non, v1.2, avec l'aide du §5.11), coefficient.
 2. Source de la valeur réelle.
 3. Pour t'aider : lien BI, valeur de l'an dernier, indice.
 4. Dates : ouverture, clôture, résultat prévu, avec la mention « heure de Paris ».
 5. Actions : Enregistrer, Publier, Annuler la question (confirmation), Supprimer (brouillon sans prono).
 
 Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Dans la page d'une question existante :
-- **Suivi** : joueur, état, date de validation, bouton « Déverrouiller » si la question est ouverte et le prono validé ;
-- **Résultat** : si la question est clôturée ou résolue ;
-- **Historique** : les événements, sans valeurs avant la clôture.
+- **Suivi** :
+  - colonnes : joueur, état, date de validation, et, depuis la v1.2, prolongation (« jusqu'au … ») ;
+  - bouton « Déverrouiller » si la question est ouverte pour ce joueur et son prono validé ;
+  - bouton « Prolonger » (v1.2, ExtensionDialog) pour un joueur sans prono, tant que la question est ouverte ou clôturée sans résultat, sauf sur sa propre ligne ;
+  - « Changer la date » et « Annuler la prolongation » (confirmation) pour une prolongation en cours ;
+  - valeurs affichées selon le §6.6 ;
+- **Résultat** : si la question est clôturée ou résolue ; désactivé, avec la raison, tant qu'une prolongation court ;
+- **Historique** : les événements, sans valeurs avant la clôture (§6.6).
 
 **`/admin/joueurs`**
 - **Liste blanche** : zone de texte pour l'ajout en série, liste avec « Compte créé : oui / non » et bouton de retrait.
@@ -1294,8 +1575,8 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 **`/admin/categories`** : liste, ajout, renommage, archivage (une catégorie archivée disparaît des choix mais reste sur ses questions).
 
 **`/admin/saisons`**
-- Formulaire « Nouvelle saison » : nom (prérempli par `suggestedSeasonLabel`) et date de début, avec la mention « à 0 h, heure de Paris » (v1.1, §5.13).
-- Pour chaque saison, de la plus récente à la plus ancienne : nom, dates (« du 28 sept. 2026 au 5 sept. 2027 », ou « depuis le … » pour la dernière), « En cours » pour la saison courante, nombre de questions (résolues / total), état de la proclamation ; boutons Modifier (nom, date de début) et Supprimer (confirmation), avec la raison quand ils sont refusés.
+- Formulaire « Nouvelle saison » : nom (prérempli par `suggestedSeasonLabel`), date de début, avec la mention « à 0 h, heure de Paris » (v1.1, §5.13), et case « Jokers autorisés (2 par joueur) », cochée par défaut (v1.2).
+- Pour chaque saison, de la plus récente à la plus ancienne : nom, dates (« du 28 sept. 2026 au 5 sept. 2027 », ou « depuis le … » pour la dernière), « En cours » pour la saison courante, nombre de questions (résolues / total), jokers (« autorisés » ou « non », v1.2), état de la proclamation ; boutons Modifier (nom, date de début, jokers) et Supprimer (confirmation), avec la raison quand ils sont refusés.
 - Rappel de créer la saison suivante (§5.13) ; invitation à créer la première saison s'il n'y en a aucune.
 - Éditeur de lots (rang et description, ordre).
 - Bouton « Proclamer le classement final », actif seulement si les conditions sont remplies (sinon, la raison est affichée), avec une confirmation qui rappelle que l'action est irréversible.
@@ -1306,7 +1587,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 - 404 : « Cette page n'existe pas. » et « Retour à l'accueil » ;
 - erreur : « Une erreur est survenue. Réessaie. » et « Réessayer » (`error.tsx`, et `global-error.tsx` pour une erreur du layout racine, qui a son propre document ; É8).
 
-**Chargement** : `loading.tsx` avec des squelettes gris `chip` sur l'accueil, `/pronos`, `/classement` et `/questions/[id]` (composants de `src/components/ui/Skeleton.tsx`, annoncés « Chargement… » aux lecteurs d'écran). Mise en œuvre (É8) :
+**Chargement** : `loading.tsx` avec des squelettes gris `chip` sur l'accueil, `/pronos`, `/classement`, `/questions/[id]` et `/chat` (É8d) (composants de `src/components/ui/Skeleton.tsx`, annoncés « Chargement… » aux lecteurs d'écran). Mise en œuvre (É8) :
 - un `loading.tsx` couvre toutes les pages placées sous lui : l'accueil est donc rangé dans le groupe de routes `(jeu)/(accueil)`, pour que son squelette ne s'affiche pas en allant sur `/profil` ou `/lots` ;
 - une page qui part en streaming derrière son squelette ne peut plus changer son code HTTP : `/questions/[id]` répondrait 200 au lieu de 404 pour une question programmée. Son `layout.tsx` fait donc le contrôle avant le squelette (`isQuestionVisible`, une requête légère), et appelle `notFound()`.
 
@@ -1320,6 +1601,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
   - les tableaux défilent horizontalement dans leur conteneur (`TableScroll`) : il est `relative`, pour que les textes réservés aux lecteurs d'écran ne débordent pas de la page, et devient une région nommée accessible au clavier tant que son tableau dépasse (É8) ; seul `/classement` affiche à la place la liste compacte, sous 640 px (§8.3) ;
   - le compte à rebours passe en version compacte.
 - À 390 px de large : aucun défilement horizontal de la page, toutes les actions restent accessibles. Points relevés à l'É8 : un `<input>` ou un `<fieldset>` impose sa largeur propre à son conteneur (`w-0` ou `min-w-0` le libère), et les tuiles « Réel, médiane, moyenne » passent sur deux lignes. Relevé à la recette (R-01) : une grille qui ne définit ses colonnes qu'à partir d'une largeur (`lg:grid-cols-12`) a, en dessous, une colonne implicite `auto`, qui prend la largeur du plus long nom ; toute grille de mise en page porte donc `grid-cols-1` (`minmax(0, 1fr)`). `e2e/responsive.spec.ts` vérifie les pages avec un nom de 30 caractères.
+- v1.2 : `/chat` à 390 px (champ d'écriture et palette visibles, longs mots coupés). L'onglet « Chat » ajouté à la navigation (É8d) allonge l'en-tête : vérifier aussi 1 024 px, où l'en-tête de l'admin dépassait déjà de 8 px (point ouvert de l'É8b, voir `avancement.md`).
 
 ### 8.5 Accessibilité
 
@@ -1334,7 +1616,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 ### 8.6 Textes et ton
 
 - Tutoiement, français, phrases courtes.
-- Vocabulaire : **pronostic, prono, points, joker, classement**. Jamais « pari », « parier », « mise », « miser », « parieur » (vérifié par un test, §9.3).
+- Vocabulaire : **pronostic, prono, malus (« points de malus »), joker, classement, prolongation**. Jamais « pari », « parier », « mise », « miser », « parieur » (vérifié par un test, §9.3). Depuis la v1.2, on ne parle plus de « points » gagnés : un malus s'affiche en nombre positif avec le mot « malus » (« 250 de malus », colonne « MALUS »), jamais avec un signe moins.
 - Nombres au format français (« 2 450 »), décimales avec une virgule. Les milliers sont séparés par une espace insécable ordinaire (U+00A0) : l'espace fine que donne `Intl` ne se voyait pas dans les polices du site (recette, R-07).
 - Dates : « mer. 21 oct. à 18 h », « à 18 h 30 » quand il y a des minutes ; avec l'année quand la date n'est pas de l'année en cours, heure de Paris (« sam. 29 nov. 2025 à 23 h » ; `formatDateTime(date, now)`, recette R-08) ; date relative pour les annonces.
 - Une raison après un deux-points commence par une minuscule (« pas publiée : la clôture est déjà passée. » ; `lowerFirst`, recette R-06).
@@ -1366,7 +1648,10 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 - **Vocabulaire** : un test parcourt `src/**/*.tsx` et `src/lib/game/constants.ts` et échoue s'il trouve, en tenant compte de la casse, `/\b(pari|parier|parieur|mise|miser)\b/` ou `/\bparis sportifs?\b/i`. « Paris » avec une majuscule, la ville, reste autorisé.
 - **Pas de `Date.now()` ni de `new Date()` sans argument dans `src/lib/game/`** : un test lit les fichiers et échoue s'il en trouve.
 - **Matrice d'autorisation** (§6.5) : pour chaque service d'écriture, un test par profil (anonyme, joueur, désactivé, admin) vérifie le code de retour attendu.
-- **Confidentialité** : en bout en bout, la page d'une question ouverte ne contient jamais, dans son HTML, la valeur d'un prono d'un autre joueur (valeur témoin du seed : `987654`).
+- **Confidentialité** : en bout en bout, la page d'une question ouverte ne contient jamais, dans son HTML, la valeur d'un prono d'un autre joueur (valeur témoin du seed : `987654`). Depuis la v1.2 (É8c), deux cas de plus :
+  - la page d'une question clôturée sans résultat ne contient pas la valeur témoin `876543` pour un joueur qui n'a pas pronostiqué cette question, ni pour le joueur qui y a une prolongation ;
+  - le prono d'un joueur en prolongation (valeur témoin saisie par le test) n'apparaît pas dans le HTML vu par un autre joueur, ni dans le back-office.
+- **Chat** (É8d) : `/api/chat` répond `401` sans session, et ne renvoie jamais de texte de message supprimé.
 
 ### 9.4 Bout en bout
 
@@ -1374,7 +1659,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 - Un seul worker, tests indépendants entre eux : chaque test qui écrit utilise ses propres comptes et questions du seed.
 - Sélecteurs par rôle et par libellé (`getByRole`, `getByLabel`). `data-testid` seulement pour les zones sans rôle (compte à rebours, graphique).
 - Les tests importent `test` depuis `e2e/fixtures.ts` : chaque test y reçoit sa propre adresse client (`x-forwarded-for`), sinon la limitation des tentatives (5 connexions par minute et par adresse) bloquerait la suite. `signIn()` et `signOut()` passent par l'interface. Un test qui modifie un compte du seed (nom, mot de passe) le remet dans son état initial.
-- Accessibilité : `AxeBuilder` sur `/connexion`, `/`, `/pronos`, `/questions/<résolue>`, `/classement`, `/profil`, `/admin`, `/admin/questions/<id>`. Aucune violation `serious` ni `critical`. Depuis l'É8, aussi à 390 px sur les pages à tableaux (zones défilantes accessibles au clavier) ; après une navigation côté client, attendre le `<title>` avant axe (Next l'ajoute un peu plus tard).
+- Accessibilité : `AxeBuilder` sur `/connexion`, `/`, `/pronos`, `/questions/<résolue>`, `/classement`, `/profil`, `/admin`, `/admin/questions/<id>`, et depuis la v1.2 `/questions/<clôturée, sans prono>` et `/chat` (palette ouverte comprise). Aucune violation `serious` ni `critical`. Depuis l'É8, aussi à 390 px sur les pages à tableaux (zones défilantes accessibles au clavier) ; après une navigation côté client, attendre le `<title>` avant axe (Next l'ajoute un peu plus tard).
 - Responsive (`e2e/responsive.spec.ts`, É8) : à 390 × 844, pas de défilement horizontal sur toutes les pages du joueur et de l'admin ; menu, champ du prono et boutons visibles ; liste compacte de `/classement`. En-têtes (`e2e/headers.spec.ts`) : ceux du §3.3 sur les pages publiques, connectées, l'API et les redirections, `robots.txt`, balise `noindex`.
 
 ### 9.5 Seuils de couverture (`npm run test:coverage`)
@@ -1400,15 +1685,18 @@ Saisons (v1.1) : le seed crée lui-même trois saisons, l'ancienne, la précéde
 | Saison ancienne (É7) | pas proclamée, prête à l'être : 1 question résolue (JPO, valeur réelle 180) et 4 pronos |
 | Saison précédente | proclamée, avec 2 questions résolues et un `season_standing` (palmarès) |
 | Saison courante : programmée | 1 question (ouverture à +2 j) |
-| Saison courante : ouvertes | 4 questions : nombre (clôture +1 j, urgente), Juste Prix (+3 j), choix à 3 réponses (+5 j), oui/non (+6 j). Pronos variés : enregistrés, validés, avec joker. Un autre joueur a la valeur témoin `987654` sur la première. |
-| Saison courante : clôturées | 2 questions sans résultat, avec des pronos : « Studyrama » (résolue par `e2e/admin-questions.spec.ts`) et « webinaire » (aucun test ne la résout, É7) |
-| Saison courante : résolues | 3 questions : un nombre qui reproduit les vecteurs P1 (podium avec ex æquo), un Juste Prix qui reproduit J3, un choix ; résolues à des dates différentes, pour tester les flèches |
+| Saison courante : ouvertes | 4 questions : nombre (clôture +1 j, urgente), un second nombre (+3 j ; c'était un Juste Prix jusqu'à la v1.1), choix à 3 réponses (+5 j), oui/non (+6 j). Pronos variés : enregistrés, validés, avec joker. Un autre joueur a la valeur témoin `987654` sur la première. |
+| Saison courante : clôturées | 2 questions sans résultat, avec des pronos : « Studyrama » (résolue par `e2e/admin-questions.spec.ts`) et « webinaire » (aucun test ne la résout, É7). v1.2 : sur « webinaire », un joueur a la valeur témoin `876543`, un autre joueur n'a pas de prono et a une prolongation qui court jusqu'à +2 j (accordée par l'admin), et au moins un troisième joueur n'a ni prono ni prolongation (vue « Les pronos s'afficheront au résultat ») |
+| Saison courante : résolues | 3 questions : un nombre qui reproduit les vecteurs P1 (rangs de proximité avec ex æquo), un nombre qui reproduit A1 (un joueur sans prono, un joker), un choix (malus d'une mauvaise réponse renseigné) ; résolues à des dates différentes, pour tester les flèches |
 | Saison courante : autres | 1 question annulée avec un joker posé, 1 brouillon |
+| Questions à choix (v1.2) | toutes avec un malus d'une mauvaise réponse (par exemple 50 et 100) |
+| Jokers (v1.2) | autorisés dans les trois saisons |
 | Annonces | 2 |
 | Lots | 3 pour la saison courante |
 | Visites | `joueur4` avec `last_seen_at` à −2 h, pour voir la pastille « Nouveau » sur une question ouverte à −1 h |
+| Chat (É8d) | une dizaine de messages de plusieurs joueurs sur deux jours (avec des emojis), un message supprimé, un message de résultat pour une question résolue ; `chat_read` pour quelques comptes, pour voir la pastille des non lus |
 
-Les tests d'intégration du classement calculent à la main, dans le test, le classement attendu pour ces données, et le comparent au résultat.
+Le choix des joueurs (prolongé, sans prono…) tient compte des états laissés par les tests de bout en bout (point ouvert n° 6 de `avancement.md` : Camille est réservée à la pastille « Nouveau »). Les tests d'intégration du classement calculent à la main, dans le test, le classement attendu pour ces données (malus, absents compris), et le comparent au résultat.
 
 ---
 
@@ -1419,9 +1707,10 @@ Les tests d'intégration du classement calculent à la main, dans le test, le cl
 - **Entrées** : toutes validées par Zod côté serveur, même si le formulaire valide déjà.
 - **Server Actions** : contrôle des droits dans chaque action et dans chaque service (§6.4).
 - **Données sensibles** : les chiffres de l'école ne sont visibles qu'après connexion d'un compte de la liste blanche. Aucune page publique hormis `/connexion`, `/inscription` et `/api/health`, qui renvoie seulement `{ "ok": true }` ou `{ "ok": false }`.
-- **Journaux** : `console.error` avec un code d'erreur et l'identifiant utilisateur, sans valeur de prono ni donnée personnelle. Consultables dans les logs Vercel.
+- **Journaux** : `console.error` avec un code d'erreur et l'identifiant utilisateur, sans valeur de prono, sans texte de message du chat, sans donnée personnelle. Consultables dans les logs Vercel.
+- **Chat** (É8d) : texte affiché échappé, liens non cliquables, 10 messages par minute au plus, contenu effacé à la suppression et à l'anonymisation (§5.15).
 - **Sauvegarde** : restauration à un instant donné proposée par Neon (fenêtre selon l'offre gratuite). Pas d'export applicatif (écarté dans le cahier des charges).
-- **Données personnelles** : email professionnel et nom affiché uniquement ; hébergement en Europe (Francfort) ; effacement par anonymisation (§6.3).
+- **Données personnelles** : email professionnel, nom affiché et, depuis l'É8d, messages du chat ; hébergement en Europe (Francfort) ; effacement par anonymisation (§6.3).
 - **Offre gratuite de Vercel** : usage non commercial en principe, risque accepté par l'utilisateur (cahier des charges C11).
 
 ---
@@ -1429,6 +1718,8 @@ Les tests d'intégration du classement calculent à la main, dans le test, le cl
 ## 11. Plan de construction par étapes
 
 Chaque étape se termine par des **critères de passage**. Ils sont tous obligatoires, et s'ajoutent à la non-régression : **tous les tests des étapes précédentes passent encore**.
+
+Les étapes É1 à É8b sont faites. Elles décrivent ce qui a été construit avec le barème en points de la v1.1 (paliers, bonus podium, Juste Prix, « points » à l'écran). L'É8c le remplace par le malus : pour la règle actuelle, lire le §5, pas les tâches des étapes passées. Les tests de l'ancien barème sont remplacés à l'É8c par ceux du malus, parce que la règle change (décision de l'utilisateur) ; ce n'est pas un affaiblissement.
 
 **Porte commune à toutes les étapes :**
 - [ ] `npm run verify` passe (lint, types, tests unitaires et d'intégration, build).
@@ -1449,6 +1740,8 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 | É7 | Résultats, classement, palmarès | 10/10 |
 | É8 | Finitions et qualité | 12/10 |
 | É8b | Changement du nom du site (v1.1) | 12/10, dès que le nouveau nom est choisi, et avant H-10 |
+| É8c | Malus, jokers par saison, prolongations, couleur (v1.2) | 05/10 |
+| É8d | Chat général (v1.2) | 07/10 |
 | É9 | Recette et lancement | 13/10, lancement le 14/10 |
 
 ### É1 — Socle du projet
@@ -1799,11 +2092,163 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 
 **Interventions humaines** : choix du nom (avant l'étape), H-16 si l'adresse change, H-08.
 
+### É8c — Malus, jokers par saison, prolongations, couleur (v1.2)
+
+**Objectif** : les règles de la v1.2 du cahier des charges, sauf le chat :
+- le barème devient un malus (écart brut, sans plafond ; le moins de malus gagne) ;
+- le Juste Prix et le bonus podium disparaissent ;
+- l'admin fixe le malus d'une mauvaise réponse sur chaque question à choix ;
+- un absent prend le malus du pire prono ;
+- les jokers sont autorisés ou non par saison, et divisent le malus par deux ;
+- l'admin prolonge une question pour un joueur absent ;
+- un joueur sans prono ne voit pas les pronos des autres avant le résultat ;
+- la couleur principale devient #0036B3.
+
+Ces changements touchent le même cœur de code (barème, classement, visibilité) : ils vont ensemble.
+
+**Prérequis** : É8b validée ; v1.2 du cahier des charges et de ce document validée par l'utilisateur.
+
+**Branche** : `etape-08c-malus`.
+
+**À savoir avant de coder** : l'écart brut sans plafond, le malus du pire prono pour un absent et le départage inchangé sont des **décisions de l'utilisateur**, prises après qu'on lui a présenté l'écart relatif et le plafond (02/10/2026). Ne pas les rediscuter : les appliquer.
+
+**Tâches**
+1. **Lecture seule, avant toute chose** : compter sur `dev` et en production les saisons, les questions (dont les questions à choix et celles avec `price_is_right`), les pronos avec joker et les lignes de `season_standing`, puis le consigner.
+   - Production au 02/10/2026 : 1 saison (2026-2027, non proclamée), 0 question, 0 prono, 0 ligne de palmarès, 1 compte.
+   - Si la production contient des questions à choix, demander à l'utilisateur leur malus d'une mauvaise réponse avant d'appliquer la migration.
+   - Si elle contient des lignes de palmarès ou des questions Juste Prix avec des pronos, s'arrêter et exposer le problème.
+2. **Schéma et migration** (§4.3), uniquement des ajouts, SQL relu avant application :
+   - `season.jokers_enabled` ;
+   - `question.wrong_answer_malus` (rempli à 50 pour les questions à choix existantes avant la contrainte) ;
+   - `price_is_right` remis à `false` et contrainte `question_price_is_right_removed` ;
+   - table `question_extension` ;
+   - `season_standing.malus`, et `points` devient nullable.
+
+   Appliquer sur `dev` (`npm run db:migrate`, hôte vérifié), puis relancer le seed.
+3. **`src/lib/game`, tests d'abord** :
+   - constantes et `scoring.ts` (§5.5 : vecteurs M, K, Q, P, A, X6) ;
+   - `standings.ts` (§5.6 : C1 à C9) ;
+   - `questionStatusFor` (§5.2 : E1 à E6) ;
+   - badges (rang de proximité sans bonus, §5.8) ;
+   - retirer `priceIsRight`, `wentOver`, les paliers et le bonus de tout le code.
+4. **Services** :
+   - `questions.ts` : malus d'une mauvaise réponse, plus de Juste Prix, résultat refusé pendant une prolongation ;
+   - `predictions.ts` : statut pour le propriétaire, `JOKERS_DISABLED`, ordre des verrous du §5.4 ;
+   - `seasons.ts` : `jokersEnabled`, `JOKERS_IN_USE`, malus au palmarès ;
+   - `extensions.ts` (§5.14) ;
+   - ajouter les deux nouveaux services à la matrice d'autorisation (36 services).
+5. **Lectures** (§7.4) :
+   - visibilité v1.2 dans `getQuestionPredictionsForViewer` (§6.6) ;
+   - questions ouvertes pour le joueur prolongé ;
+   - résultats et profils avec les absents ;
+   - classement en malus ;
+   - jokers restants à `null` dans une saison sans jokers ;
+   - tableau de bord et page d'une question de l'admin, avec les prolongations.
+6. **Interface** (§8) :
+   - partout, « points » devient « malus » : accueil, tuiles, classement et sa liste compacte, palmarès, profil, page d'une question, `ResultPanel`, `PredictionsTable`, `/questions` ;
+   - tri du plus petit malus au plus grand ;
+   - Juste Prix retiré : formulaire d'admin, `PredictionForm`, en-tête de question, règlement ;
+   - champ du malus d'une mauvaise réponse dans le formulaire de question, et affichage aux joueurs ;
+   - case des jokers dans `/admin/saisons` ; joker « ÷2 », masqué dans une saison sans jokers ;
+   - `ExtensionDialog` et section des prolongations dans le suivi ;
+   - pastille « PROLONGÉE POUR TOI » ;
+   - vue « Les pronos s'afficheront au résultat » ;
+   - mention des prolongations en cours ;
+   - `/reglement` réécrit (§8.3) ;
+   - couleur #0036B3 (`globals.css`, trois jetons), puis captures avant et après pour l'utilisateur.
+7. **Seed** (§9.6) et tests existants : remplacer les vecteurs et les attendus de l'ancien barème par ceux du malus (classement du seed recalculé à la main). C'est une **règle qui change**, décidée par l'utilisateur, pas un test affaibli : le consigner au journal, test par test, pour les tests remplacés.
+8. `avancement.md` : statut, décisions, points ouverts pour l'É8d.
+
+**Tests à écrire**
+- `tests/unit/game/scoring.test.ts` (§5.5 : M1 à M7, K1 à K5, Q1 à Q3, P1, P2, A1 à A4, X6), `standings.test.ts` (C1 à C9), `question-status.test.ts` (+ E1 à E6), `badges.test.ts` adapté, `purity.test.ts` et `vocabulary.test.ts` inchangés.
+- `tests/integration/predictions.test.ts` :
+  - un joueur prolongé enregistre, valide et pose un joker jusqu'à sa date limite (exclue), plus après ;
+  - un autre joueur reste refusé ;
+  - un prono enregistré pendant la prolongation compte comme validé à sa fin ;
+  - déverrouillage pendant la prolongation ;
+  - `JOKERS_DISABLED`.
+- `tests/integration/extensions.test.ts` : PR1 à PR10, et la matrice d'autorisation des deux services.
+- `tests/integration/questions.test.ts` :
+  - malus d'une mauvaise réponse obligatoire et > 0 pour un choix, absent pour un nombre ;
+  - verrouillé quand la question a des pronos ;
+  - copié à la duplication ;
+  - type Juste Prix refusé ;
+  - résultat refusé pendant une prolongation.
+- `tests/integration/seasons.test.ts` : SA9 à SA13.
+- `tests/integration/visibility.test.ts` : chaque case du §6.6 v1.2 (sans prono, prolongation, admin qui n'a pas pronostiqué, sagesse de la foule sans les pronos cachés, historique).
+- `tests/integration/standings.test.ts`, `proclaim.test.ts` (malus écrit dans `season_standing.malus`), `results-data.test.ts`, `badges-data.test.ts`, `seed.test.ts` : nouveaux attendus.
+- `tests/integration/schema.test.ts` :
+  - question à choix sans malus refusée ;
+  - `price_is_right = true` refusé ;
+  - une seule prolongation par joueur et par question ;
+  - prolongation accordée à soi-même refusée.
+- `tests/integration/migrate.test.ts` : la migration passe sur une base qui contient des questions à choix, un Juste Prix et un palmarès, et conserve tout.
+- `tests/integration/authorization-matrix.test.ts` : 36 services.
+- `e2e/results.spec.ts` :
+  - malus affichés ;
+  - classement du plus petit malus au plus grand ;
+  - ligne « Pas de prono » ;
+  - règlement sans paliers.
+- `e2e/player.spec.ts` : « JOKER ÷2 », malus d'une mauvaise réponse visible.
+- `e2e/admin-questions.spec.ts` : création d'une question à choix avec son malus ; plus de type Juste Prix.
+- `e2e/admin-seasons.spec.ts` : case des jokers ; retrait refusé sur la saison courante (des jokers y sont posés).
+- `e2e/admin-extension.spec.ts` (nouveau) :
+  - l'admin prolonge « webinaire » pour un joueur sans prono ;
+  - ce joueur la voit dans ses questions ouvertes avec « PROLONGÉE POUR TOI » et ne voit pas `876543` ;
+  - il enregistre une valeur témoin ;
+  - un joueur qui a pronostiqué voit la mention de la prolongation, mais pas la valeur témoin ;
+  - un joueur sans prono voit « Les pronos s'afficheront au résultat » ;
+  - « Saisir le résultat » est désactivé avec la raison.
+
+  Tenir compte des états laissés dans la base e2e (point ouvert n° 6).
+- `e2e/a11y.spec.ts` (question clôturée sans prono) et `e2e/responsive.spec.ts` (dialogue de prolongation, pages avec malus) à 390 px.
+
+**Critères de passage** : porte commune ; couverture du §9.5 ; migration appliquée sur `dev` puis en production sans perte ; contrastes de #0036B3 vérifiés (axe, captures validées par l'utilisateur).
+
+**Interventions humaines** : H-08. Avant H-11, l'utilisateur sait qu'il doit renseigner le malus d'une mauvaise réponse de chaque question à choix (annexe B).
+
+### É8d — Chat général (v1.2)
+
+**Objectif** : un onglet « Chat » où toute l'équipe échange des messages avec des emojis (grille d'emojis), conservés en base. Les nouveaux messages arrivent par interrogation périodique, et un message automatique annonce chaque résultat (§5.15).
+
+**Prérequis** : É8c validée.
+
+**Branche** : `etape-08d-chat`.
+
+**Tâches**
+1. Schéma et migration (ajouts seulement) : enum `chat_message_kind`, tables `chat_message` et `chat_read` (§4.3), SQL relu ; appliquer sur `dev`.
+2. `src/lib/chat/` : `emojis.ts`, `polling.ts` (`shouldPoll`), `result-message.ts`, tests d'abord.
+3. Services `chat.ts` (§5.15) ; message de résultat dans `resolveQuestion` ; effacement des messages dans `anonymizeUser`. Matrice d'autorisation : 39 services.
+4. Lectures `data/chat.ts` ; route `GET /api/chat` ; exception du proxy (§6.4).
+5. Interface : `/chat` (§8.3), `ChatRoom`, `ChatMessage`, `ChatComposer`, `EmojiPalette` (§8.2), onglet « Chat » et sa pastille dans `AppHeader`, squelette `loading.tsx`.
+6. Vérifier l'en-tête à 1 024 px avec l'onglet de plus (point ouvert de l'É8b, que l'utilisateur doit trancher).
+7. Seed (§9.6).
+8. Vérifier à la main que la page cesse d'interroger le serveur quand l'onglet est caché ou la personne inactive (onglet Réseau du navigateur), et le consigner.
+
+**Tests à écrire**
+- `tests/unit/chat/emojis.test.ts` : 48 emojis distincts, chacun avec un nom, aucun mot interdit (§9.3).
+- `tests/unit/chat/polling.test.ts` (CH11) et `result-message.test.ts` : nombre, égalité au rang 1, choix, sans prono, « (corrigé) ».
+- `tests/integration/chat.test.ts` : CH1 à CH10, `getChatUpdates` (nouveaux messages et suppressions depuis `since`), non lus.
+- `tests/integration/authorization-matrix.test.ts` : 39 services.
+- `e2e/chat.spec.ts` :
+  - un joueur envoie un message avec un emoji de la palette ;
+  - un second joueur, dans un autre contexte de navigateur, le voit arriver sans recharger (en moins de 15 s) ;
+  - la pastille des non lus apparaît chez un troisième joueur après navigation ;
+  - suppression de son propre message ;
+  - l'admin supprime le message d'un autre ;
+  - le message de résultat apparaît après la résolution de « Studyrama » par `admin-questions.spec.ts` (ordre alphabétique des fichiers : vérifier) ;
+  - `/api/chat` répond `401` sans session.
+- `e2e/a11y.spec.ts` et `e2e/responsive.spec.ts` : `/chat`, palette ouverte, à 390 et 1 280 px.
+
+**Critères de passage** : porte commune ; arrêt de l'interrogation vérifié et consigné.
+
+**Interventions humaines** : H-08 (l'utilisateur discute avec un collègue ou avec un second compte du seed sur l'aperçu).
+
 ### É9 — Recette et lancement
 
 **Objectif** : des collègues testent, on corrige, la production est remplie et vérifiée, on lance le 14 octobre.
 
-**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change.
+**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change, l'É8c, et l'É8d (sauf si l'utilisateur décide de la reporter après le lancement : le chat ne bloque rien d'autre).
 
 **Branche** : `etape-09-recette` pour les corrections.
 
@@ -1896,7 +2341,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 - **Vérification** : le nombre d'adresses correspond à l'équipe.
 
 ### H-11 — Contenu de la campagne (dès la mise en production de É5b)
-1. Préparer les questions avec le gabarit de l'annexe B, par exemple dans un tableur.
+1. Préparer les questions avec le gabarit de l'annexe B, par exemple dans un tableur, y compris le malus d'une mauvaise réponse de chaque question à choix (v1.2). Les questions à choix se saisissent de préférence après la mise en production de l'É8c, qui ajoute ce champ.
 2. Dans `/admin/categories` : créer les catégories.
 3. Dans `/admin/questions` : créer chaque question.
 4. Sélectionner toutes les questions de la campagne → « Définir les dates » :
@@ -1904,18 +2349,18 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
    - clôture le **21/10/2026**, à l'heure choisie (par exemple 18 h) ;
    - résultat prévu, question par question si besoin ;
    - puis « Publier ».
-5. Dans `/admin/saisons` : créer la saison 2026-2027 avec sa date de début (ou ajuster la sienne), puis saisir ses lots. **À faire avant l'étape 4** : sans saison, les questions ne peuvent pas être publiées (v1.1).
+5. Dans `/admin/saisons` : créer la saison 2026-2027 avec sa date de début (ou ajuster la sienne), choisir si les jokers sont autorisés (v1.2), puis saisir ses lots. **À faire avant l'étape 4** : sans saison, les questions ne peuvent pas être publiées (v1.1). Les jokers ne peuvent plus être retirés une fois qu'un joueur en a posé un.
 6. Dans `/admin/annonces` : écrire le message de bienvenue.
 - **Vérification** : `/admin/questions` affiche les questions en « programmée », avec les bonnes dates en heure de Paris.
 
 ### H-12 — Recette avec des collègues (É9)
 1. Choisir 2 ou 3 collègues. L'agent fournit les identifiants de test du seed (`joueur1@example.test` et suivants, mot de passe `Test-1234!`) et l'adresse de l'aperçu.
-2. Leur demander, en 20 minutes : se connecter, faire 3 pronos (dont un à choix), en valider 2, poser un joker, regarder le classement et une question résolue, puis noter tout ce qui gêne.
+2. Leur demander, en 20 minutes : se connecter, faire 3 pronos (dont un à choix), en valider 2, poser un joker, regarder le classement (en malus) et une question résolue, écrire dans le chat avec un emoji (si l'É8d est faite), puis noter tout ce qui gêne.
 3. Transmettre les remarques à l'agent.
 - **Vérification** : les remarques sont consignées ; les corrections retenues sont faites et testées.
 
 ### H-13 — Relecture du règlement et des textes (É9)
-- Lire `/reglement`, l'accueil, `/pronos` et la fenêtre de confirmation. Signaler toute formulation à changer.
+- Lire `/reglement` (en particulier le malus, le pire prono pour les absents et les prolongations, v1.2), l'accueil, `/pronos` et la fenêtre de confirmation. Signaler toute formulation à changer.
 
 ### H-14 — Checklist de lancement (13/10)
 - Cocher la section 13 avec l'agent.
@@ -1944,8 +2389,9 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 - [ ] Le compte admin est créé et accède à `/admin` (H-09).
 - [ ] La liste blanche contient toute l'équipe (H-10).
 - [ ] Les catégories sont créées.
-- [ ] Toutes les questions de la campagne sont **programmées** : ouverture le 14/10, clôture le 21/10, heures vérifiées en heure de Paris, source et aide remplies (H-11).
-- [ ] La saison 2026-2027 existe avec la bonne date de début, ses lots sont saisis. L'annonce de bienvenue est prête.
+- [ ] Toutes les questions de la campagne sont **programmées** : ouverture le 14/10, clôture le 21/10, heures vérifiées en heure de Paris, source et aide remplies, malus d'une mauvaise réponse cohérent pour chaque question à choix (H-11).
+- [ ] La saison 2026-2027 existe avec la bonne date de début et le bon réglage des jokers, ses lots sont saisis. L'annonce de bienvenue est prête.
+- [ ] Le chat fonctionne entre deux comptes (si l'É8d est faite), et l'accueil s'affiche aux couleurs #0036B3.
 - [ ] Le nom et l'adresse du site sont définitifs (É8b faite, ou écartée par l'utilisateur).
 - [ ] `/reglement` a été relu (H-13).
 - [ ] Test sur téléphone et sur ordinateur avec le compte admin : l'accueil s'affiche et le compte à rebours de l'ouverture est cohérent.
@@ -1954,7 +2400,8 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 
 **Après le lancement** (pour mémoire) :
 - Relancer à la main les retardataires grâce au suivi de `/admin`.
-- Saisir chaque résultat dès qu'il est connu.
+- Pour un absent, accorder une prolongation depuis le suivi de la question, et le prévenir soi-même.
+- Saisir chaque résultat dès qu'il est connu (après la fin des prolongations).
 - Proclamer la saison une fois toutes les questions résolues.
 - Avant la rentrée 2027 : créer la saison 2027-2028 avec sa date de début dans `/admin/saisons` ; elle commencera seule ce jour-là. Dupliquer alors les questions récurrentes.
 
@@ -1977,6 +2424,8 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | Vercel : commande de build | `vercel.json` → `buildCommand`. Vérifier dans les logs de build que la migration s'exécute bien avant `next build`. |
 | Cookies de 400 jours | Chrome plafonne la durée d'un cookie à 400 jours : ne pas dépasser. |
 | Heures d'été et d'hiver | Toujours passer par `@date-fns/tz`. Ne jamais construire une date « Paris » en ajoutant +1 ou +2 heures à la main. |
+| Chat : interrogation périodique (É8d) | Pas de WebSocket sur les fonctions Vercel : la page interroge `GET /api/chat`, seulement onglet visible et personne active (§5.15). Chaque appel est une invocation de fonction Vercel et réveille la base Neon (mise en veille après quelques minutes sans requête) : vérifier les quotas des offres gratuites au moment de l'étape et garder l'intervalle de 10 s au minimum. Ne pas utiliser une Server Action pour interroger le serveur : Next les exécute l'une après l'autre, elles bloqueraient l'envoi d'un message. |
+| Emojis (É8d) | Une longueur JavaScript (`.length`) compte les unités UTF-16 : un emoji en vaut 2. Compter en points de code (`[...texte].length`), comme `char_length` de PostgreSQL. Certains emojis composés (familles, drapeaux) comptent plusieurs points de code : sans importance avec la palette choisie. |
 | Streaming et `loading.tsx` (É8) | Une page sous un `loading.tsx` part en streaming : un `notFound()` appelé dans la page donne un code 200 (avec `noindex`). Le contrôle se fait dans un `layout.tsx` du même dossier, avant le squelette (§8.3). Quand le navigateur quitte une page avant la fin de son streaming, le serveur journalise `Error: The destination stream closed early.` (React abandonne le rendu) : sans conséquence pour le joueur, visible dans les journaux de Vercel et des tests de bout en bout. |
 
 ---
@@ -1992,10 +2441,18 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | Prono | `prediction` |
 | Enregistré / validé | `saved` / `validated` |
 | Joker | `joker` |
-| Juste Prix | `priceIsRight` |
+| Jokers autorisés (saison) | `jokersEnabled` |
+| Malus | `malus` ; malus de base `baseMalus` ; malus d'une question `total` |
+| Malus d'une mauvaise réponse | `wrongAnswerMalus` |
+| Malus d'absence (pire prono) | `absentMalus` |
+| Prolongation | `extension` (`questionExtension`) |
+| Rang de proximité | `podiumRank` |
+| Juste Prix (supprimé en v1.2) | `priceIsRight` (colonne conservée, toujours `false`) |
 | Dans le mille | `bullseye` |
-| Bonus podium | `podiumBonus` |
+| Bonus podium (supprimé en v1.2) | `podiumBonus` |
 | Écart relatif | `relativeError` |
+| Chat, message, message de résultat | `chat`, `chatMessage`, `result` (`chat_message_kind`) |
+| Non lus | `unread` (`chat_read`) |
 | Sagesse de la foule | `crowd` |
 | Classement | `standings` |
 | Palmarès | `seasonStanding` / `palmares` (route) |
@@ -2015,11 +2472,12 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | Champ | Exemple | Conseil |
 |---|---|---|
 | Catégorie | Candidatures | Réutiliser les mêmes catégories d'une année sur l'autre. |
-| Type | Nombre / Nombre Juste Prix / Choix / Oui-Non | Le Juste Prix est plus difficile : l'utiliser avec parcimonie. |
+| Type | Nombre / Choix / Oui-Non | Le malus d'une question à nombre est l'écart brut (v1.2) : une question sur des milliers (candidatures) pèse bien plus qu'une question sur des dizaines (JPO) ou sur un taux. En tenir compte dans le choix des questions et des coefficients. |
 | Énoncé | Combien de candidatures au total au 31 mai 2027 ? | Une seule question, sans ambiguïté, avec la date. |
 | Description | Toutes filières confondues, hors désistements. | Préciser le périmètre. |
 | Unité | candidatures | Au pluriel. |
 | Réponses possibles (choix) | Programme A / Programme B / Programme C | Entre 2 et 6 réponses. |
+| Malus d'une mauvaise réponse (choix) | 100 | Obligatoire (v1.2). Le comparer aux écarts attendus sur les questions à nombre de la saison : quelques dizaines pour une JPO, quelques centaines pour des candidatures. |
 | Source de la valeur réelle | Tableau BI « Candidatures », total au 31/05/2027 à minuit | **Une source unique et incontestable.** |
 | Lien BI | https://… | Le tableau exact, pas l'accueil du BI. |
 | Valeur de l'an dernier | 2 318 | Même périmètre et même date que la question. |
@@ -2029,4 +2487,4 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | Clôture | 21/10/2026 18:00 | **Bien avant le résultat**, pour obliger à extrapoler. |
 | Résultat prévu | 01/06/2027 | Date à laquelle tu pourras saisir la valeur. |
 
-À éviter : une question dont la réponse peut être 0, une question dont la réponse est déjà connue d'un membre de l'équipe au moment de la clôture, deux questions presque identiques.
+À éviter : une question dont la réponse est déjà connue d'un membre de l'équipe au moment de la clôture, deux questions presque identiques. (La v1.1 déconseillait aussi une réponse qui peut valoir 0 ; avec l'écart brut de la v1.2, ce n'est plus un problème.)

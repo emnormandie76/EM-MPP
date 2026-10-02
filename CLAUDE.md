@@ -1,15 +1,15 @@
 # Les petits pronos de la promo (dépôt EM-MPP)
 
-Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plus). L'admin crée des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les gagnants. Les saisons sont créées par l'admin (nom, date de début) et basculent automatiquement à leur date de début (v1.1). Lancement le 14 octobre 2026. Next.js sur Vercel, base Neon. Le site n'envoie aucun email.
+Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plus). L'admin crée des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les gagnants : ceux qui ont le moins de points de malus (écart brut au résultat, v1.2). Les saisons sont créées par l'admin (nom, date de début, jokers autorisés ou non) et basculent automatiquement à leur date de début (v1.1). Un chat général relie l'équipe (v1.2). Lancement le 14 octobre 2026. Next.js sur Vercel, base Neon. Le site n'envoie aucun email.
 
 ## Documents de référence
 
 | Document | Rôle |
 |---|---|
-| [docs/features/cahier-des-charges.md](docs/features/cahier-des-charges.md) | Règles fonctionnelles (v1.1, validée : saisons gérées par l'admin) : le **quoi** |
+| [docs/features/cahier-des-charges.md](docs/features/cahier-des-charges.md) | Règles fonctionnelles (v1.2 du 02/10/2026 : malus, jokers par saison, prolongations, chat) : le **quoi** |
 | [docs/architecture/architecture.md](docs/architecture/architecture.md) | Référence technique et plan de construction par étapes : le **comment** |
 | [docs/architecture/avancement.md](docs/architecture/avancement.md) | Étape en cours, interventions humaines faites, journal des décisions |
-| [docs/design/maquette-b5/](docs/design/maquette-b5/) | Maquette visuelle retenue (style B5 « Jour de match ») |
+| [docs/design/maquette-b5/](docs/design/maquette-b5/) | Maquette visuelle retenue (style B5 « Jour de match ») ; la couleur principale est #0036B3 depuis la v1.2 (architecture §8.1) |
 
 ## Phase en cours
 
