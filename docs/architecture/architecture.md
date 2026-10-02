@@ -1,8 +1,8 @@
-# Architecture et plan de construction — Le Bon Chiffre
+# Architecture et plan de construction — Les petits pronos de la promo
 
 > **Version 1.1 du 30/09/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
-> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6). Précisé pendant l'É8 (01/10/2026) : bordure `line-strong` foncée à #7E8796 (§8.1), classement compact sur téléphone (§8.3, §8.4), conteneur défilant des tableaux et squelettes de chargement (§2, §8.3, §8.4), page d'erreur globale (§8.3), contrôle de visibilité dans le layout de `/questions/[id]` (§7.4, §8.3), tests à 390 px (§9.4), streaming (§14). Précisé après la recette par un agent (01/10/2026, rapport `docs/recette/rapport-recette-2026-10-01.md`) : prono Juste Prix qui dépasse hors de l'écart moyen (§5.5, §5.6), étiquette « TOI » à côté du point (§5.7, §8.2), jokers masqués dans l'historique avant la clôture (§6.6), titre des pages d'admin caché aux joueurs (§6.4), confirmation de la désactivation (§6.3), messages de résultat et grilles à 390 px (§8.4, §8.5), espace des milliers et année des dates (§8.6).
+> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6). Précisé pendant l'É8 (01/10/2026) : bordure `line-strong` foncée à #7E8796 (§8.1), classement compact sur téléphone (§8.3, §8.4), conteneur défilant des tableaux et squelettes de chargement (§2, §8.3, §8.4), page d'erreur globale (§8.3), contrôle de visibilité dans le layout de `/questions/[id]` (§7.4, §8.3), tests à 390 px (§9.4), streaming (§14). Précisé après la recette par un agent (01/10/2026, rapport `docs/recette/rapport-recette-2026-10-01.md`) : prono Juste Prix qui dépasse hors de l'écart moyen (§5.5, §5.6), étiquette « TOI » à côté du point (§5.7, §8.2), jokers masqués dans l'historique avant la clôture (§6.6), titre des pages d'admin caché aux joueurs (§6.4), confirmation de la désactivation (§6.3), messages de résultat et grilles à 390 px (§8.4, §8.5), espace des milliers et année des dates (§8.6). Précisé à l'É8b (02/10/2026) : le site s'appelle « Les petits pronos de la promo », nom écrit une seule fois dans `APP_NAME` (`src/lib/app.ts`), logo sur deux lignes (§8.2), nouvelle adresse `les-petits-pronos-de-la-promo.vercel.app` (H-16), test de fumée en production lancé seul avec `BASE_URL` (§9.1).
 > - Règles fonctionnelles : [cahier des charges v1.1](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
@@ -1118,7 +1118,7 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 
 - **AppHeader** :
   - hauteur 72 px, fond `bg`, bordure basse `line` ;
-  - logo : carré de 34 px `accent`, légèrement penché (`skewX(-8deg)`), icône `Target` en `accent-ink`, suivi de « LE BON CHIFFRE » en display 26 px 800 italique ;
+  - logo : carré de 34 px `accent`, légèrement penché (`skewX(-8deg)`), icône `Target` en `accent-ink`, suivi du nom du site (`APP_NAME`, `src/lib/app.ts`) en display 19 px 800 italique et capitales, sur deux lignes (« LES PETITS PRONOS / DE LA PROMO », `APP_NAME_LINES`) : en une ligne de 26 px, le nom ne tenait pas à 390 px (É8b) ;
   - navigation : Accueil, Mes pronos, Classement, Palmarès, Règlement, en display 17 px 700 capitales, bloc arrondi de 6 px ; lien actif sur fond `accent` avec texte `accent-ink`, les autres en `ink-2`, survol sur fond `chip` ;
   - à droite : lien « ADMIN » pour les admins seulement, avatar de 36 px, nom, et un menu (Mon profil, Se déconnecter).
 - **AdminNav** : sous-navigation du back-office, avec Tableau de bord, Questions, Joueurs, Catégories, Saisons et lots, Annonces.
@@ -1180,7 +1180,7 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 - **Field** : libellé au-dessus, champ de 44 px, bordure `line-strong` passant à `accent` au focus, message d'erreur en `hot` sous le champ (`aria-describedby`).
 - **Tabs** : liens avec le compteur (« À FAIRE (3) »).
 - **EmptyState** : icône, phrase, action éventuelle.
-- **Footer** : « Le Bon Chiffre · Saison 2026-2027 » (nom de la saison courante, rien s'il n'y en a pas) et liens Règlement, Lots, Palmarès.
+- **Footer** : « Les petits pronos de la promo · Saison 2026-2027 » (nom de la saison courante, rien s'il n'y en a pas) et liens Règlement, Lots, Palmarès.
 
 ### 8.3 Écrans
 
@@ -1352,7 +1352,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 | Intégration | Vitest et PGlite | `tests/integration/` | services, lectures et visibilité, hooks d'authentification, migrations, seed |
 | Bout en bout | Playwright | `e2e/` | parcours réels dans le navigateur, sur `next start` avec PGlite |
 | Accessibilité | `@axe-core/playwright` | `e2e/a11y.spec.ts` | pages principales |
-| Fumée en production | Playwright | `e2e/prod-smoke.spec.ts` | `/connexion` et `/api/health` en production, en lecture seule, lancé à la main avec `BASE_URL` |
+| Fumée en production | Playwright | `e2e/prod-smoke.spec.ts` | `/connexion` et `/api/health` en production, en lecture seule, lancé à la main avec `BASE_URL`. Avec `BASE_URL`, `playwright.config.ts` ne lance que ce fichier, sans serveur local ; sans elle, `npm run test:e2e` l'exclut (écrit à l'É8b) |
 
 ### 9.2 Outils de test partagés (`tests/helpers/`)
 
@@ -1463,7 +1463,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 1. Générer le projet avec `create-next-app` (TypeScript, App Router, Tailwind, ESLint, dossier `src/`, alias `@/*`) **dans un dossier temporaire hors du dépôt** : le dépôt contient déjà des fichiers qui bloqueraient l'outil (`CLAUDE.md`, `docs/`, `.claude/`, `.env`). Copier ensuite les fichiers générés dans le dépôt, sans `.git`. Fusionner `.gitignore` en gardant les entrées existantes, puis ajouter celles du §3.3.
 2. Réécrire `README.md` en UTF-8 : il est actuellement en UTF-16. Contenu : présentation courte, prérequis, commandes du §3.2, liens vers `docs/`.
 3. Installer les dépendances du §1.2 (sauf la base de données et Better Auth), configurer Vitest, Playwright, `tsx` et les scripts du §3.2 disponibles à ce stade.
-4. `src/app/globals.css` : jetons B5 (§8.1). `src/app/layout.tsx` : `lang="fr"`, polices, fond `bg`, métadonnées (titre « Le Bon Chiffre », `robots: { index: false, follow: false }`).
+4. `src/app/globals.css` : jetons B5 (§8.1). `src/app/layout.tsx` : `lang="fr"`, polices, fond `bg`, métadonnées (titre du site, `APP_NAME` depuis l'É8b, `robots: { index: false, follow: false }`).
 5. Composants de base : `Button`, `Chip`, `Card`, `Field`, `AppHeader` (navigation statique, sans session), `Footer`.
 6. Page `/` provisoire : l'en-tête B5 et une carte « Le site arrive bientôt ».
 7. `src/lib/format.ts` : `formatNumber`, `formatDateTime`, `formatRelative` (heure de Paris).
@@ -1474,7 +1474,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 **Tests à écrire**
 - `tests/unit/format.test.ts` : `formatNumber(2450)` donne « 2 450 » (avec espace fine insécable) ; `formatDateTime(2026-10-21T16:00Z)` donne « mer. 21 oct. à 18 h » ; `formatDateTime(2026-11-15T17:30Z)` donne « dim. 15 nov. à 18 h 30 ».
 - `tests/unit/vocabulary.test.ts` (§9.3).
-- `e2e/smoke.spec.ts` : `/` répond 200 ; « LE BON CHIFFRE » visible ; `html[lang=fr]` ; une adresse inconnue affiche la 404 en français.
+- `e2e/smoke.spec.ts` : `/` répond 200 ; le nom du site visible (logo et onglet, depuis l'É8b) ; `html[lang=fr]` ; une adresse inconnue affiche la 404 en français.
 
 **Critères de passage** : porte commune, plus le rendu de l'en-tête conforme à la maquette (vérification visuelle en H-08).
 
@@ -1779,7 +1779,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 
 **Tâches**
 1. **Au début de l'étape**, redemander à l'utilisateur le nouveau nom exact (majuscules, accents, espaces) et s'il veut aussi une nouvelle adresse `<nom>.vercel.app`, puis lui réexpliquer le déroulé : inventaire, remplacement, H-16, vérifications.
-2. **Inventaire complet, présenté à l'utilisateur avant toute modification.** Rechercher dans tout le dépôt (hors `node_modules`, `.next`, `playwright-report`, `test-results`) toutes les formes du nom actuel : « Le Bon Chiffre », « LE BON CHIFFRE », « Bon Chiffre », `le-bon-chiffre`, `leBonChiffre`, `le_bon_chiffre`, et les variantes sans accent ou en capitales. Au 30/09/2026, on les trouve au moins dans :
+2. **Inventaire complet, présenté à l'utilisateur avant toute modification.** Rechercher dans tout le dépôt (hors `node_modules`, `.next`, `playwright-report`, `test-results`) toutes les formes de l'ancien nom : « Le Bon Chiffre », « LE BON CHIFFRE », « Bon Chiffre », `le-bon-chiffre`, `leBonChiffre`, `le_bon_chiffre`, et les variantes sans accent ou en capitales. Au 30/09/2026, on les trouve au moins dans :
    - l'interface : `src/components/layout/Logo.tsx` (logo), `src/components/layout/Footer.tsx`, `src/app/layout.tsx` (titre des onglets et gabarit « %s · … »), `src/app/(public)/layout.tsx`, la page d'accueil, et les pages ajoutées aux É6 à É8 (règlement, lots…) ;
    - la configuration : `appName` de Better Auth (`src/lib/auth/auth.ts`), `name` dans `package.json` et `package-lock.json`, la clé `leBonChiffreDb` de `src/lib/db/client.ts` (nom technique, à renommer ou non) ;
    - les tests : `e2e/smoke.spec.ts` (logo « LE BON CHIFFRE ») et les autres specs ;
@@ -1922,7 +1922,7 @@ Chaque étape se termine par des **critères de passage**. Ils sont tous obligat
 
 ### H-15 — Annonce du lancement (14/10)
 - Envoyer à l'équipe (Teams ou oral) l'adresse de production, la façon de créer son compte, la date de clôture et les lots.
-- Proposition de message, fournie par l'agent : « Le Bon Chiffre est ouvert ! Crée ton compte sur <adresse>/inscription avec ton email pro. Tu as jusqu'au mercredi 21 octobre à 18 h pour valider tes pronos. À gagner : <lots>. » (avec le nom et l'adresse définitifs si l'É8b les a changés)
+- Proposition de message, fournie par l'agent : « Les petits pronos de la promo sont ouverts ! Crée ton compte sur https://les-petits-pronos-de-la-promo.vercel.app/inscription avec ton email pro. Tu as jusqu'au mercredi 21 octobre à 18 h pour valider tes pronos. À gagner : <lots>. » (avec le nom et l'adresse définitifs si l'É8b les a changés)
 
 ### H-16 — Nouvelle adresse de production (É8b, facultatif)
 - **Pourquoi** : l'adresse `*.vercel.app` suit le nom choisi. Il n'est pas nécessaire de recréer le projet Vercel : on le renomme et on lui ajoute une adresse ; la base, les variables et les déploiements restent.

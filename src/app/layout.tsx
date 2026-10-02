@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
+import { APP_NAME } from "@/lib/app";
 import "./globals.css";
 
 const barlow = Barlow({
@@ -18,7 +19,7 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Le Bon Chiffre", template: "%s · Le Bon Chiffre" },
+  title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
   description: "Les pronostics de l'équipe sur les chiffres de l'EM Normandie.",
   robots: { index: false, follow: false },
 };

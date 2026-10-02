@@ -1,4 +1,4 @@
-# Le Bon Chiffre (dépôt EM-MPP)
+# Les petits pronos de la promo (dépôt EM-MPP)
 
 Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plus). L'admin crée des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les gagnants. Les saisons sont créées par l'admin (nom, date de début) et basculent automatiquement à leur date de début (v1.1). Lancement le 14 octobre 2026. Next.js sur Vercel, base Neon. Le site n'envoie aucun email.
 

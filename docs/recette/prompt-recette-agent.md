@@ -13,7 +13,7 @@ Tout ce qui suit s'adresse à l'agent.
 
 ## 1. Ta mission
 
-Tu es **testeur**. L'utilisateur n'a encore testé aucune fonctionnalité de « Le Bon Chiffre » lui-même : tu le fais à sa place, **dans Chrome**, comme le feraient l'admin et les joueurs, puis tu lui remets un rapport clair de ce qui marche et de ce qui ne marche pas.
+Tu es **testeur**. L'utilisateur n'a encore testé aucune fonctionnalité de « Les petits pronos de la promo » lui-même : tu le fais à sa place, **dans Chrome**, comme le feraient l'admin et les joueurs, puis tu lui remets un rapport clair de ce qui marche et de ce qui ne marche pas.
 
 - Tu testes **toutes** les fonctionnalités : comptes, parcours joueur, résultats, classement, palmarès, back-office complet, règles du jeu, affichage sur téléphone, accessibilité de base, textes.
 - Tu compares chaque comportement observé au comportement **attendu**, tel que l'écrivent le cahier des charges, l'architecture et les décisions du journal. Une différence avec une décision consignée n'est pas un bogue : c'est le comportement voulu.
@@ -22,7 +22,7 @@ Tu es **testeur**. L'utilisateur n'a encore testé aucune fonctionnalité de « 
 ## 2. Ce que tu ne fais jamais
 
 - **Aucune modification du dépôt**, sauf ton rapport et tes captures dans `docs/recette/`. Pas de correction de code, pas de commit, pas de push. Tu ne fais aucune étape du plan de construction : les règles de `CLAUDE.md` sur les étapes ne te concernent pas.
-- **Jamais la production** : ne va pas sur `https://le-bon-chiffre.vercel.app` (vraies données, compte admin réel).
+- **Jamais la production** : ne va pas sur `https://les-petits-pronos-de-la-promo.vercel.app` ni sur l'ancienne adresse `le-bon-chiffre.vercel.app`, qui y redirige (vraies données, compte admin réel).
 - **Jamais la base Neon** : ne lance ni `npm run db:seed`, ni `npm run db:migrate`, ni `npm run db:check` (ils visent la base de `.env.local`). Ne lis, n'affiche et ne modifie aucun fichier `.env*`.
 - **Ne touche pas aux processus de l'utilisateur** : son `next dev` tourne peut-être sur le port 3000. N'arrête que les processus que tu as lancés.
 - Pendant que ton serveur tourne, ne lance ni `npm run build`, ni `npm run verify`, ni `npm run test:e2e` : ils réécrivent le dossier `.next` dont ton serveur se sert.
@@ -140,7 +140,7 @@ Connecte-toi d'abord avec **Camille** (pour la pastille « Nouveau »), puis ave
 - [ ] A12. `/joueurs/<id>` : rang et points de la saison, tuiles (écart moyen, Dans le mille, pronos joués), les 6 badges (obtenus en couleur avec compteur, les autres grisés), historique des questions résolues.
 - [ ] A13. `/palmares` : la saison précédente, podium avec avatars, classement complet dépliable, lots attribués.
 - [ ] A14. `/lots` (3 lots de la saison courante) et `/reglement` : les valeurs affichées (paliers, bonus, 50 points, ×2, 2 jokers, coefficients 1 à 3) sont exactement celles de `src/lib/game/constants.ts`, et l'exemple chiffré est juste.
-- [ ] A15. Pied de page « Le Bon Chiffre · Saison … » et ses liens ; en-tête (navigation active, lien « ADMIN » pour l'admin seulement, menu du compte).
+- [ ] A15. Pied de page « Les petits pronos de la promo · Saison … » et ses liens ; en-tête (navigation active, lien « ADMIN » pour l'admin seulement, menu du compte).
 - [ ] A16. Admin, en lecture : tableau de bord (questions ouvertes avec « validés x / N » et les retardataires, « À résoudre », « Prochaines ouvertures »), `/admin/questions` (filtres statut, saison, catégorie, dans l'adresse), page d'une question ouverte (suivi par joueur, **états seulement** avant la clôture ; historique sans valeurs), page d'une question clôturée (valeurs visibles), `/admin/joueurs`, `/admin/categories`, `/admin/saisons`, `/admin/annonces`.
 
 ### Phase B : lancer tôt un scénario dans le temps

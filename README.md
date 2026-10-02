@@ -1,4 +1,4 @@
-# Le Bon Chiffre
+# Les petits pronos de la promo
 
 Site de pronostics interne d'une équipe de l'EM Normandie. L'admin pose des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les meilleurs de la saison.
 

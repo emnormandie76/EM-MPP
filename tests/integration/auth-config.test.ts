@@ -50,10 +50,10 @@ describe("createAuth", () => {
 
 describe("trusted origins (§6.1)", () => {
   it("uses BETTER_AUTH_URL first, then the Vercel address, then localhost", () => {
-    expect(authBaseUrl({ BETTER_AUTH_URL: "https://le-bon-chiffre.vercel.app", VERCEL_URL: "x.vercel.app" })).toBe(
-      "https://le-bon-chiffre.vercel.app",
+    expect(authBaseUrl({ BETTER_AUTH_URL: "https://les-petits-pronos-de-la-promo.vercel.app", VERCEL_URL: "x.vercel.app" })).toBe(
+      "https://les-petits-pronos-de-la-promo.vercel.app",
     );
-    expect(authBaseUrl({ VERCEL_URL: "le-bon-chiffre-abc123.vercel.app" })).toBe("https://le-bon-chiffre-abc123.vercel.app");
+    expect(authBaseUrl({ VERCEL_URL: "les-petits-pronos-de-la-promo-abc123.vercel.app" })).toBe("https://les-petits-pronos-de-la-promo-abc123.vercel.app");
     expect(authBaseUrl({})).toBe("http://localhost:3000");
   });
 
@@ -61,22 +61,22 @@ describe("trusted origins (§6.1)", () => {
     expect(
       authTrustedOrigins({
         BETTER_AUTH_URL: "http://localhost:3000",
-        VERCEL_URL: "le-bon-chiffre-abc123.vercel.app",
-        VERCEL_BRANCH_URL: "le-bon-chiffre-git-etape-03.vercel.app",
-        VERCEL_PROJECT_PRODUCTION_URL: "le-bon-chiffre.vercel.app",
+        VERCEL_URL: "les-petits-pronos-de-la-promo-abc123.vercel.app",
+        VERCEL_BRANCH_URL: "les-petits-pronos-de-la-promo-git-etape-03.vercel.app",
+        VERCEL_PROJECT_PRODUCTION_URL: "les-petits-pronos-de-la-promo.vercel.app",
       }),
     ).toEqual([
       "http://localhost:3000",
-      "https://le-bon-chiffre-abc123.vercel.app",
-      "https://le-bon-chiffre-git-etape-03.vercel.app",
-      "https://le-bon-chiffre.vercel.app",
+      "https://les-petits-pronos-de-la-promo-abc123.vercel.app",
+      "https://les-petits-pronos-de-la-promo-git-etape-03.vercel.app",
+      "https://les-petits-pronos-de-la-promo.vercel.app",
     ]);
   });
 
   it("leaves out missing variables and duplicates", () => {
     expect(authTrustedOrigins({})).toEqual([]);
     expect(
-      authTrustedOrigins({ BETTER_AUTH_URL: "https://le-bon-chiffre.vercel.app", VERCEL_PROJECT_PRODUCTION_URL: "le-bon-chiffre.vercel.app" }),
-    ).toEqual(["https://le-bon-chiffre.vercel.app"]);
+      authTrustedOrigins({ BETTER_AUTH_URL: "https://les-petits-pronos-de-la-promo.vercel.app", VERCEL_PROJECT_PRODUCTION_URL: "les-petits-pronos-de-la-promo.vercel.app" }),
+    ).toEqual(["https://les-petits-pronos-de-la-promo.vercel.app"]);
   });
 });

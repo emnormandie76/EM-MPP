@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
+import { APP_NAME } from "@/lib/app";
 import { AVATAR_KEYS, defaultAvatarFor } from "@/lib/avatars";
 import { type Database, getDb } from "@/lib/db/client";
 import * as schema from "@/lib/db/schema";
@@ -43,7 +44,7 @@ export function createAuth(db: Database, env: Env = process.env) {
   const adminEmails = parseAdminEmails(env.ADMIN_EMAILS);
 
   return betterAuth({
-    appName: "Le Bon Chiffre",
+    appName: APP_NAME,
     baseURL: authBaseUrl(env),
     trustedOrigins: authTrustedOrigins(env),
     database: drizzleAdapter(db, { provider: "pg", schema, transaction: true }),

@@ -35,7 +35,7 @@ describe("getDb", () => {
     vi.unstubAllEnvs();
     vi.resetModules();
     // The singleton lives on globalThis (see client.ts): each test starts without it.
-    delete (globalThis as { leBonChiffreDb?: unknown }).leBonChiffreDb;
+    delete (globalThis as { appDb?: unknown }).appDb;
   });
 
   it("uses an in-memory PGlite when DB_DRIVER=pglite, always the same instance", async () => {

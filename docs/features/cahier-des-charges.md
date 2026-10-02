@@ -1,4 +1,4 @@
-# Cahier des charges — Le Bon Chiffre
+# Cahier des charges — Les petits pronos de la promo
 
 > **Version 1.1 du 30/09/2026.** Toutes les décisions sont prises. La section 8 liste les quelques précisions que j'ai ajoutées en rédigeant cette version ; elles restent contestables.
 >
@@ -8,7 +8,7 @@
 
 ## 1. Contexte et objectifs
 
-**Contexte.** « Le Bon Chiffre » est un site de pronostics réservé à une équipe de chargé·e·s de l'EM Normandie (20 personnes au plus), inspiré de Mon Petit Prono. L'admin crée des questions sur les chiffres de l'école (participants à une JPO, candidatures au 31 mai, intégrés à une date donnée…), les joueurs pronostiquent, et un classement visible par tous désigne les meilleurs, qui gagnent des lots.
+**Contexte.** « Les petits pronos de la promo » (nommé « Le Bon Chiffre » jusqu'au 02/10/2026) est un site de pronostics réservé à une équipe de chargé·e·s de l'EM Normandie (20 personnes au plus), inspiré de Mon Petit Prono. L'admin crée des questions sur les chiffres de l'école (participants à une JPO, candidatures au 31 mai, intégrés à une date donnée…), les joueurs pronostiquent, et un classement visible par tous désigne les meilleurs, qui gagnent des lots.
 
 **Objectif principal.** Donner envie à l'équipe de connaître les chiffres de l'école. Pour bien pronostiquer, il faut aller dans les tableaux de bord BI, comparer avec l'an dernier, calculer des taux de transformation. Le jeu est le prétexte, la culture du chiffre est le but.
 
@@ -183,7 +183,7 @@ Bonne réponse : 50 points. Mauvaise réponse : 0 point. Pas de bonus podium. Po
 | Emails (C6, C9) | Aucun email : ni notification, ni code ; connexion par mot de passe sans vérification |
 | Accès (C7) | Liste blanche |
 | Confidentialité (C8) | Accès réservé à la liste blanche : validé |
-| Nom et vocabulaire (C10) | « Le Bon Chiffre » ; on parle de pronostics et de points, jamais de paris |
+| Nom et vocabulaire (C10) | « Les petits pronos de la promo » (changé le 02/10/2026, étape É8b) ; on parle de pronostics et de points, jamais de paris |
 | Gratuité de Vercel (C11) | Risque accepté |
 | Joueurs (Q1) | Uniquement l'équipe |
 | Admin (Q2) | Il joue aussi |

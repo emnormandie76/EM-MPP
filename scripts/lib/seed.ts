@@ -632,7 +632,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
 
     const announcements = await tx.insert(announcement).values([
       {
-        body: "Bienvenue sur Le Bon Chiffre ! Les questions de la campagne d'octobre sont ouvertes : valide tes pronos avant la clôture.",
+        body: "Bienvenue sur Les petits pronos de la promo ! Les questions de la campagne d'octobre sont ouvertes : valide tes pronos avant la clôture.",
         createdBy: ids.admin,
         createdAt: shift(-2 * DAY),
         updatedAt: shift(-2 * DAY),

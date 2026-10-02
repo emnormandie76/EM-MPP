@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { APP_NAME } from "../src/lib/app";
 import { ACCOUNTS, expect, SEED_PASSWORD, signIn, signOut, test } from "./fixtures";
 
 // Accounts and access (architecture §11 É4). Each test that writes uses its own seeded accounts.
@@ -74,8 +75,8 @@ test("a player gets the 404 page on the back office, without the title of the pa
     expect(response?.status()).toBe(404);
     await expect(page.getByRole("heading", { level: 1, name: "Cette page n'existe pas." })).toBeVisible();
     // The same tab title as an unknown address.
-    await expect(page).toHaveTitle("Le Bon Chiffre");
-    expect(await response!.text(), url).not.toContain(`${title} · Le Bon Chiffre`);
+    await expect(page).toHaveTitle(APP_NAME);
+    expect(await response!.text(), url).not.toContain(`${title} · ${APP_NAME}`);
   }
 });
 
@@ -83,10 +84,10 @@ test("the admin reaches /admin/joueurs from the header", async ({ page }) => {
   await signIn(page, ACCOUNTS.admin);
   await page.getByRole("banner").getByRole("link", { name: "Admin" }).click();
   await expect(page).toHaveURL("/admin");
-  await expect(page).toHaveTitle("Back-office · Le Bon Chiffre");
+  await expect(page).toHaveTitle(`Back-office · ${APP_NAME}`);
   await page.getByRole("navigation", { name: "Back-office" }).getByRole("link", { name: "Joueurs" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Joueurs" })).toBeVisible();
-  await expect(page).toHaveTitle("Joueurs · Le Bon Chiffre");
+  await expect(page).toHaveTitle(`Joueurs · ${APP_NAME}`);
   const accounts = page.getByRole("table", { name: "Comptes des joueurs" });
   await expect(accounts.getByRole("row").filter({ hasText: ACCOUNTS.sarah })).toContainText("Joueur");
   await expect(accounts.getByRole("row").filter({ hasText: ACCOUNTS.admin })).toContainText("C'est toi");

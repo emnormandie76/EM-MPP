@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { ErrorScreen } from "@/components/layout/ErrorScreen";
+import { APP_NAME } from "@/lib/app";
 import "./globals.css";
 
 /**
@@ -23,7 +24,7 @@ export default function GlobalError({
   return (
     <html lang="fr">
       <body className="flex min-h-dvh flex-col bg-bg font-sans text-ink antialiased">
-        <title>Erreur · Le Bon Chiffre</title>
+        <title>{`Erreur · ${APP_NAME}`}</title>
         <meta name="robots" content="noindex, nofollow" />
         <ErrorScreen onRetry={() => retry()} />
       </body>

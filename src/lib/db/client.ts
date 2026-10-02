@@ -11,7 +11,7 @@ export type Database = PgDatabase<PgQueryResultHKT, typeof schema>;
 // One instance per process, kept on globalThis: Next.js bundles the route handlers and the pages
 // separately, each with its own copy of this module. Two PGlite instances on the same folder
 // would not see each other's writes (a session created by /api/auth, unknown to the pages).
-const shared = globalThis as typeof globalThis & { leBonChiffreDb?: Database };
+const shared = globalThis as typeof globalThis & { appDb?: Database };
 
 /**
  * Singleton database, chosen by `DB_DRIVER`:
@@ -20,8 +20,8 @@ const shared = globalThis as typeof globalThis & { leBonChiffreDb?: Database };
  * - `pglite`: PGlite (tests).
  */
 export function getDb(): Database {
-  shared.leBonChiffreDb ??= createDb(process.env.DB_DRIVER);
-  return shared.leBonChiffreDb;
+  shared.appDb ??= createDb(process.env.DB_DRIVER);
+  return shared.appDb;
 }
 
 function createDb(driver: string | undefined): Database {
