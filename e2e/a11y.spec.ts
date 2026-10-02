@@ -65,6 +65,17 @@ for (const [tab, title] of [
   });
 }
 
+// v1.2 (§9.4, step 8d): the chat, with the emoji grid open.
+test("/chat (player), emoji grid open, has no serious or critical accessibility violation", async ({ page }) => {
+  await signIn(page, ACCOUNTS.julien);
+  await page.goto("/chat");
+  await expect(page.getByRole("log", { name: "Messages du chat" })).toBeVisible();
+  expect(await blockingViolations(page), "fil").toEqual([]);
+  await page.getByRole("button", { name: "Ajouter un emoji" }).click();
+  await expect(page.getByRole("group", { name: "Emojis" })).toBeVisible();
+  expect(await blockingViolations(page), "grille ouverte").toEqual([]);
+});
+
 // v1.2 (§9.4): a closed question the player did not predict (« Les pronos s'afficheront au résultat »).
 test("/questions/<id> (closed, without a prediction) has no serious or critical accessibility violation", async ({ page }) => {
   await signIn(page, ACCOUNTS.hugo);
@@ -140,6 +151,10 @@ test.describe("at 390 px", () => {
     await page.goto((await page.getByRole("link", { name: "Sarah", exact: true }).getAttribute("href"))!);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sarah");
     expect(await blockingViolations(page), "profil de Sarah").toEqual([]);
+    await page.goto("/chat");
+    await page.getByRole("button", { name: "Ajouter un emoji" }).click();
+    await expect(page.getByRole("group", { name: "Emojis" })).toBeVisible();
+    expect(await blockingViolations(page), "chat, grille ouverte").toEqual([]);
   });
 
   test("the back-office pages have no serious or critical accessibility violation", async ({ page }) => {

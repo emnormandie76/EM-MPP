@@ -39,6 +39,7 @@ async function main(): Promise<void> {
     const summary = await seedDatabase(target.db, { now: new Date(), env: process.env });
     console.log(
       `Seed terminé : ${summary.users} comptes, ${summary.questions} questions, ${summary.predictions} pronos, ` +
+        `${summary.chatMessages} messages de chat, ` +
         `saisons ${summary.seasons.older} (prête à proclamer), ${summary.seasons.previous} (proclamée) et ${summary.seasons.current}.`,
     );
   } finally {

@@ -43,7 +43,7 @@ for (const url of ["/connexion", "/inscription"]) {
 
 test("the player pages do not scroll sideways at 390 px", async ({ page }) => {
   await signIn(page, ACCOUNTS.julien);
-  for (const url of ["/", "/pronos", "/questions", "/classement", "/palmares", "/reglement", "/lots", "/profil"]) {
+  for (const url of ["/", "/pronos", "/questions", "/classement", "/chat", "/palmares", "/reglement", "/lots", "/profil"]) {
     await page.goto(url);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expectNoSidewaysScroll(page);
@@ -184,4 +184,55 @@ test("the extension dialog fits the screen at 390 px (v1.2)", async ({ page }) =
   await expectNoSidewaysScroll(page);
   await dialog.getByRole("button", { name: "Annuler" }).click();
   await expect(dialog).toBeHidden();
+});
+
+// v1.2 (§8.4, step 8d): the chat at 390 px: the message field, the emoji grid and the « Envoyer »
+// button fit the screen, and a very long word wraps instead of widening the page.
+test("/chat fits the screen at 390 px, emoji grid open, with a very long word", async ({ page }) => {
+  await signIn(page, ACCOUNTS.julien);
+  await page.goto("/chat");
+  const longWord = `https://exemple.test/${"tres-long-".repeat(20)}`;
+  await page.getByLabel("Ton message").fill(longWord);
+  await page.getByRole("button", { name: "Envoyer" }).click();
+  await expect(page.getByRole("log", { name: "Messages du chat" }).getByText(longWord)).toBeVisible();
+  // The address stays text: never a link (§5.15).
+  await expect(page.getByRole("log", { name: "Messages du chat" }).getByRole("link", { name: longWord })).toHaveCount(0);
+  await expectNoSidewaysScroll(page);
+
+  await page.getByRole("button", { name: "Ajouter un emoji" }).click();
+  const grid = page.getByRole("group", { name: "Emojis" });
+  await expect(grid).toBeVisible();
+  await expect(grid.getByRole("button", { name: "fusée" })).toBeInViewport();
+  for (const control of [page.getByLabel("Ton message"), page.getByRole("button", { name: "Envoyer" })]) {
+    await expect(control).toBeInViewport();
+  }
+  await expectNoSidewaysScroll(page);
+});
+
+// Step 8d (§8.2, decision of the user of 02/10/2026): with the Chat tab, the header is compacted
+// between 1 024 and 1 279 px; at 1 024 px, it no longer widens the page, for an admin (one more
+// link) as for a player, and every link of the navigation stays visible.
+test.describe("at 1 024 px", () => {
+  test.use({ viewport: { width: 1024, height: 768 } });
+
+  for (const [who, email] of [
+    ["an admin", ACCOUNTS.admin],
+    ["a player", ACCOUNTS.julien],
+  ] as const) {
+    test(`the header fits the screen for ${who}`, async ({ page }) => {
+      await signIn(page, email);
+      for (const url of ["/", "/chat", "/classement"]) {
+        await page.goto(url);
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+        const header = await page.getByRole("banner").locator("> div").evaluate((element) => element.scrollWidth - element.clientWidth);
+        expect(header, url).toBeLessThanOrEqual(0);
+      }
+      const navigation = page.getByRole("navigation", { name: "Navigation principale" });
+      for (const label of ["Accueil", "Mes pronos", "Classement", "Chat", "Palmarès", "Règlement"]) {
+        await expect(navigation.getByRole("link", { name: new RegExp(`^${label}`) })).toBeInViewport();
+      }
+      await expect(page.getByRole("banner").locator("summary[aria-label^='Mon compte']")).toBeInViewport();
+    });
+  }
 });

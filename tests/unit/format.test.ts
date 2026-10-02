@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, formatDate, formatDateTime, formatMalus, formatNumber, formatPercent, formatRelative, lowerFirst, malusText, rankSuffix } from "@/lib/format";
+import {
+  formatChatDay,
+  formatCount,
+  formatDate,
+  formatDateTime,
+  formatMalus,
+  formatNumber,
+  formatPercent,
+  formatRelative,
+  formatTime,
+  lowerFirst,
+  malusText,
+  parisDayKey,
+  rankSuffix,
+} from "@/lib/format";
 
 const NBSP = " ";
 
@@ -129,5 +143,32 @@ describe("formatPercent", () => {
 describe("rankSuffix", () => {
   it("writes 1er, then 2e, 3e…", () => {
     expect([1, 2, 3, 10, 21].map((rank) => `${rank}${rankSuffix(rank)}`)).toEqual(["1er", "2e", "3e", "10e", "21e"]);
+  });
+});
+
+describe("formatTime and formatChatDay (chat, §8.3)", () => {
+  it("gives the Paris time, with minutes only when there are some", () => {
+    expect(formatTime(new Date("2026-10-21T12:32:00Z"))).toBe("14 h 32");
+    expect(formatTime(new Date("2026-11-15T17:00:00Z"))).toBe("18 h");
+    expect(formatTime(new Date("2026-10-21T22:05:00Z"))).toBe("0 h 05");
+  });
+
+  it("names today and yesterday in Paris days, then the date, with the year if needed", () => {
+    const now = new Date("2026-10-21T10:00:00Z");
+    expect(formatChatDay(new Date("2026-10-20T22:30:00Z"), now)).toBe("Aujourd'hui");
+    expect(formatChatDay(new Date("2026-10-20T21:59:00Z"), now)).toBe("Hier");
+    expect(formatChatDay(new Date("2026-10-19T21:59:00Z"), now)).toBe("lun. 19 oct.");
+    expect(formatChatDay(new Date("2025-12-31T12:00:00Z"), now)).toBe("mer. 31 déc. 2025");
+  });
+
+  it("finds yesterday across a change of time", () => {
+    // Sunday 25 October 2026 has 25 hours in Paris; Monday 00:30 is 23:30 UTC on Sunday.
+    expect(formatChatDay(new Date("2026-10-25T00:30:00Z"), new Date("2026-10-25T23:30:00Z"))).toBe("Hier");
+    // Sunday 28 March 2027 has 23 hours; Monday 0:30 in Paris is 22:30 UTC on Sunday.
+    expect(formatChatDay(new Date("2027-03-27T23:30:00Z"), new Date("2027-03-28T22:30:00Z"))).toBe("Hier");
+  });
+
+  it("keys the Paris day of a date", () => {
+    expect(parisDayKey(new Date("2026-09-30T22:30:00Z"))).toBe("2026-10-01");
   });
 });

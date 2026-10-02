@@ -8,6 +8,8 @@ import {
   allowedEmail,
   announcement,
   category,
+  chatMessage,
+  chatRead,
   prediction,
   predictionEvent,
   prize,
@@ -37,7 +39,8 @@ import { seedSeasons } from "./seed-seasons";
 //
 // v1.2 (step 8c): malus, every choice question with its malus of a wrong answer, jokers allowed in
 // the three seasons, and the closed webinar question with a witness value, an extension and players
-// without a prediction (§9.6).
+// without a prediction (§9.6). Step 8d: a chat over two days, with emojis, a deleted message, the
+// result message of a resolved question, and a few accounts that read part of it.
 
 export const SEED_PASSWORD = "Test-1234!";
 /** Value of another player's prediction on an open question: must never reach the page (§9.3). */
@@ -96,6 +99,8 @@ export type SeedSummary = {
   prizes: number;
   standings: number;
   extensions: number;
+  chatMessages: number;
+  chatReads: number;
 };
 
 /** Erases every table of the public schema except app_meta, and restarts the identities. */
@@ -433,6 +438,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       correctedAt: daysAgo(7),
     });
     const r3Closes = daysAgo(6);
+    const r3ResolvedAt = daysAgo(3);
     const r3 = await addQuestion({
       category: "Intégration",
       type: "choice",
@@ -445,7 +451,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       closesAt: r3Closes,
       options: ["Caen", "Le Havre", "Paris"],
       result: "Le Havre",
-      resolvedAt: daysAgo(3),
+      resolvedAt: r3ResolvedAt,
     });
     await addPredictions(r1, playedOn(r1Closes), [
       { person: "sarah", answer: 240, validated: true },
@@ -680,6 +686,54 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       { seasonId: currentSeasonId, rankLabel: "3e", description: "Un mug de l'école", position: 3 },
     ]).returning();
 
+    // Chat (§9.6): a dozen messages over two days, in the order of their dates (the ids give the
+    // order of the thread), Thomas's deleted, and the result message of the Bachelor campus
+    // question, posted when it was resolved.
+    type ChatSpec = { at: Date; person?: Person; body?: string; deleted?: boolean; resultOf?: number };
+    const chatSpecs: ChatSpec[] = [
+      { at: r3ResolvedAt, resultOf: r3.id },
+      { at: shift(-26 * HOUR), person: "sarah", body: "Salut l'équipe 👋 Qui a déjà validé ses pronos de la semaine ?" },
+      { at: shift(-25.5 * HOUR), person: "julien", body: "Moi ! J'ai tenté le coup sur la JPO 🎯" },
+      { at: shift(-25 * HOUR), person: "lea", body: "Le résultat du campus Bachelor m'a surprise 😮\nJe n'aurais jamais dit Le Havre." },
+      { at: shift(-24 * HOUR), person: "thomas", deleted: true },
+      { at: shift(-22 * HOUR), person: "admin", body: "Rappel : ne donnez pas vos pronos dans le chat avant la clôture 😉" },
+      { at: shift(-5 * HOUR), person: "hugo", body: "Bravo à ceux qui avaient trouvé Le Havre 👏👏" },
+      { at: shift(-3 * HOUR), person: "ines", body: "Le webinaire a cartonné, à mon avis on sera tous loin 📈" },
+      { at: shift(-2 * HOUR), person: "mehdi", body: "De retour de congés, j'ai du retard sur mes pronos 😅" },
+      { at: shift(-40 * MINUTE), person: "sarah", body: "Qui vient au salon de Caen samedi ? ☕" },
+      { at: shift(-15 * MINUTE), person: "lea", body: "Moi ! 🙌" },
+    ];
+    chatSpecs.sort((a, b) => a.at.getTime() - b.at.getTime());
+    const chatIds: number[] = [];
+    for (const spec of chatSpecs) {
+      const [row] = await tx
+        .insert(chatMessage)
+        .values(
+          spec.resultOf !== undefined
+            ? { kind: "result", questionId: spec.resultOf, createdAt: spec.at }
+            : {
+                kind: "message",
+                userId: ids[spec.person!],
+                body: spec.deleted ? null : spec.body!,
+                createdAt: spec.at,
+                ...(spec.deleted ? { deletedAt: new Date(spec.at.getTime() + 5 * MINUTE), deletedBy: ids[spec.person!] } : {}),
+              },
+        )
+        .returning({ id: chatMessage.id });
+      chatIds.push(row.id);
+    }
+    // Sarah read everything; Julien and the admin, up to the admin's reminder; the others never
+    // opened the chat (every message unread, their own aside).
+    const reminderId = chatIds[chatSpecs.findIndex(({ person }) => person === "admin")];
+    const chatReads = await tx
+      .insert(chatRead)
+      .values([
+        { userId: ids.sarah, lastReadId: chatIds.at(-1)!, updatedAt: shift(-10 * MINUTE) },
+        { userId: ids.julien, lastReadId: reminderId, updatedAt: shift(-21 * HOUR) },
+        { userId: ids.admin, lastReadId: reminderId, updatedAt: shift(-21 * HOUR) },
+      ])
+      .returning();
+
     return {
       users: Object.keys(PEOPLE).length,
       allowedEmails: allowed.length,
@@ -692,6 +746,8 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       prizes: prizes.length,
       standings: standings.length,
       extensions: 1,
+      chatMessages: chatIds.length,
+      chatReads: chatReads.length,
     };
   });
 }

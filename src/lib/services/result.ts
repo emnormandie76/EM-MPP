@@ -1,3 +1,4 @@
+import { CHAT_MAX_LENGTH, CHAT_MAX_PER_MINUTE } from "@/lib/chat/constants";
 import { JOKERS_PER_SEASON } from "@/lib/game/constants";
 
 // Shared types of the write services (architecture §7.1). Services never throw for an expected
@@ -61,6 +62,11 @@ export const ERROR_MESSAGES = {
   EXTENSION_HAS_PREDICTION: "Ce joueur a déjà un prono sur cette question.",
   INVALID_EXTENSION_DATE: "La date limite doit être dans le futur et après la clôture de la question.",
   NO_EXTENSION: "Aucune prolongation en cours pour ce joueur.",
+  // General chat (v1.2, §5.15, step 8d).
+  EMPTY_MESSAGE: "Écris un message.",
+  MESSAGE_TOO_LONG: `${CHAT_MAX_LENGTH} caractères au maximum.`,
+  CHAT_RATE_LIMITED: `Doucement : ${CHAT_MAX_PER_MINUTE} messages par minute au maximum.`,
+  MESSAGE_NOT_FOUND: "Ce message n'existe plus.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

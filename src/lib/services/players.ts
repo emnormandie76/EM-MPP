@@ -1,10 +1,10 @@
 import { generateId } from "better-auth";
 import { hashPassword } from "better-auth/crypto";
-import { and, count, eq, like, ne, sql } from "drizzle-orm";
+import { and, count, eq, isNull, like, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { defaultAvatarFor } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
-import { account, allowedEmail, seasonStanding, session, user } from "@/lib/db/schema";
+import { account, allowedEmail, chatMessage, seasonStanding, session, user } from "@/lib/db/schema";
 import { normalizeEmail, parseEmail, splitEmailList } from "@/lib/validation/account";
 import { type Actor, authorize, type Failure, fail, fieldErrorsOf, isFailure, ok, type Result, type Role } from "./result";
 import { anonymizedEmail, hasAccount, isAnonymized, isDisplayNameTaken } from "./users";
@@ -221,7 +221,7 @@ async function nextAnonymousName(db: Database): Promise<string> {
 /**
  * Right to erasure (§6.3): the account keeps its predictions, so that the others' standings stay
  * right, but loses its name, address and avatar, is disabled and leaves the allow list. Its name
- * also leaves the palmarès.
+ * also leaves the palmarès, and its chat messages are erased (v1.2).
  */
 export async function anonymizeUser(
   db: Database,
@@ -257,6 +257,11 @@ export async function anonymizeUser(
     await tx.delete(allowedEmail).where(eq(allowedEmail.email, target.email));
     // The palmarès keeps ranks and malus, but not the name (decision of 30/09/2026).
     await tx.update(seasonStanding).set({ nameSnapshot: name }).where(eq(seasonStanding.userId, target.id));
+    // The chat messages are erased, as by a deletion (v1.2, §5.15).
+    await tx
+      .update(chatMessage)
+      .set({ body: null, deletedAt: now, deletedBy: me.id })
+      .where(and(eq(chatMessage.userId, target.id), isNull(chatMessage.deletedAt)));
     return ok({ name });
   });
 }

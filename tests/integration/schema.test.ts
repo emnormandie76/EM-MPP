@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db/client";
-import { allowedEmail, category, prediction, question, questionExtension, questionOption, season, seasonStanding } from "@/lib/db/schema";
+import { allowedEmail, category, chatMessage, prediction, question, questionExtension, questionOption, season, seasonStanding } from "@/lib/db/schema";
 import { createTestDb } from "../helpers/db";
 import { createCategory, createPrediction, createQuestion, createUser } from "../helpers/factories";
 
@@ -178,6 +178,44 @@ describe("database schema", () => {
     });
   });
 
+  describe("chat (v1.2)", () => {
+    it("ties a player's message to its author and a result message to its question, without text", async () => {
+      const player = await createUser(db);
+      const q = await createQuestion(db, { status: "published", opensAt, closesAt });
+      const createdAt = closesAt;
+      expect(await refusal(db.insert(chatMessage).values({ kind: "message", body: "Sans auteur", createdAt }))).toContain("chat_message_author");
+      expect(await refusal(db.insert(chatMessage).values({ kind: "result", createdAt }))).toContain("chat_message_question");
+      expect(await refusal(db.insert(chatMessage).values({ kind: "result", questionId: q.id, body: "Texte", createdAt }))).toContain(
+        "chat_message_result_no_body",
+      );
+      expect(
+        await refusal(db.insert(chatMessage).values({ kind: "message", userId: player.id, questionId: q.id, body: "Les deux", createdAt })),
+      ).toContain("chat_message_question");
+    });
+
+    it("keeps one result message per question", async () => {
+      const q = await createQuestion(db, { status: "published", opensAt, closesAt });
+      await db.insert(chatMessage).values({ kind: "result", questionId: q.id, createdAt: closesAt });
+      expect(await refusal(db.insert(chatMessage).values({ kind: "result", questionId: q.id, createdAt: closesAt }))).toContain(
+        "chat_message_result_unique",
+      );
+    });
+
+    it("holds a message of 1 to 500 characters until it is deleted, then no text, with who deleted it", async () => {
+      const player = await createUser(db);
+      const message = { kind: "message" as const, userId: player.id, createdAt: closesAt };
+      for (const body of [null, "", "a".repeat(501)]) {
+        expect(await refusal(db.insert(chatMessage).values({ ...message, body })), String(body?.length)).toContain("chat_message_body_length");
+      }
+      await db.insert(chatMessage).values({ ...message, body: "🎉".repeat(500) });
+      expect(await refusal(db.insert(chatMessage).values({ ...message, body: "Texte", deletedAt: closesAt, deletedBy: player.id }))).toContain(
+        "chat_message_deleted_no_body",
+      );
+      expect(await refusal(db.insert(chatMessage).values({ ...message, body: null, deletedAt: closesAt }))).toContain("chat_message_deleted_by");
+      await db.insert(chatMessage).values({ ...message, body: null, deletedAt: closesAt, deletedBy: player.id });
+    });
+  });
+
   describe("other tables", () => {
     it("keeps category names unique whatever the case", async () => {
       await createCategory(db, "Salons");
@@ -244,6 +282,7 @@ describe("database schema", () => {
         "question_closes_at_idx",
         "prediction_event_question_created_idx",
         "question_extension_user_idx",
+        "chat_message_user_created_idx",
       ]),
     );
   });

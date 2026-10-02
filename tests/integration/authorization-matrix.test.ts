@@ -6,6 +6,8 @@ import {
   allowedEmail,
   announcement,
   category,
+  chatMessage,
+  chatRead,
   prediction,
   predictionEvent,
   prize,
@@ -19,6 +21,7 @@ import {
 } from "@/lib/db/schema";
 import { createAnnouncement, deleteAnnouncement, updateAnnouncement } from "@/lib/services/announcements";
 import { archiveCategory, createCategory, renameCategory, unarchiveCategory } from "@/lib/services/categories";
+import { deleteChatMessage, markChatRead, postChatMessage } from "@/lib/services/chat";
 import { cancelQuestionExtension, setQuestionExtension } from "@/lib/services/extensions";
 import { addAllowedEmails, anonymizeUser, disableUser, enableUser, removeAllowedEmail, setRole, setTemporaryPassword } from "@/lib/services/players";
 import { savePrediction, setJoker, unlockPrediction, validatePrediction } from "@/lib/services/predictions";
@@ -125,6 +128,8 @@ async function snapshot(): Promise<string> {
     prize,
     announcement,
     seasonStanding,
+    chatMessage,
+    chatRead,
   ];
   const dumps = await Promise.all(tables.map(async (table) => (await db.select().from(table)).map((row) => JSON.stringify(row)).sort()));
   return JSON.stringify(dumps);
@@ -435,13 +440,39 @@ const CASES: { service: string; access: Access; prepare: () => Promise<Call> }[]
     access: "account",
     prepare: async () => (actor) => recordVisit(db, actor, now),
   },
+  // General chat (§5.15, v1.2)
+  {
+    service: "postChatMessage",
+    access: "account",
+    prepare: async () => (actor) => postChatMessage(db, actor, { body: "Bonjour l'équipe 👋" }, now),
+  },
+  {
+    service: "deleteChatMessage",
+    access: "account",
+    prepare: async () => {
+      // Each allowed profile deletes its own message (an admin may delete any).
+      const own = async (userId: string) =>
+        (await db.insert(chatMessage).values({ kind: "message", userId, body: "À supprimer", createdAt: clock.at("-1min") }).returning())[0];
+      const playerMessage = await own(player().id);
+      const adminMessage = await own(admin().id);
+      return (actor) => deleteChatMessage(db, actor, { messageId: actor?.id === admin().id ? adminMessage.id : playerMessage.id }, now);
+    },
+  },
+  {
+    service: "markChatRead",
+    access: "account",
+    prepare: async () => {
+      const [message] = await db.insert(chatMessage).values({ kind: "message", userId: admin().id, body: "À lire", createdAt: clock.at("-1min") }).returning();
+      return (actor) => markChatRead(db, actor, { lastMessageId: message.id }, now);
+    },
+  },
 ];
 
 const PROFILES: Profile[] = ["anonymous", "player", "disabled player", "disabled admin", "admin"];
 
 describe("authorization matrix (§6.5, §9.3)", () => {
-  it("covers the 36 write services of §7.3 (34 until step 8b, plus the 2 extension services of step 8c)", () => {
-    expect(new Set(CASES.map(({ service }) => service)).size).toBe(36);
+  it("covers the 39 write services of §7.3 (34 until step 8b, 2 extension services of step 8c, 3 chat services of step 8d)", () => {
+    expect(new Set(CASES.map(({ service }) => service)).size).toBe(39);
   });
 
   for (const { service, access, prepare } of CASES) {

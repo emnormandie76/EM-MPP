@@ -306,6 +306,55 @@ export const announcement = pgTable(
   (t) => [check("announcement_body_length", sql`char_length(${t.body}) between 1 and 500`)],
 );
 
+export const chatMessageKind = pgEnum("chat_message_kind", ["message", "result"]);
+
+/**
+ * Messages of the general chat (v1.2, §5.15), kept forever; their order is the one of the ids. A
+ * `message` is written by a player; a `result` is posted by the first entry of a question's result,
+ * and its text is computed on reading. Deleting a message erases its text.
+ */
+export const chatMessage = pgTable(
+  "chat_message",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    kind: chatMessageKind("kind").notNull(),
+    /** The author of a `message`; null for a `result`. */
+    userId: text("user_id").references(() => user.id),
+    /** The question of a `result`; null for a `message`. */
+    questionId: integer("question_id").references(() => question.id),
+    /** Text of a `message`; null for a `result` and once deleted. */
+    body: text("body"),
+    createdAt: timestamptz("created_at").notNull(),
+    deletedAt: timestamptz("deleted_at"),
+    deletedBy: text("deleted_by").references(() => user.id),
+  },
+  (t) => [
+    check("chat_message_author", sql`(${t.kind} = 'message') = (${t.userId} is not null)`),
+    check("chat_message_question", sql`(${t.kind} = 'result') = (${t.questionId} is not null)`),
+    check("chat_message_result_no_body", sql`${t.kind} = 'message' or ${t.body} is null`),
+    check(
+      "chat_message_body_length",
+      sql`${t.kind} <> 'message' or ${t.deletedAt} is not null or coalesce(char_length(${t.body}), 0) between 1 and 500`,
+    ),
+    check("chat_message_deleted_no_body", sql`${t.deletedAt} is null or ${t.body} is null`),
+    check("chat_message_deleted_by", sql`(${t.deletedAt} is null) = (${t.deletedBy} is null)`),
+    // One result message per question.
+    uniqueIndex("chat_message_result_unique").on(t.questionId).where(sql`${t.kind} = 'result'`),
+    // The limit of 10 messages a minute (§5.15).
+    index("chat_message_user_created_idx").on(t.userId, t.createdAt),
+  ],
+);
+
+/** Latest chat message read by each account: the unread badge of the Chat tab (§5.15). */
+export const chatRead = pgTable("chat_read", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id),
+  /** No foreign key: a deleted message must not be blocked by it. */
+  lastReadId: integer("last_read_id").notNull(),
+  updatedAt: timestamptz("updated_at").notNull(),
+});
+
 /** Final standings frozen at proclamation: the palmarès. */
 export const seasonStanding = pgTable(
   "season_standing",

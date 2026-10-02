@@ -6,6 +6,8 @@ import {
   allowedEmail,
   announcement,
   category,
+  chatMessage,
+  chatRead,
   prediction,
   predictionEvent,
   prize,
@@ -19,6 +21,7 @@ import { JOKERS_PER_SEASON } from "@/lib/game/constants";
 import { questionStatus } from "@/lib/game/question-status";
 import { seasonAt, seasonStartFromLocalDate } from "@/lib/game/time";
 import { isNew, newReference } from "@/lib/game/visits";
+import { getChatMessages, getUnreadChatCount } from "@/lib/data/chat";
 import { markAsProduction, openPglite, type ScriptDb } from "../../scripts/lib/db";
 import { CLOSED_WITNESS_VALUE, SEED_PASSWORD, SeedRefusedError, seedDatabase, WITNESS_VALUE } from "../../scripts/lib/seed";
 
@@ -64,6 +67,8 @@ describe("seed (scripts/seed.ts)", () => {
       prizes: 3,
       standings: 9,
       extensions: 1,
+      chatMessages: 11,
+      chatReads: 3,
     });
 
     const users = await db.select().from(user);
@@ -252,6 +257,37 @@ describe("seed (scripts/seed.ts)", () => {
     expect(open.filter(({ opensAt }) => isNew(opensAt!, reference)).map(({ title }) => title)).toEqual([
       "Le taux d'intégration du Bachelor dépassera-t-il 60 % ?",
     ]);
+  });
+
+  it("fills the chat over two days: emojis, a deleted message, a result message, some accounts that read it (§9.6, step 8d)", async () => {
+    target = await migratedDb();
+    const { db } = target;
+    await seedDatabase(db, { now: MID_SEASON, env: {} });
+
+    const rows = await db.select().from(chatMessage).orderBy(chatMessage.id);
+    expect(rows).toHaveLength(11);
+    // The ids follow the dates, so the thread is in chronological order.
+    expect(rows.map(({ createdAt }) => createdAt.getTime())).toEqual(rows.map(({ createdAt }) => createdAt.getTime()).sort((a, b) => a - b));
+    expect(rows.every(({ createdAt }) => createdAt < MID_SEASON)).toBe(true);
+    expect(new Set(rows.filter(({ userId }) => userId).map(({ userId }) => userId)).size).toBeGreaterThanOrEqual(6);
+    expect(rows.filter(({ body }) => body && /\p{Extended_Pictographic}/u.test(body)).length).toBeGreaterThanOrEqual(5);
+    expect(rows.filter(({ deletedAt }) => deletedAt)).toEqual([expect.objectContaining({ kind: "message", body: null })]);
+
+    const [result] = rows.filter(({ kind }) => kind === "result");
+    const [campus] = await db.select().from(question).where(eq(question.id, result.questionId!));
+    expect(campus.title).toBe("Quel campus comptera le plus d'intégrés en Bachelor ?");
+    expect(result.createdAt).toEqual(campus.resolvedAt);
+
+    const [sarah] = await db.select().from(user).where(eq(user.email, "joueur1@example.test"));
+    const [hugo] = await db.select().from(user).where(eq(user.email, "joueur8@example.test"));
+    const page = await getChatMessages(db, { id: hugo.id, role: "player" }, {}, MID_SEASON);
+    expect(page.messages.find(({ kind }) => kind === "result")?.result?.text).toBe(
+      "Résultat : Quel campus comptera le plus d'intégrés en Bachelor ? → Le Havre. 5 bonnes réponses sur 8 pronos.",
+    );
+    expect(await db.select().from(chatRead)).toHaveLength(3);
+    expect(await getUnreadChatCount(db, { id: sarah.id, role: "player" })).toBe(0);
+    // Hugo never opened the chat: every message but his own and the deleted one.
+    expect(await getUnreadChatCount(db, { id: hugo.id, role: "player" })).toBe(9);
   });
 
   it("gives every account the password Test-1234!, hashed the Better Auth way", async () => {

@@ -14,7 +14,7 @@
 >     - couleur principale #0036B3 (§8.1).
 >   - **É8d** : chat général avec grille d'emojis et message automatique au résultat (§5.15).
 >   - Sections touchées : §1.1, §2, §4.3, §5, §6.4 à §6.6, §7.3, §7.4, §8, §9, §11, §13, annexes.
-> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6). Précisé pendant l'É8 (01/10/2026) : bordure `line-strong` foncée à #7E8796 (§8.1), classement compact sur téléphone (§8.3, §8.4), conteneur défilant des tableaux et squelettes de chargement (§2, §8.3, §8.4), page d'erreur globale (§8.3), contrôle de visibilité dans le layout de `/questions/[id]` (§7.4, §8.3), tests à 390 px (§9.4), streaming (§14). Précisé après la recette par un agent (01/10/2026, rapport `docs/recette/rapport-recette-2026-10-01.md`) : prono Juste Prix qui dépasse hors de l'écart moyen (§5.5, §5.6), étiquette « TOI » à côté du point (§5.7, §8.2), jokers masqués dans l'historique avant la clôture (§6.6), titre des pages d'admin caché aux joueurs (§6.4), confirmation de la désactivation (§6.3), messages de résultat et grilles à 390 px (§8.4, §8.5), espace des milliers et année des dates (§8.6). Précisé à l'É8b (02/10/2026) : le site s'appelle « Les petits pronos de la promo », nom écrit une seule fois dans `APP_NAME` (`src/lib/app.ts`), logo sur deux lignes (§8.2), nouvelle adresse `les-petits-pronos-de-la-promo.vercel.app` (H-16), test de fumée en production lancé seul avec `BASE_URL` (§9.1).
+> - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6). Précisé pendant l'É8 (01/10/2026) : bordure `line-strong` foncée à #7E8796 (§8.1), classement compact sur téléphone (§8.3, §8.4), conteneur défilant des tableaux et squelettes de chargement (§2, §8.3, §8.4), page d'erreur globale (§8.3), contrôle de visibilité dans le layout de `/questions/[id]` (§7.4, §8.3), tests à 390 px (§9.4), streaming (§14). Précisé après la recette par un agent (01/10/2026, rapport `docs/recette/rapport-recette-2026-10-01.md`) : prono Juste Prix qui dépasse hors de l'écart moyen (§5.5, §5.6), étiquette « TOI » à côté du point (§5.7, §8.2), jokers masqués dans l'historique avant la clôture (§6.6), titre des pages d'admin caché aux joueurs (§6.4), confirmation de la désactivation (§6.3), messages de résultat et grilles à 390 px (§8.4, §8.5), espace des milliers et année des dates (§8.6). Précisé à l'É8b (02/10/2026) : le site s'appelle « Les petits pronos de la promo », nom écrit une seule fois dans `APP_NAME` (`src/lib/app.ts`), logo sur deux lignes (§8.2), nouvelle adresse `les-petits-pronos-de-la-promo.vercel.app` (H-16), test de fumée en production lancé seul avec `BASE_URL` (§9.1). Précisé à l'É8d (02/10/2026) : contraintes de `chat_message` (§4.3), marge d'une minute des interrogations, refus de `markChatRead`, texte du message de résultat, lecture des messages plus anciens, réponse 400 de `/api/chat` (§5.15), pastille des non lus mise à jour à chaque page vue et en-tête compacté entre 1 024 et 1 279 px (§8.2, décision de l'utilisateur), chat en pleine hauteur d'écran (§8.3), pureté et vocabulaire de `src/lib/chat` (§9.3), arrêt de l'interrogation testé avec une horloge simulée (§9.4).
 > - Règles fonctionnelles : [cahier des charges v1.2](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
@@ -240,7 +240,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
    │  │                           ChoiceDistribution, ResultPanel, BadgeList…
    │  ├─ layout/                  AppHeader, AdminNav, Footer, VisitTracker
    │  ├─ chat/                    ChatRoom (client, interrogation périodique), ChatMessage,
-   │  │                           ChatComposer, EmojiPalette (É8d)
+   │  │                           ChatComposer, EmojiPalette, UnreadChat (pastille des non lus) (É8d)
    │  └─ avatars/                 16 maillots SVG + Avatar
    └─ lib/
       ├─ game/                    règles pures (§5), aucune dépendance à Next ou à la base
@@ -257,7 +257,8 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
       │  ├─ visits.ts             pastille « Nouveau »
       │  └─ countdown.ts
       ├─ chat/                    emojis.ts (palette), polling.ts (règle pure de l'interrogation
-      │                           périodique), result-message.ts (texte du message de résultat) (É8d)
+      │                           périodique), result-message.ts (texte du message de résultat),
+      │                           message-body.ts (texte et longueur d'un message), constants.ts (É8d)
       ├─ format.ts                nombres et dates en français
       ├─ db/
       │  ├─ schema/               auth.ts (généré), app.ts, index.ts
@@ -536,7 +537,7 @@ Clé primaire `(question_id, user_id)` : une prolongation au plus par joueur et 
 | `deleted_at` | timestamptz | nullable |
 | `deleted_by` | text | → `user.id`, nullable |
 
-Contraintes : `CHECK ((kind = 'message') = (user_id IS NOT NULL))`, `CHECK ((kind = 'result') = (question_id IS NOT NULL))`, `CHECK (kind = 'message' OR body IS NULL)`, `CHECK (kind <> 'message' OR deleted_at IS NOT NULL OR char_length(body) BETWEEN 1 AND 500)`, `CHECK (deleted_at IS NULL OR body IS NULL)` ; index unique partiel `(question_id) WHERE kind = 'result'` (un seul message de résultat par question) ; index `(user_id, created_at)` (limite de 10 messages par minute).
+Contraintes : `chat_message_author` `CHECK ((kind = 'message') = (user_id IS NOT NULL))`, `chat_message_question` `CHECK ((kind = 'result') = (question_id IS NOT NULL))`, `chat_message_result_no_body` `CHECK (kind = 'message' OR body IS NULL)`, `chat_message_body_length` `CHECK (kind <> 'message' OR deleted_at IS NOT NULL OR coalesce(char_length(body), 0) BETWEEN 1 AND 500)` (le `coalesce` refuse aussi un message sans texte, que `char_length(NULL)` aurait laissé passer), `chat_message_deleted_no_body` `CHECK (deleted_at IS NULL OR body IS NULL)`, `chat_message_deleted_by` `CHECK ((deleted_at IS NULL) = (deleted_by IS NULL))` (ajoutée à l'É8d) ; index unique partiel `chat_message_result_unique` `(question_id) WHERE kind = 'result'` (un seul message de résultat par question) ; index `chat_message_user_created_idx` `(user_id, created_at)` (limite de 10 messages par minute). Migration `0004_chat`, uniquement des ajouts (É8d).
 
 **`chat_read`** : dernier message lu par chaque compte (pastille de l'onglet Chat, É8d).
 
@@ -1047,7 +1048,8 @@ Un fil unique pour toute l'équipe (cahier des charges §4.11). Les messages son
 **Arrivée des nouveaux messages** : Vercel ne garde pas de connexion ouverte (WebSocket), et le projet n'utilise aucun service tiers (§1.1). La page `/chat` interroge donc `GET /api/chat` toutes les `CHAT_POLL_MS` (10 s).
 - Elle ne le fait que si l'onglet est visible (`document.visibilityState`) et si la personne a agi dans les `CHAT_IDLE_MS` (5 min) précédentes : souris, clavier, défilement, focus.
 - Sinon elle se met en pause, et reprend aussitôt, avec une interrogation immédiate, dès que l'onglet redevient visible ou que la personne agit.
-- La règle est une fonction pure, `shouldPoll({ visible, lastActivityAt, now })`, dans `src/lib/chat/polling.ts`.
+- La règle est une fonction pure, `shouldPoll({ visible, lastActivityAt, now })`, dans `src/lib/chat/polling.ts` (dates en millisecondes ; pause dès que 5 min pile se sont écoulées depuis la dernière action).
+- Mise en œuvre (É8d) : en pause, la page ne garde aucune minuterie ; une interrogation demandée pendant qu'une autre est en cours (après l'envoi d'un message) passe juste après.
 - Sans cette pause, un onglet oublié toute la journée empêcherait la base Neon de se mettre en veille, et consommerait les quotas gratuits de Neon et de Vercel.
 
 **Écrire** `postChatMessage(db, actor, { body }, now)`
@@ -1057,33 +1059,38 @@ Un fil unique pour toute l'équipe (cahier des charges §4.11). Les messages son
   - longueur comptée en points de code Unicode (`[...texte].length`, comme `char_length` de PostgreSQL : un emoji simple compte pour 1) ;
   - vide : `EMPTY_MESSAGE`, « Écris un message. » ;
   - plus de 500 : `MESSAGE_TOO_LONG`, « 500 caractères au maximum. ».
-- Au plus `CHAT_MAX_PER_MINUTE` (10) messages par compte sur les 60 dernières secondes (ligne `user` verrouillée en `FOR NO KEY UPDATE`, puis comptage) : `CHAT_RATE_LIMITED`, « Doucement : 10 messages par minute au maximum. ».
+- Au plus `CHAT_MAX_PER_MINUTE` (10) messages par compte sur les 60 dernières secondes, messages supprimés compris (ligne `user` verrouillée en `FOR NO KEY UPDATE`, puis comptage) : `CHAT_RATE_LIMITED`, « Doucement : 10 messages par minute au maximum. ». Un message posté il y a exactement 60 s ne compte plus.
+- Un texte de plus de 10 000 caractères est refusé (`MESSAGE_TOO_LONG`) avant d'être lu (É8d).
 - Effet : insère un `message`.
 
 **Supprimer** `deleteChatMessage(db, actor, { messageId }, now)`
 - Un `message` non supprimé : par son auteur ou par un admin. Un message de résultat : par un admin seulement. Sinon `FORBIDDEN` ; message inconnu ou déjà supprimé : `MESSAGE_NOT_FOUND`, « Ce message n'existe plus. ».
 - Effet : `body = NULL` (le contenu est effacé, pas seulement masqué), `deleted_at = now`, `deleted_by = acteur`. L'affichage montre « Message supprimé. ». Pas de modification de message.
 
-**Marquer comme lu** `markChatRead(db, actor, { lastMessageId }, now)` : `chat_read.last_read_id = max(valeur actuelle, lastMessageId)`, en refusant un identifiant supérieur au plus grand message existant. Appelé par la page `/chat` quand elle affiche des messages, onglet visible.
+**Marquer comme lu** `markChatRead(db, actor, { lastMessageId }, now)` : `chat_read.last_read_id = max(valeur actuelle, lastMessageId)`, en refusant (`INVALID_INPUT`) un identifiant supérieur au plus grand message existant ; un identifiant plus petit ne change rien, `updated_at` compris. Appelé par la page `/chat` quand elle affiche des messages, onglet visible.
 
 **Message de résultat** : `resolveQuestion` (§5.11) insère un `result` à la première saisie du résultat, avec la question. Le texte est calculé à la lecture par `src/lib/chat/result-message.ts`, une fonction pure et testée :
-- nombre : « Résultat : <énoncé> → <valeur> <unité>. Le plus proche : <nom> » (« Les plus proches : Léa et Hugo » à égalité au rang 1) ;
+- nombre : « Résultat : <énoncé> → <valeur> <unité>. Le plus proche : <nom>. » (« Les plus proches : Hugo et Léa. » à égalité au rang 1, par ordre alphabétique ; « Élodie, Hugo et Léa » à trois) ;
 - choix : « Résultat : <énoncé> → <bonne réponse>. <n> bonne(s) réponse(s) sur <m> pronos. » ;
 - sans aucun prono, la seconde phrase est omise ;
-- « (corrigé) » est ajouté si le résultat a été corrigé ;
+- « (corrigé) » est ajouté si le résultat a été corrigé, après « Résultat » : « Résultat (corrigé) : … » ;
 - le message porte un lien vers la question ;
-- si la question est annulée ensuite, il n'est plus affiché.
+- si la question est annulée ensuite, il n'est plus affiché (ni compté dans les non lus) ;
+- une correction ou une annulation se voit au prochain chargement de `/chat` : l'interrogation ne renvoie pas les messages de résultat déjà affichés (précision de l'É8d). Un message de résultat supprimé par l'admin affiche « Message supprimé. ».
 
 **Anonymisation** (`anonymizeUser`, §6.3) : tous les messages du compte sont effacés comme une suppression (`deleted_by` = l'admin).
 
 **Lectures** (`src/lib/data/chat.ts`) :
 - `getChatMessages(db, viewer, { beforeId? }, now)` : les `CHAT_PAGE_SIZE` (50) messages précédant `beforeId`, ou les derniers. Chaque message contient l'identifiant, le type, la date, l'auteur (identifiant, nom, avatar, inactif), le texte ou « supprimé », le texte calculé d'un message de résultat, et `canDelete` ;
-- `getChatUpdates(db, viewer, { afterId, since }, now)` : les messages d'identifiant supérieur à `afterId` (100 au plus), les identifiants des messages supprimés depuis `since`, et `serverTime`, à repasser en `since` à l'appel suivant ;
-- `getUnreadChatCount(db, viewer)` : les messages d'identifiant supérieur à `chat_read.last_read_id` (ou tous, s'il n'a jamais ouvert le chat), hors les siens et hors les messages supprimés.
+- `getChatUpdates(db, viewer, { afterId, since }, now)` : les messages d'identifiant supérieur à `afterId` (100 au plus), les identifiants des messages supprimés depuis `since`, et `serverTime`, à repasser en `since` à l'appel suivant. Précision de l'É8d : les deux listes reprennent aussi la dernière minute avant `since` (messages créés ou supprimés), car un message peut être enregistré juste après une interrogation, avec une date ou un identifiant antérieurs ; la page fusionne par identifiant ;
+- `getUnreadChatCount(db, viewer)` : les messages d'identifiant supérieur à `chat_read.last_read_id` (ou tous, s'il n'a jamais ouvert le chat), hors les siens et hors les messages supprimés ;
+- les dates des messages sont en ISO (texte) : les mêmes objets passent en JSON par la route ;
+- « Messages plus anciens » appelle la Server Action `loadOlderChatMessagesAction({ beforeId })`, une lecture (`getChatMessages`) qui renvoie `null` sans session valide (É8d).
 
 **Route** `src/app/api/chat/route.ts` (`GET`, `after` et `since` en paramètres) :
 - lit la session (`getViewer`, en-têtes d'abord, §6.4) ;
 - sans session valide ou pour un compte désactivé : `401` avec `{ "error": "NOT_AUTHENTICATED" }`, et la page renvoie alors vers `/connexion` ;
+- `after` (entier) ou `since` (date) absent ou invalide : `400` avec `{ "error": "INVALID_INPUT" }` (É8d) ;
 - sinon : `200` avec le JSON de `getChatUpdates` ;
 - `Cache-Control: no-store`, rendu dynamique ;
 - aucun effet de bord : marquer comme lu passe par une Server Action.
@@ -1370,7 +1377,8 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 - **AppHeader** :
   - hauteur 72 px, fond `bg`, bordure basse `line` ;
   - logo : carré de 34 px `accent`, légèrement penché (`skewX(-8deg)`), icône `Target` en `accent-ink`, suivi du nom du site (`APP_NAME`, `src/lib/app.ts`) en display 19 px 800 italique et capitales, sur deux lignes (« LES PETITS PRONOS / DE LA PROMO », `APP_NAME_LINES`) : en une ligne de 26 px, le nom ne tenait pas à 390 px (É8b) ;
-  - navigation : Accueil, Mes pronos, Classement, Chat (É8d), Palmarès, Règlement, en display 17 px 700 capitales, bloc arrondi de 6 px ; lien actif sur fond `accent` avec texte `accent-ink`, les autres en `ink-2`, survol sur fond `chip`. « Chat » porte une pastille avec le nombre de messages non lus (« 9+ » au-delà de 9 ; nom accessible « Chat, 3 messages non lus »), calculée au rendu de la page (`getUnreadChatCount`), sans interrogation périodique hors de `/chat` ;
+  - navigation : Accueil, Mes pronos, Classement, Chat (É8d), Palmarès, Règlement, en display 17 px 700 capitales, bloc arrondi de 6 px ; lien actif sur fond `accent` avec texte `accent-ink`, les autres en `ink-2`, survol sur fond `chip`. « Chat » porte une pastille avec le nombre de messages non lus (« 9+ » au-delà de 9 ; nom accessible « Chat, 3 messages non lus »), calculée au rendu de la page (`getUnreadChatCount`), sans interrogation périodique hors de `/chat`. Mise en œuvre (É8d) : Next garde le layout, donc l'en-tête, d'une navigation à l'autre ; la Server Action de visite (`recordVisitAction`, §5.9) renvoie aussi le nombre de non lus, et la pastille (`UnreadChat`) suit chaque page vue. Elle est masquée sur `/chat` ;
+  - entre 1 024 et 1 279 px, l'en-tête est compacté : liens et blocs plus serrés, menu du compte réduit à l'avatar (décision de l'utilisateur du 02/10/2026, É8d : avec l'onglet « Chat », il dépassait de 103 px pour un admin et de 41 px pour un joueur à 1 024 px) ;
   - à droite : lien « ADMIN » pour les admins seulement, avatar de 36 px, nom, et un menu (Mon profil, Se déconnecter).
 - **AdminNav** : sous-navigation du back-office, avec Tableau de bord, Questions, Joueurs, Catégories, Saisons et lots, Annonces.
 - **AnnouncementBar** : carte `surface`, étiquette « ANNONCE » sur fond `accent`, texte en `ink-2` 15 px, date relative en `muted` 13 px (« il y a 2 h »).
@@ -1436,7 +1444,7 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 - **Chat** (É8d) :
   - `ChatRoom` (client) : liste et interrogation périodique (§5.15) ;
   - `ChatMessage` : avatar de 32 px, nom relié au profil, heure (« à 14 h 32 »), texte en `white-space: pre-wrap` et coupure des mots longs ; bouton « Supprimer le message » (icône `Trash2`, confirmation) si `canDelete` ; « Message supprimé. » en `muted` italique ;
-  - message de résultat : carte `accent-soft` avec l'icône `MessageCircle`, le texte et le lien « Voir la question » ;
+  - message de résultat : carte `accent-soft` avec l'icône `MessageCircle`, le texte (qui commence par « Résultat : »), l'heure et le lien « Voir la question » ;
   - `ChatComposer` : zone de texte libellée « Ton message », compteur « n / 500 », bouton `Smile` « Ajouter un emoji » (`aria-expanded`), bouton « ENVOYER ». Entrée envoie, Maj + Entrée va à la ligne (rappel affiché) ; bouton désactivé pendant l'envoi ;
   - `EmojiPalette` : grille de 8 colonnes des 48 emojis de `src/lib/chat/emojis.ts`, chaque emoji est un `<button>` dont le nom accessible est son nom français. Un clic insère l'emoji à la position du curseur et rend le focus à la zone de texte ; Échap ferme la grille ; navigation au clavier.
 
@@ -1536,7 +1544,8 @@ Les sections « barème (tableau des paliers) », « bonus podium » et « Juste
   - séparateurs de jour : « Aujourd'hui », « Hier », « mer. 21 oct. », avec l'année si besoin ;
   - au chargement, défilement jusqu'en bas ; un nouveau message fait défiler seulement si l'on était déjà en bas, sinon un bouton « Nouveaux messages » apparaît ;
   - en haut, le bouton « Messages plus anciens » charge les 50 précédents.
-- Champ d'écriture en bas de page (fixe sur téléphone), palette d'emojis.
+- Champ d'écriture en bas de page (fixe sur téléphone), palette d'emojis. Mise en œuvre (É8d) : la carte du chat occupe la hauteur de l'écran sous le titre ; le fil défile à l'intérieur et se réduit quand la palette s'ouvre, et le champ reste en bas de l'écran. Un champ « collé » au bas de l'écran cachait les derniers messages sur téléphone.
+- La suppression d'un message passe par une confirmation (« Supprimer ce message ? »).
 - EmptyState « Aucun message pour l'instant. Lance la discussion ! »
 - En cas d'erreur réseau, nouvel essai au tour suivant ; au troisième échec d'affilée, « Connexion perdue, nouvel essai… » discret. Une réponse `401` renvoie vers `/connexion`.
 
@@ -1601,7 +1610,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
   - les tableaux défilent horizontalement dans leur conteneur (`TableScroll`) : il est `relative`, pour que les textes réservés aux lecteurs d'écran ne débordent pas de la page, et devient une région nommée accessible au clavier tant que son tableau dépasse (É8) ; seul `/classement` affiche à la place la liste compacte, sous 640 px (§8.3) ;
   - le compte à rebours passe en version compacte.
 - À 390 px de large : aucun défilement horizontal de la page, toutes les actions restent accessibles. Points relevés à l'É8 : un `<input>` ou un `<fieldset>` impose sa largeur propre à son conteneur (`w-0` ou `min-w-0` le libère), et les tuiles « Réel, médiane, moyenne » passent sur deux lignes. Relevé à la recette (R-01) : une grille qui ne définit ses colonnes qu'à partir d'une largeur (`lg:grid-cols-12`) a, en dessous, une colonne implicite `auto`, qui prend la largeur du plus long nom ; toute grille de mise en page porte donc `grid-cols-1` (`minmax(0, 1fr)`). `e2e/responsive.spec.ts` vérifie les pages avec un nom de 30 caractères.
-- v1.2 : `/chat` à 390 px (champ d'écriture et palette visibles, longs mots coupés). L'onglet « Chat » ajouté à la navigation (É8d) allonge l'en-tête : vérifier aussi 1 024 px, où l'en-tête de l'admin dépassait déjà de 8 px (point ouvert de l'É8b, voir `avancement.md`).
+- v1.2 : `/chat` à 390 px (champ d'écriture et palette visibles, longs mots coupés). L'onglet « Chat » ajouté à la navigation (É8d) allonge l'en-tête : entre 1 024 et 1 279 px, il est compacté (§8.2), et `e2e/responsive.spec.ts` vérifie 1 024 px pour un admin et un joueur.
 
 ### 8.5 Accessibilité
 
@@ -1651,7 +1660,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 - **Confidentialité** : en bout en bout, la page d'une question ouverte ne contient jamais, dans son HTML, la valeur d'un prono d'un autre joueur (valeur témoin du seed : `987654`). Depuis la v1.2 (É8c), deux cas de plus :
   - la page d'une question clôturée sans résultat ne contient pas la valeur témoin `876543` pour un joueur qui n'a pas pronostiqué cette question, ni pour le joueur qui y a une prolongation ;
   - le prono d'un joueur en prolongation (valeur témoin saisie par le test) n'apparaît pas dans le HTML vu par un autre joueur, ni dans le back-office.
-- **Chat** (É8d) : `/api/chat` répond `401` sans session, et ne renvoie jamais de texte de message supprimé.
+- **Chat** (É8d) : `/api/chat` répond `401` sans session, et ne renvoie jamais de texte de message supprimé. Le test de pureté couvre aussi `src/lib/chat`, et le test du vocabulaire ses fichiers (textes du message de résultat, noms des emojis).
 
 ### 9.4 Bout en bout
 
@@ -1660,6 +1669,7 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 - Sélecteurs par rôle et par libellé (`getByRole`, `getByLabel`). `data-testid` seulement pour les zones sans rôle (compte à rebours, graphique).
 - Les tests importent `test` depuis `e2e/fixtures.ts` : chaque test y reçoit sa propre adresse client (`x-forwarded-for`), sinon la limitation des tentatives (5 connexions par minute et par adresse) bloquerait la suite. `signIn()` et `signOut()` passent par l'interface. Un test qui modifie un compte du seed (nom, mot de passe) le remet dans son état initial.
 - Accessibilité : `AxeBuilder` sur `/connexion`, `/`, `/pronos`, `/questions/<résolue>`, `/classement`, `/profil`, `/admin`, `/admin/questions/<id>`, et depuis la v1.2 `/questions/<clôturée, sans prono>` et `/chat` (palette ouverte comprise). Aucune violation `serious` ni `critical`. Depuis l'É8, aussi à 390 px sur les pages à tableaux (zones défilantes accessibles au clavier) ; après une navigation côté client, attendre le `<title>` avant axe (Next l'ajoute un peu plus tard).
+- Chat (`e2e/chat.spec.ts`, É8d) : l'arrêt de l'interrogation (onglet caché, inactivité de 5 min) et sa reprise immédiate sont vérifiés avec l'horloge simulée de Playwright (`page.clock`), en comptant les appels à `/api/chat`.
 - Responsive (`e2e/responsive.spec.ts`, É8) : à 390 × 844, pas de défilement horizontal sur toutes les pages du joueur et de l'admin ; menu, champ du prono et boutons visibles ; liste compacte de `/classement`. En-têtes (`e2e/headers.spec.ts`) : ceux du §3.3 sur les pages publiques, connectées, l'API et les redirections, `robots.txt`, balise `noindex`.
 
 ### 9.5 Seuils de couverture (`npm run test:coverage`)

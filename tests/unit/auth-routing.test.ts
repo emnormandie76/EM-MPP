@@ -4,13 +4,16 @@ import { isOpenAuthPath } from "@/lib/auth/http-paths";
 import { isPublicPath } from "@/lib/auth/public-paths";
 
 describe("pages reachable without a session (§6.4)", () => {
-  it.each(["/connexion", "/inscription", "/api/auth/sign-in/email", "/api/health"])("%s is public", (path) => {
+  it.each(["/connexion", "/inscription", "/api/auth/sign-in/email", "/api/health", "/api/chat"])("%s is public", (path) => {
     expect(isPublicPath(path)).toBe(true);
   });
 
-  it.each(["/", "/profil", "/admin", "/admin/joueurs", "/connexions", "/api/autre", "/inscription-bis"])("%s needs a session", (path) => {
-    expect(isPublicPath(path)).toBe(false);
-  });
+  it.each(["/", "/profil", "/admin", "/admin/joueurs", "/connexions", "/api/autre", "/inscription-bis", "/chat", "/api/chats"])(
+    "%s needs a session",
+    (path) => {
+      expect(isPublicPath(path)).toBe(false);
+    },
+  );
 });
 
 describe("Better Auth routes open over HTTP (decision of 30/09/2026)", () => {

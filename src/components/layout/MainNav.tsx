@@ -4,6 +4,7 @@ import { ChevronDown, LogOut, Menu, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Avatar } from "@/components/avatars/Avatar";
+import { useUnreadChat } from "@/components/chat/UnreadChat";
 import { signOutAction } from "@/lib/actions/auth";
 import type { AvatarKey } from "@/lib/avatars";
 import { useDetailsMenu } from "./useDetailsMenu";
@@ -12,6 +13,7 @@ const LINKS = [
   { href: "/", label: "Accueil" },
   { href: "/pronos", label: "Mes pronos" },
   { href: "/classement", label: "Classement" },
+  { href: "/chat", label: "Chat" },
   { href: "/palmares", label: "Palmarès" },
   { href: "/reglement", label: "Règlement" },
 ] as const;
@@ -23,21 +25,38 @@ function isActive(pathname: string, href: string) {
 }
 
 const LINK_CLASSES =
-  "rounded-button px-3.5 py-1.75 font-display text-[17px] font-bold uppercase tracking-[0.06em] whitespace-nowrap";
+  "rounded-button px-3.5 py-1.75 lg:px-2 xl:px-3.5 font-display text-[17px] font-bold uppercase tracking-[0.06em] whitespace-nowrap";
 const MENU_ITEM_CLASSES =
   "flex w-full items-center gap-2 rounded-button px-3.5 py-2 text-left text-[15px] font-semibold text-ink-2 hover:bg-chip";
 
+/** Badge of the Chat tab: the unread messages, "9+" beyond 9. The link's name says it in full. */
+function UnreadBadge({ count }: { count: number }) {
+  return (
+    <span
+      aria-hidden
+      className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-pill bg-hot px-1.5 align-[2px] font-sans text-xs font-bold tracking-normal text-accent-ink tabular-nums"
+    >
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+
 function NavLinks({ pathname }: { pathname: string }) {
+  const { count: unread } = useUnreadChat();
   return LINKS.map(({ href, label }) => {
     const active = isActive(pathname, href);
+    // Not on the chat itself, where the messages are being read.
+    const badge = href === "/chat" && unread > 0 && !active;
     return (
       <Link
         key={href}
         href={href}
         aria-current={active ? "page" : undefined}
+        aria-label={badge ? `${label}, ${unread === 1 ? "1 message non lu" : `${unread} messages non lus`}` : undefined}
         className={[LINK_CLASSES, active ? "bg-accent text-accent-ink" : "text-ink-2 hover:bg-chip"].join(" ")}
       >
         {label}
+        {badge ? <UnreadBadge count={unread} /> : null}
       </Link>
     );
   });
@@ -74,7 +93,7 @@ function AdminLink({ pathname, className }: { pathname: string; className: strin
   );
 }
 
-/** Account menu (from 1 024 px): avatar and name, then profile and sign-out. */
+/** Account menu (from 1 024 px): the avatar, with the name from 1 280 px (compact header, step 8d), then profile and sign-out. */
 function AccountMenu({ viewer }: { viewer: HeaderViewer }) {
   const menuRef = useDetailsMenu();
   return (
@@ -84,7 +103,7 @@ function AccountMenu({ viewer }: { viewer: HeaderViewer }) {
         className="flex cursor-pointer list-none items-center gap-2.5 rounded-button py-1 pr-1 pl-1 hover:bg-chip [&::-webkit-details-marker]:hidden"
       >
         <Avatar avatar={viewer.avatar} name={viewer.name} size={36} ring />
-        <span className="max-w-40 truncate text-[15px] font-semibold">{viewer.name}</span>
+        <span className="hidden max-w-40 truncate text-[15px] font-semibold xl:inline">{viewer.name}</span>
         <ChevronDown aria-hidden size={16} strokeWidth={2.4} className="text-muted" />
       </summary>
       <div className="absolute right-0 top-full z-10 mt-2 flex w-56 flex-col gap-1 rounded-card border border-line bg-surface p-2 shadow-lg">
@@ -104,10 +123,10 @@ export function MainNav({ viewer }: { viewer: HeaderViewer }) {
 
   return (
     <>
-      <nav aria-label="Navigation principale" className="hidden grow items-center gap-1.5 lg:flex">
+      <nav aria-label="Navigation principale" className="hidden grow items-center gap-0.5 lg:flex xl:gap-1.5">
         <NavLinks pathname={pathname} />
       </nav>
-      <div className="hidden items-center gap-5 lg:flex">
+      <div className="hidden items-center gap-3 lg:flex xl:gap-5">
         {viewer.isAdmin ? (
           <AdminLink
             pathname={pathname}

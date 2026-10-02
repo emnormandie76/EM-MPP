@@ -1,7 +1,7 @@
 import { and, asc, count, eq, gt, inArray, max } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "@/lib/db/client";
-import { category, prediction, question, questionExtension, questionOption } from "@/lib/db/schema";
+import { category, chatMessage, prediction, question, questionExtension, questionOption } from "@/lib/db/schema";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { COEFFICIENTS } from "@/lib/game/constants";
 import { parseNumberInput } from "@/lib/game/number-input";
@@ -583,7 +583,8 @@ const resolveInput = idInput.extend({
 /**
  * Real value or right answer (§5.11), once the question is closed and no extension runs on it (v1.2,
  * §5.14): the extended player must not answer once the result is known. The first entry sets
- * `resolved_at`; a later different entry is a correction, dated by `corrected_at`. Entering the
+ * `resolved_at` and posts the result message of the chat (step 8d); a later different entry is a
+ * correction, dated by `corrected_at`. Entering the
  * same result again changes nothing. The question is locked before its extensions are read
  * (FOR UPDATE: it waits for the extension services, which lock it too).
  */
@@ -638,6 +639,9 @@ export async function resolveQuestion(
       .update(question)
       .set({ ...result, ...(corrected ? { correctedAt: now } : { resolvedAt: now }), updatedAt: now })
       .where(eq(question.id, row.id));
+    // The chat announces the first entry (§5.15); its text is computed on reading, so a correction
+    // shows in it without a second message.
+    if (!corrected) await tx.insert(chatMessage).values({ kind: "result", questionId: row.id, createdAt: now });
     return ok({ corrected, unchanged: false });
   });
 }

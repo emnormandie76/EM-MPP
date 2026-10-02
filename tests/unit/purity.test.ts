@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 // Architecture §1.1 and §9.3: the rules of the game are pure functions. The time is a parameter
 // (no Date.now(), no new Date() without argument), and they never import Next or the database.
+// The rules of the chat (src/lib/chat, step 8d) follow the same rule.
 const FORBIDDEN = [
   /\bDate\.now\s*\(/g,
   /\bnew\s+Date\s*\(\s*\)/g,
@@ -12,11 +13,12 @@ const FORBIDDEN = [
 ];
 
 const GAME_DIR = fileURLToPath(new URL("../../src/lib/game", import.meta.url));
+const CHAT_DIR = fileURLToPath(new URL("../../src/lib/chat", import.meta.url));
 
-function gameFiles(): string[] {
-  return readdirSync(GAME_DIR, { recursive: true, encoding: "utf8" })
+function filesOf(dir: string): string[] {
+  return readdirSync(dir, { recursive: true, encoding: "utf8" })
     .filter((file) => file.endsWith(".ts"))
-    .map((file) => path.join(GAME_DIR, file));
+    .map((file) => path.join(dir, file));
 }
 
 function findForbidden(text: string): string[] {
@@ -36,10 +38,20 @@ describe("purity of src/lib/game", () => {
   });
 
   it("has files to scan", () => {
-    expect(gameFiles().length).toBeGreaterThanOrEqual(12);
+    expect(filesOf(GAME_DIR).length).toBeGreaterThanOrEqual(12);
   });
 
-  it.each(gameFiles().map((file) => [path.basename(file), file]))("%s reads no clock and imports no framework", (_, file) => {
+  it.each(filesOf(GAME_DIR).map((file) => [path.basename(file), file]))("%s reads no clock and imports no framework", (_, file) => {
+    expect(findForbidden(readFileSync(file, "utf8"))).toEqual([]);
+  });
+});
+
+describe("purity of src/lib/chat", () => {
+  it("has files to scan", () => {
+    expect(filesOf(CHAT_DIR).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it.each(filesOf(CHAT_DIR).map((file) => [path.basename(file), file]))("%s reads no clock and imports no framework", (_, file) => {
     expect(findForbidden(readFileSync(file, "utf8"))).toEqual([]);
   });
 });

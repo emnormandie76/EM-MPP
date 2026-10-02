@@ -227,6 +227,24 @@ export default async function RulesPage() {
         </ul>
       </Section>
 
+      <Section id="chat" title="Chat">
+        <ul className={LIST}>
+          <li>
+            <strong>Ne donne pas ton prono dans le chat avant la clôture.</strong> Rien ne l&apos;empêche techniquement : c&apos;est
+            une question de fair-play.
+          </li>
+          <li>
+            Tu peux supprimer tes messages ; l&apos;admin peut supprimer n&apos;importe quel message. Un message ne se modifie pas.
+          </li>
+          <li>Quand un résultat est saisi, un message l&apos;annonce dans le{" "}
+            <Link href="/chat" className="font-semibold text-accent-text hover:underline">
+              chat
+            </Link>
+            .
+          </li>
+        </ul>
+      </Section>
+
       <Section id="saisons" title="Saisons et palmarès">
         <ul className={LIST}>
           <li>

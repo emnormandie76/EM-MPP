@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getActor } from "@/lib/auth/session";
+import { getActor, getViewer } from "@/lib/auth/session";
+import { getUnreadChatCount } from "@/lib/data/chat";
 import { getDb } from "@/lib/db/client";
 import { recordVisit, updateAvatar, updateDisplayName } from "@/lib/services/profile";
 
@@ -24,7 +25,14 @@ export async function updateAvatarAction(_: unknown, formData: FormData) {
  * A page seen, once displayed (§5.9): called by VisitTracker. No revalidation, so that the
  * "Nouveau" badges of the page stay until the next one. Reading the session here, in a Server
  * Action, also renews it (at most once a day), which a page render cannot do.
+ *
+ * Returns the unread chat messages (step 8d, §8.2): Next keeps the layout, and so the header and its
+ * Chat badge, across the navigations between pages; the badge follows each page seen this way,
+ * without any periodic polling. Null without a valid session.
  */
-export async function recordVisitAction(): Promise<void> {
-  await recordVisit(getDb(), await getActor(), new Date());
+export async function recordVisitAction(): Promise<{ unreadChat: number } | null> {
+  const viewer = await getViewer();
+  const result = await recordVisit(getDb(), await getActor(), new Date());
+  if (!result.ok || !viewer) return null;
+  return { unreadChat: await getUnreadChatCount(getDb(), viewer) };
 }

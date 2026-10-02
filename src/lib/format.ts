@@ -1,5 +1,5 @@
 import { tz } from "@date-fns/tz";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { TIME_ZONE } from "./game/time";
 
@@ -60,18 +60,43 @@ export function formatDate(date: Date): string {
   return `${formatDayMonth(date)} ${format(date, "yyyy", { in: paris })}`;
 }
 
+/** "18 h", "18 h 30" (Paris time). */
+export function formatTime(date: Date): string {
+  const hour = format(date, "H", { in: paris });
+  const minutes = format(date, "mm", { in: paris });
+  return minutes === "00" ? `${hour} h` : `${hour} h ${minutes}`;
+}
+
+/** "mer. 21 oct.", with the year when `now` is given and the date is of another year (R-08). */
+function formatWeekday(date: Date, now?: Date): string {
+  const weekday = format(date, "EEE", { locale: fr, in: paris });
+  const year = format(date, "yyyy", { in: paris });
+  const day = now && year !== format(now, "yyyy", { in: paris }) ? formatDate(date) : formatDayMonth(date);
+  return `${weekday} ${day}`;
+}
+
 /**
  * "mer. 21 oct. à 18 h", "dim. 15 nov. à 18 h 30" (Paris time). Given `now`, a date of another
  * year carries it: "sam. 29 nov. 2025 à 23 h" (past seasons; test report of 01/10/2026, R-08).
  */
 export function formatDateTime(date: Date, now?: Date): string {
-  const weekday = format(date, "EEE", { locale: fr, in: paris });
-  const hour = format(date, "H", { in: paris });
-  const minutes = format(date, "mm", { in: paris });
-  const time = minutes === "00" ? `${hour} h` : `${hour} h ${minutes}`;
-  const year = format(date, "yyyy", { in: paris });
-  const day = now && year !== format(now, "yyyy", { in: paris }) ? formatDate(date) : formatDayMonth(date);
-  return `${weekday} ${day} à ${time}`;
+  return `${formatWeekday(date, now)} à ${formatTime(date)}`;
+}
+
+/** The Paris day of a date, "2026-10-21": two dates of the same day have the same key. */
+export function parisDayKey(date: Date): string {
+  return format(date, "yyyy-MM-dd", { in: paris });
+}
+
+/**
+ * Day separator of the chat (§8.3): "Aujourd'hui", "Hier", then "mer. 21 oct.", with the year when
+ * it is not the current one (Paris days).
+ */
+export function formatChatDay(date: Date, now: Date): string {
+  const day = parisDayKey(date);
+  if (day === parisDayKey(now)) return "Aujourd'hui";
+  if (day === parisDayKey(subDays(now, 1, { in: paris }))) return "Hier";
+  return formatWeekday(date, now);
 }
 
 /** "il y a 2 h", or the Paris date after a week. Future dates read "à l'instant". */
