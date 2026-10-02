@@ -11,9 +11,11 @@ import { useStaleResult } from "@/components/ui/useStaleResult";
 import { createSeasonAction, deleteSeasonAction, updateSeasonAction } from "@/lib/actions/content";
 import type { FormState } from "@/lib/actions/form-state";
 import { seasonStartFromLocalDate, suggestedSeasonLabel } from "@/lib/game/time";
+import { JOKERS_PER_SEASON } from "@/lib/game/constants";
 import { SEASON_NAME_MAX } from "@/lib/validation/content";
 
-// Seasons of /admin/saisons (architecture §5.13, §8.3): creation, renaming, start day, deletion.
+// Seasons of /admin/saisons (architecture §5.13, §8.3): creation, renaming, start day, jokers
+// allowed or not (v1.2), deletion.
 
 const ICON = { "aria-hidden": true, size: 16, strokeWidth: 2.4 } as const;
 const START_HINT = "La saison commence à 0 h, heure de Paris, ce jour-là.";
@@ -30,6 +32,51 @@ function formFeedback(state: FormState, fields: string[]) {
   return shown ? null : { tone: "error" as const, text: state.message };
 }
 
+/** "Jokers autorisés (2 par joueur)": a checkbox, with its hint and error linked to it. */
+function JokersCheckbox({
+  id,
+  defaultChecked,
+  disabled = false,
+  hint,
+  error,
+}: {
+  id: string;
+  defaultChecked: boolean;
+  disabled?: boolean;
+  hint?: string;
+  error?: string;
+}) {
+  const describedBy = [hint ? `${id}-hint` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="flex items-center gap-2.5 text-[15px] font-semibold has-disabled:cursor-not-allowed has-disabled:text-muted">
+        <input
+          id={id}
+          type="checkbox"
+          // A disabled checkbox is not sent: the setting is then left as it is.
+          name="jokersEnabled"
+          defaultChecked={defaultChecked}
+          disabled={disabled}
+          aria-describedby={describedBy}
+          aria-invalid={error ? true : undefined}
+          className="size-4.5 accent-accent"
+        />
+        Jokers autorisés ({JOKERS_PER_SEASON} par joueur)
+      </label>
+      {hint ? (
+        <p id={`${id}-hint`} className="text-[13px] text-muted">
+          {hint}
+        </p>
+      ) : null}
+      {error ? (
+        <p id={`${id}-error`} className="text-sm font-medium text-hot">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** Name suggested for a start day, or null while the date is incomplete. */
 function suggestionFor(startsOn: string): string | null {
   try {
@@ -40,7 +87,7 @@ function suggestionFor(startsOn: string): string | null {
 }
 
 /**
- * New season: name and start day. The name follows the start day ("2027-2028") until the admin
+ * New season: name, start day and jokers (allowed by default). The name follows the start day ("2027-2028") until the admin
  * types their own; once the season is created, the form offers the next one. When the seasons
  * change elsewhere on the page (a season deleted or moved), an untouched form follows the new
  * suggestion (test report of 01/10/2026, R-05: it kept a date based on the deleted season).
@@ -102,6 +149,7 @@ export function SeasonCreateForm({ suggestedStart, suggestedLabel }: { suggested
           className="w-64"
         />
       </div>
+      <JokersCheckbox id="new-season-jokers" defaultChecked hint="Un joker divise par deux le malus de la question où il est posé." />
       <Button type="submit" pending={pending} className="self-start">
         <Plus {...ICON} />
         Créer la saison
@@ -119,12 +167,15 @@ export type SeasonActionsProps = {
     startsOn: string;
     proclaimed: boolean;
     prizeCount: number;
+    jokersEnabled: boolean;
+    /** A joker is posed in the season: they can no longer be taken away. */
+    jokersPosed: boolean;
   };
   /** Why the season cannot be deleted, or null. */
   deleteBlocked: string | null;
 };
 
-/** Edit (inline form: name and start day) and delete (with confirmation) one season. */
+/** Edit (inline form: name, start day and jokers) and delete (with confirmation) one season. */
 export function SeasonActions({ season, deleteBlocked }: SeasonActionsProps) {
   const [editing, setEditing] = useState(false);
   const [editState, setEditState] = useState<FormState>(null);
@@ -181,6 +232,21 @@ export function SeasonActions({ season, deleteBlocked }: SeasonActionsProps) {
             className="w-64"
           />
         </div>
+        {/* Tells the action that the checkbox was there: unchecked, it is not sent. */}
+        {season.proclaimed ? null : <input type="hidden" name="jokersSent" value="1" />}
+        <JokersCheckbox
+          id={`season-${season.id}-jokers`}
+          defaultChecked={season.jokersEnabled}
+          disabled={season.proclaimed}
+          hint={
+            season.proclaimed
+              ? "Saison proclamée : le réglage des jokers ne change plus."
+              : season.jokersEnabled && season.jokersPosed
+                ? "Des jokers sont déjà posés dans cette saison : ils ne peuvent plus être retirés."
+                : undefined
+          }
+          error={fieldError(editState, "jokersEnabled")}
+        />
         <div className="flex flex-wrap gap-2">
           <Button type="submit" pending={pending}>
             Enregistrer
@@ -189,7 +255,7 @@ export function SeasonActions({ season, deleteBlocked }: SeasonActionsProps) {
             Annuler
           </Button>
         </div>
-        <FormMessage feedback={formFeedback(editState, ["label", "startsOn"])} />
+        <FormMessage feedback={formFeedback(editState, ["label", "startsOn", "jokersEnabled"])} />
       </form>
     );
   }

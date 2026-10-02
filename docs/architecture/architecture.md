@@ -1432,7 +1432,7 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 - **Tabs** : liens avec le compteur (« À FAIRE (3) »).
 - **EmptyState** : icône, phrase, action éventuelle.
 - **Footer** : « Les petits pronos de la promo · Saison 2026-2027 » (nom de la saison courante, rien s'il n'y en a pas) et liens Règlement, Lots, Palmarès.
-- **ExtensionDialog** (É8c, back-office) : `<dialog>` « Prolonger pour <nom> », champ date-heure (heure de Paris), prérempli 48 h plus tard à l'heure pile, et rappel « Le joueur ne verra pas les pronos des autres avant d'avoir répondu. Préviens-le toi-même. » ; boutons « Annuler » et « Prolonger ».
+- **ExtensionDialog** (É8c, back-office) : `<dialog>` « Prolonger pour <nom> », champ date-heure (heure de Paris), prérempli 48 h plus tard à l'heure pile, et rappel « Le joueur ne verra pas les pronos des autres avant d'avoir répondu. Préviens-le toi-même. » ; boutons « Annuler » et « Prolonger ». Précisé à l'É8c : les 48 h partent de la clôture de la question si elle est encore à venir (absence prévue, PR10), l'heure est arrondie à l'heure suivante ; « Changer la date » ouvre le même dialogue, prérempli avec la date limite en cours.
 - **Chat** (É8d) :
   - `ChatRoom` (client) : liste et interrogation périodique (§5.15) ;
   - `ChatMessage` : avatar de 32 px, nom relié au profil, heure (« à 14 h 32 »), texte en `white-space: pre-wrap` et coupure des mots longs ; bouton « Supprimer le message » (icône `Trash2`, confirmation) si `canDelete` ; « Message supprimé. » en `muted` italique ;
@@ -1482,7 +1482,7 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 - **Clôturée, j'ai un prono** : mon prono, le tableau des pronos visibles (joueur, valeur, joker), la sagesse de la foule et le StripChart (ou ChoiceDistribution), sans valeur réelle. Mention « Résultat attendu le … ». Si une prolongation court : « Prolongation en cours pour n joueur(s), jusqu'au … : son prono s'affichera ensuite. » (§6.6).
 - **Clôturée, je n'ai pas de prono** (v1.2) : « Tu n'as pas pronostiqué cette question : les pronos s'afficheront au résultat. », sans tableau ni graphique, et la mention « Résultat attendu le … ».
 - **Résolue** : ResultPanel complet ; tableau avec prono, écart, joker et malus par joueur, trié du plus petit malus au plus grand ; les joueurs du classement sans prono figurent en bas, « Pas de prono », avec leur malus d'absence (v1.2) ; « Résultat corrigé le … » le cas échéant.
-- **Annulée** : bandeau « Question annulée : aucun point n'est attribué et les jokers sont rendus. » Les pronos ne sont pas affichés.
+- **Annulée** : bandeau « Question annulée : aucun malus n'est attribué et les jokers sont rendus. » (« aucun point » jusqu'à la v1.1 ; vocabulaire du §8.6). Les pronos ne sont pas affichés.
 - **Brouillon ou programmée** : page 404 pour un joueur.
 
 **`/classement`**

@@ -19,7 +19,7 @@ import {
 import { user } from "./auth";
 
 // Application tables (architecture §4.3, indexes §4.4). Dates are timestamptz in UTC; typed
-// numbers are numeric(14, 2) read as `number`; points are never stored, except in the palmarès.
+// numbers are numeric(14, 2) read as `number`; malus are never stored, except in the palmarès.
 
 const timestamptz = (name: string) => timestamp(name, { withTimezone: true });
 const typedNumber = (name: string) => numeric(name, { precision: 14, scale: 2, mode: "number" });
@@ -72,6 +72,8 @@ export const season = pgTable(
     label: text("label").notNull(),
     /** 00:00 on its start day, Paris time; two seasons never start the same day. */
     startsAt: timestamptz("starts_at").notNull().unique(),
+    /** Jokers allowed during the season (v1.2, §5.13). */
+    jokersEnabled: boolean("jokers_enabled").notNull().default(true),
     proclaimedAt: timestamptz("proclaimed_at"),
     createdAt: createdAt(),
   },
@@ -106,7 +108,13 @@ export const question = pgTable(
       .notNull()
       .references(() => category.id),
     type: questionType("type").notNull(),
+    /**
+     * Juste Prix, removed in v1.2: the column stays (dropping it would be a destructive migration,
+     * §0.4), always false, and the code no longer reads it.
+     */
     priceIsRight: boolean("price_is_right").notNull().default(false),
+    /** Malus of a wrong answer, set on each choice question (v1.2, §5.5); null for a number. */
+    wrongAnswerMalus: typedNumber("wrong_answer_malus"),
     title: text("title").notNull(),
     description: text("description"),
     unit: text("unit"),
@@ -143,7 +151,9 @@ export const question = pgTable(
     ),
     check("question_title_length", sql`char_length(${t.title}) between 5 and 200`),
     check("question_description_length", sql`char_length(${t.description}) <= 2000`),
-    check("question_price_is_right_number", sql`not ${t.priceIsRight} or ${t.type} = 'number'`),
+    check("question_price_is_right_removed", sql`not ${t.priceIsRight}`),
+    check("question_wrong_answer_malus", sql`(${t.type} = 'choice') = (${t.wrongAnswerMalus} is not null)`),
+    check("question_wrong_answer_malus_positive", sql`${t.wrongAnswerMalus} > 0`),
     check("question_help_bi_url_http", sql`${t.helpBiUrl} ~ '^https?://'`),
     check("question_result_positive", sql`${t.resultNumber} >= 0`),
     // The right answer is one of the question's own options (§4.5).
@@ -239,6 +249,38 @@ export const predictionEvent = pgTable(
   (t) => [index("prediction_event_question_created_idx").on(t.questionId, t.createdAt)],
 );
 
+/**
+ * Extension of a question for one player (v1.2, §5.14): the admin reopens it for an absent player,
+ * until a personal deadline. At most one per player and question; changing it updates the row.
+ */
+export const questionExtension = pgTable(
+  "question_extension",
+  {
+    questionId: integer("question_id")
+      .notNull()
+      .references(() => question.id),
+    /** The player the question is extended for. */
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    /** The player's own deadline (excluded, like a closing). */
+    closesAt: timestamptz("closes_at").notNull(),
+    grantedBy: text("granted_by")
+      .notNull()
+      .references(() => user.id),
+    grantedAt: timestamptz("granted_at").notNull(),
+    /** Latest admin who changed the deadline or ended the extension. */
+    updatedBy: text("updated_by").references(() => user.id),
+    updatedAt: timestamptz("updated_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.questionId, t.userId] }),
+    // No one extends a question for themselves.
+    check("question_extension_not_self", sql`${t.userId} <> ${t.grantedBy}`),
+    index("question_extension_user_idx").on(t.userId),
+  ],
+);
+
 export const prize = pgTable("prize", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   seasonId: integer("season_id")
@@ -276,7 +318,10 @@ export const seasonStanding = pgTable(
       .references(() => user.id),
     /** With ties: 1, 1, 3… */
     rank: integer("rank").notNull(),
-    points: integer("points").notNull(),
+    /** Points of the seasons proclaimed with the v1.1 scale; never written since v1.2. */
+    points: integer("points"),
+    /** Total malus of the season (v1.2), written by every new proclamation. */
+    malus: numeric("malus", { precision: 16, scale: 2, mode: "number" }),
     bullseyes: integer("bullseyes").notNull(),
     // numeric(18, 6) rather than (10, 6): a relative error can exceed 9 999 (typing mistake).
     meanError: numeric("mean_error", { precision: 18, scale: 6, mode: "number" }),
@@ -284,5 +329,8 @@ export const seasonStanding = pgTable(
     /** Display name at the time of the proclamation. */
     nameSnapshot: text("name_snapshot").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.seasonId, t.userId] })],
+  (t) => [
+    primaryKey({ columns: [t.seasonId, t.userId] }),
+    check("season_standing_score", sql`${t.malus} is not null or ${t.points} is not null`),
+  ],
 );

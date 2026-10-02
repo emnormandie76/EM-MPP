@@ -1,6 +1,9 @@
+import { PODIUM_SIZE } from "./constants";
 import type { QuestionType } from "./scoring";
 
 // Badges (architecture §5.8), all deduced from resolved predictions and the palmarès, never stored.
+// v1.2: the "podium" is the proximity rank of §5.5, without any bonus; every prediction of a number
+// question takes part in it.
 
 export type BadgeKey = "first_bullseye" | "nostradamus" | "sharpshooter" | "joker_win" | "assiduous" | "champion";
 
@@ -20,8 +23,6 @@ export function badgeName(key: BadgeKey): string {
 
 /** Dans le mille needed in one season for Nostradamus. */
 const NOSTRADAMUS_BULLSEYES = 3;
-/** Podium ranks that win a bonus. */
-const PODIUM_SIZE = 3;
 
 /** One scored prediction of the player, on a resolved and not cancelled question. */
 export type BadgeResult = {

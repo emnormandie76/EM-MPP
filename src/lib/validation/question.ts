@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { COEFFICIENTS } from "@/lib/game/constants";
+import { parseNumberInput } from "@/lib/game/number-input";
 import { parisLocalToUtc } from "@/lib/game/time";
 
 // Question inputs shared by the services and the back-office forms (architecture §5.11, §8.3).
@@ -19,13 +20,12 @@ export const QUESTION_LIMITS = {
   optionsMax: 10,
 } as const;
 
-/** The four kinds of the form: a number, a "Juste Prix" number, a choice, or the yes/no template. */
-export const QUESTION_KINDS = ["number", "priceIsRight", "choice", "yesNo"] as const;
+/** The kinds of the form: a number, a choice, or the yes/no template. The Juste Prix is gone (v1.2). */
+export const QUESTION_KINDS = ["number", "choice", "yesNo"] as const;
 export type QuestionKind = (typeof QUESTION_KINDS)[number];
 
 export const QUESTION_KIND_LABELS: Record<QuestionKind, string> = {
   number: "Nombre",
-  priceIsRight: "Nombre Juste Prix",
   choice: "Choix",
   yesNo: "Oui/Non",
 };
@@ -59,6 +59,8 @@ export const QUESTION_MESSAGES = {
   closesBeforeOpens: "La clôture doit être après l'ouverture.",
   resultBeforeCloses: "Le résultat prévu ne peut pas être avant la clôture.",
   closesInPast: "La clôture doit être dans le futur.",
+  wrongAnswerMalus: "Indique le malus d'une mauvaise réponse.",
+  wrongAnswerMalusZero: "Le malus doit être supérieur à 0.",
 } as const;
 
 const M = QUESTION_MESSAGES;
@@ -89,6 +91,28 @@ export const localDateTimeSchema = z
 
 const HTTP_URL = /^https?:\/\/[^\s]+$/i;
 
+/**
+ * Malus of a wrong answer (v1.2, §5.11), typed like a prediction (§5.3), strictly positive, with no
+ * default value; empty means null (required for a choice, checked by `shapeOf`).
+ */
+export const wrongAnswerMalusSchema = z
+  .string(M.wrongAnswerMalus)
+  .nullable()
+  .transform((value, ctx) => {
+    const text = value?.trim() ?? "";
+    if (text === "") return null;
+    const parsed = parseNumberInput(text);
+    if (!parsed.ok) {
+      ctx.addIssue({ code: "custom", message: parsed.message });
+      return z.NEVER;
+    }
+    if (parsed.value === 0) {
+      ctx.addIssue({ code: "custom", message: M.wrongAnswerMalusZero });
+      return z.NEVER;
+    }
+    return parsed.value;
+  });
+
 /** Every field of the question form, each one optional: an update only sends what it changes. */
 export const questionFieldsSchema = z.object({
   kind: z.enum(QUESTION_KINDS, M.kind),
@@ -97,6 +121,7 @@ export const questionFieldsSchema = z.object({
   description: optionalText(L.descriptionMax, M.description),
   unit: optionalText(L.unitMax, M.unit),
   options: z.array(z.string(M.optionEmpty).trim(), M.optionsCount).max(L.optionsMax, M.optionsCount),
+  wrongAnswerMalus: wrongAnswerMalusSchema,
   source: z.string(M.source).trim().min(1, M.source).max(L.sourceMax, M.sourceLength),
   coefficient: z.coerce
     .number(M.coefficient)
@@ -122,35 +147,40 @@ export const updateQuestionSchema = questionFieldsSchema.partial().extend({
 
 export type QuestionShape = {
   type: "number" | "choice";
-  priceIsRight: boolean;
   unit: string | null;
   options: string[];
+  /** Malus of a wrong answer: set for a choice, null for a number (v1.2). */
+  wrongAnswerMalus: number | null;
 };
 
+export type ShapeError = { ok: false; field: "options" | "wrongAnswerMalus"; message: string };
+
 /**
- * Type, "Juste Prix", unit and answers of a kind (§4.5): a number has a unit and no answers; a
- * choice has 2 to 10 answers, non-empty and unique whatever the case, and no unit.
+ * Type, unit, answers and malus of a wrong answer of a kind (§4.5, §5.11): a number has a unit, no
+ * answers and no such malus (switching to a number clears it); a choice has 2 to 10 answers,
+ * non-empty and unique whatever the case, no unit, and a malus of a wrong answer.
  */
 export function shapeOf(
   kind: QuestionKind,
   unit: string | null | undefined,
   options: readonly string[] | undefined,
-): { ok: true; shape: QuestionShape } | { ok: false; message: string } {
-  if (kind === "number" || kind === "priceIsRight") {
-    return { ok: true, shape: { type: "number", priceIsRight: kind === "priceIsRight", unit: unit ?? null, options: [] } };
-  }
+  wrongAnswerMalus: number | null | undefined,
+): { ok: true; shape: QuestionShape } | ShapeError {
+  if (kind === "number") return { ok: true, shape: { type: "number", unit: unit ?? null, options: [], wrongAnswerMalus: null } };
   const labels = kind === "yesNo" ? [...YES_NO_OPTIONS] : (options ?? []).map((label) => label.trim());
-  if (labels.length < L.optionsMin || labels.length > L.optionsMax) return { ok: false, message: M.optionsCount };
-  if (labels.some((label) => label === "")) return { ok: false, message: M.optionEmpty };
-  if (labels.some((label) => label.length > L.optionLabelMax)) return { ok: false, message: M.optionLength };
+  const optionsError = (message: string): ShapeError => ({ ok: false, field: "options", message });
+  if (labels.length < L.optionsMin || labels.length > L.optionsMax) return optionsError(M.optionsCount);
+  if (labels.some((label) => label === "")) return optionsError(M.optionEmpty);
+  if (labels.some((label) => label.length > L.optionLabelMax)) return optionsError(M.optionLength);
   const keys = new Set(labels.map((label) => label.toLocaleLowerCase("fr")));
-  if (keys.size !== labels.length) return { ok: false, message: M.optionsDuplicate };
-  return { ok: true, shape: { type: "choice", priceIsRight: false, unit: null, options: labels } };
+  if (keys.size !== labels.length) return optionsError(M.optionsDuplicate);
+  if (wrongAnswerMalus === null || wrongAnswerMalus === undefined) return { ok: false, field: "wrongAnswerMalus", message: M.wrongAnswerMalus };
+  return { ok: true, shape: { type: "choice", unit: null, options: labels, wrongAnswerMalus } };
 }
 
 /** Kind shown in the form for a stored question: a choice answered "Oui", "Non" reads as yes/no. */
-export function kindOf(question: { type: "number" | "choice"; priceIsRight: boolean }, optionLabels: readonly string[]): QuestionKind {
-  if (question.type === "number") return question.priceIsRight ? "priceIsRight" : "number";
+export function kindOf(question: { type: "number" | "choice" }, optionLabels: readonly string[]): QuestionKind {
+  if (question.type === "number") return "number";
   const yesNo = optionLabels.length === 2 && optionLabels[0] === YES_NO_OPTIONS[0] && optionLabels[1] === YES_NO_OPTIONS[1];
   return yesNo ? "yesNo" : "choice";
 }

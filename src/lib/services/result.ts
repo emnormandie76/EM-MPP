@@ -52,6 +52,15 @@ export const ERROR_MESSAGES = {
   NO_PREDICTION: "Enregistre d'abord ton prono.",
   NO_JOKER_LEFT: `Tu as déjà utilisé tes ${JOKERS_PER_SEASON} jokers cette saison.`,
   NOT_VALIDATED: "Ce prono n'est pas validé.",
+  // Jokers by season and extensions (v1.2, §5.4, §5.13, §5.14, step 8c).
+  JOKERS_DISABLED: "Pas de joker cette saison.",
+  JOKERS_IN_USE: "Des jokers sont déjà posés dans cette saison : impossible de les retirer.",
+  EXTENSION_RUNNING: "Un joueur a une prolongation en cours : attends sa fin ou annule-la.",
+  SELF_EXTENSION: "Tu ne peux pas te prolonger toi-même : demande à l'autre admin.",
+  EXTENSION_NOT_ALLOWED: "Prolongation impossible : la question doit être ouverte ou clôturée, sans résultat.",
+  EXTENSION_HAS_PREDICTION: "Ce joueur a déjà un prono sur cette question.",
+  INVALID_EXTENSION_DATE: "La date limite doit être dans le futur et après la clôture de la question.",
+  NO_EXTENSION: "Aucune prolongation en cours pour ce joueur.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

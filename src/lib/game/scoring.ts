@@ -1,17 +1,19 @@
-import { BULLSEYE_POINTS, CHOICE_POINTS, JOKER_MULTIPLIER, PODIUM_BONUS, SCORE_TIERS } from "./constants";
+import { BULLSEYE_PERCENT, JOKER_DIVISOR } from "./constants";
 
-// Points of each prediction on a resolved question (architecture §5.5). Computed on every read,
-// never stored. Number comparisons are exact: values have at most 2 decimals, so they are
-// compared in integer hundredths.
+// Malus of each prediction on a resolved question (architecture §5.5, v1.2): the raw gap to the real
+// value, without any cap; the fewest malus wins. Computed on every read, never stored. Predictions,
+// real values and malus of a wrong answer have at most 2 decimals: everything is computed in exact
+// integer hundredths, and the malus stay in hundredths until they are displayed.
 
 export type QuestionType = "number" | "choice";
 
 export type ScoringQuestion = {
   type: QuestionType;
-  priceIsRight: boolean;
   coefficient: number;
   resultNumber: number | null;
   resultOptionId: number | null;
+  /** Malus of a wrong answer, for a choice question. */
+  wrongAnswerMalus: number | null;
 };
 
 export type ScoringPrediction = {
@@ -22,20 +24,26 @@ export type ScoringPrediction = {
 
 export type PredictionScore<P extends ScoringPrediction = ScoringPrediction> = {
   prediction: P;
-  /** Points of the scale (number) or of the right answer (choice). */
-  basePoints: number;
-  /** Rank among the eligible predictions of a number question, with ties (1, 1, 3); else null. */
-  podiumRank: number | null;
-  podiumBonus: number;
+  /** Gap (number) or malus of a wrong answer (choice), in hundredths, before coefficient and joker. */
+  baseMalus: number;
+  /** Malus of the question, in hundredths: base × coefficient, halved with a joker. */
+  total: number;
+  /** Relative error of 1 % or less (number question). It does not change the malus. */
   bullseye: boolean;
   /** |prediction − real| / |real| for a number question (infinite if real = 0 ≠ prediction); else null. */
   relativeError: number | null;
+  /** 1 + the number of predictions strictly closer, with ties (1, 1, 3), on a number question; else null. */
+  podiumRank: number | null;
+};
+
+export type QuestionScores<P extends ScoringPrediction = ScoringPrediction> = {
+  scores: PredictionScore<P>[];
   /**
-   * Juste Prix: the prediction went over the real value. Its relative error is shown, but it stays out
-   * of the mean error of the tie-break, like its points (decision of 01/10/2026).
+   * Malus of a player of the standings without a prediction (decision of 02/10/2026): the worst
+   * prediction's, in hundredths. Largest gap × coefficient (number), malus of a wrong answer ×
+   * coefficient (choice), 0 when nobody predicted.
    */
-  wentOver: boolean;
-  total: number;
+  absentMalus: number;
 };
 
 /** Exact integer hundredths of a value that has at most 2 decimals. */
@@ -43,89 +51,62 @@ export function toHundredths(value: number): number {
   return Math.round(value * 100);
 }
 
-/** First tier satisfied, else 0. In tier t (%) if and only if distance × 100 ≤ t × |real|. */
-function scalePoints(distance: number, real: number): number {
-  const tier = SCORE_TIERS.find(({ maxPercent }) => distance * 100 <= maxPercent * Math.abs(real));
-  return tier?.points ?? 0;
+/** A malus in hundredths divided by JOKER_DIVISOR (2), rounded to the hundredth, half up. */
+export function halveForJoker(hundredths: number): number {
+  return Math.floor((hundredths + 1) / JOKER_DIVISOR);
 }
 
-function podiumBonus(rank: number | null): number {
-  return rank === null ? 0 : (PODIUM_BONUS[rank - 1] ?? 0);
+function total(baseMalus: number, coefficient: number, joker: boolean): number {
+  const malus = baseMalus * coefficient;
+  return joker ? halveForJoker(malus) : malus;
 }
 
-function total(basePoints: number, bonus: number, coefficient: number, joker: boolean): number {
-  return (basePoints + bonus) * coefficient * (joker ? JOKER_MULTIPLIER : 1);
-}
-
-export function scoreQuestion<P extends ScoringPrediction>(
-  question: ScoringQuestion,
-  predictions: readonly P[],
-): PredictionScore<P>[] {
+export function scoreQuestion<P extends ScoringPrediction>(question: ScoringQuestion, predictions: readonly P[]): QuestionScores<P> {
   return question.type === "number" ? scoreNumber(question, predictions) : scoreChoice(question, predictions);
 }
 
-function scoreChoice<P extends ScoringPrediction>(question: ScoringQuestion, predictions: readonly P[]): PredictionScore<P>[] {
+function scoreChoice<P extends ScoringPrediction>(question: ScoringQuestion, predictions: readonly P[]): QuestionScores<P> {
   const answer = question.resultOptionId;
   if (answer === null) throw new Error("Cannot score a question with no result");
-  return predictions.map((prediction) => {
-    const basePoints = prediction.optionId === answer ? CHOICE_POINTS : 0;
+  if (question.wrongAnswerMalus === null) throw new Error("Cannot score a choice question without the malus of a wrong answer");
+  const wrong = toHundredths(question.wrongAnswerMalus);
+  const scores = predictions.map((prediction) => {
+    // No answer counts as a wrong answer, like an absence.
+    const baseMalus = prediction.optionId === answer ? 0 : wrong;
     return {
       prediction,
-      basePoints,
-      podiumRank: null,
-      podiumBonus: 0,
+      baseMalus,
+      total: total(baseMalus, question.coefficient, prediction.joker),
       bullseye: false,
       relativeError: null,
-      wentOver: false,
-      total: total(basePoints, 0, question.coefficient, prediction.joker),
+      podiumRank: null,
     };
   });
+  return { scores, absentMalus: predictions.length === 0 ? 0 : wrong * question.coefficient };
 }
 
-type NumberEvaluation = {
-  basePoints: number;
-  relativeError: number | null;
-  /** Distance in hundredths, when the prediction competes for the podium. */
-  podiumDistance: number | null;
-  wentOver: boolean;
-};
-
-function evaluateNumber(question: ScoringQuestion, real: number, value: number | null): NumberEvaluation {
-  if (value === null) return { basePoints: 0, relativeError: null, podiumDistance: null, wentOver: false };
-  const guess = toHundredths(value);
-  const distance = Math.abs(guess - real);
-  // Real value 0: the relative error does not exist; only 0 scores (100 points, from the scale).
-  const relativeError = real === 0 ? (distance === 0 ? 0 : Number.POSITIVE_INFINITY) : distance / Math.abs(real);
-  // Juste Prix: going over the real value scores nothing and leaves the podium.
-  const over = question.priceIsRight && guess > real;
-  return {
-    basePoints: over ? 0 : scalePoints(distance, real),
-    relativeError,
-    podiumDistance: over || !Number.isFinite(relativeError) ? null : distance,
-    wentOver: over,
-  };
-}
-
-function scoreNumber<P extends ScoringPrediction>(question: ScoringQuestion, predictions: readonly P[]): PredictionScore<P>[] {
+function scoreNumber<P extends ScoringPrediction>(question: ScoringQuestion, predictions: readonly P[]): QuestionScores<P> {
   if (question.resultNumber === null) throw new Error("Cannot score a question with no result");
   const real = toHundredths(question.resultNumber);
-  const evaluations = predictions.map((prediction) => evaluateNumber(question, real, prediction.valueNumber));
-  const distances = evaluations.flatMap(({ podiumDistance }) => (podiumDistance === null ? [] : [podiumDistance]));
+  const gaps = predictions.map(({ valueNumber }) => (valueNumber === null ? null : Math.abs(toHundredths(valueNumber) - real)));
+  const known = gaps.filter((gap) => gap !== null);
+  const absentMalus = known.length === 0 ? 0 : Math.max(...known) * question.coefficient;
 
-  return predictions.map((prediction, index) => {
-    const { basePoints, relativeError, podiumDistance, wentOver } = evaluations[index];
-    const podiumRank =
-      podiumDistance === null ? null : 1 + distances.filter((distance) => distance < podiumDistance).length;
-    const bonus = podiumBonus(podiumRank);
+  const scores = predictions.map((prediction, index) => {
+    const gap = gaps[index];
+    // A prediction without a value (impossible through the services) is treated as an absence.
+    if (gap === null) {
+      return { prediction, baseMalus: absentMalus, total: absentMalus, bullseye: false, relativeError: null, podiumRank: null };
+    }
     return {
       prediction,
-      basePoints,
-      podiumRank,
-      podiumBonus: bonus,
-      bullseye: basePoints === BULLSEYE_POINTS,
-      relativeError,
-      wentOver,
-      total: total(basePoints, bonus, question.coefficient, prediction.joker),
+      baseMalus: gap,
+      total: total(gap, question.coefficient, prediction.joker),
+      // Real value 0: only 0 is a Dans le mille.
+      bullseye: gap * 100 <= BULLSEYE_PERCENT * Math.abs(real),
+      relativeError: real === 0 ? (gap === 0 ? 0 : Number.POSITIVE_INFINITY) : gap / Math.abs(real),
+      podiumRank: 1 + known.filter((other) => other < gap).length,
     };
   });
+  return { scores, absentMalus };
 }

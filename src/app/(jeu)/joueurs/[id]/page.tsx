@@ -12,8 +12,8 @@ import { TableScroll } from "@/components/ui/TableScroll";
 import { requireUser } from "@/lib/auth/session";
 import { type AnswerView, getPlayerProfile, type PlayerProfile } from "@/lib/data/players";
 import { getDb } from "@/lib/db/client";
-import { formatCount, formatNumber, formatPercent, rankSuffix } from "@/lib/format";
-import { JOKER_MULTIPLIER } from "@/lib/game/constants";
+import { formatCount, formatMalus, formatNumber, formatPercent, rankSuffix } from "@/lib/format";
+import { JOKER_DIVISOR } from "@/lib/game/constants";
 
 export const metadata: Metadata = { title: "Joueur" };
 
@@ -26,7 +26,7 @@ function answerText({ valueNumber, optionLabel }: AnswerView, unit: string | nul
   return optionLabel ?? "—";
 }
 
-/** "3e · 185 points", or why there is no rank yet. */
+/** "3e · 185 de malus", or why there is no rank yet. */
 function Standing({ profile }: { profile: PlayerProfile }) {
   const { season, standing, resolvedCount } = profile;
   if (!season) return <p className="text-[15px] text-ink-2">Aucune saison en cours.</p>;
@@ -40,12 +40,18 @@ function Standing({ profile }: { profile: PlayerProfile }) {
         <span className="text-[22px]">{rankSuffix(standing.rank)}</span>
       </span>
       <span className="text-[34px] leading-none font-extrabold tabular-nums text-accent-text">
-        {standing.points}
-        <span className="ml-1 text-lg uppercase text-muted">points</span>
+        {formatMalus(standing.malus)} <span className="text-lg uppercase text-muted">de malus</span>
       </span>
       <span className="font-sans text-[15px] text-muted">Saison {season.label}</span>
     </p>
   );
+}
+
+/** "10 (4 %)": the raw gap of a number prediction, with the relative error. */
+function gapText(item: PlayerProfile["history"][number]): string {
+  if (item.gap === null) return "—";
+  const relative = item.relativeError === null || !Number.isFinite(item.relativeError) ? "" : ` (${formatPercent(item.relativeError)})`;
+  return `${formatMalus(item.gap)}${relative}`;
 }
 
 function HistoryTable({ profile }: { profile: PlayerProfile }) {
@@ -60,7 +66,7 @@ function HistoryTable({ profile }: { profile: PlayerProfile }) {
             <th scope="col" className={TH}>Réel</th>
             <th scope="col" className={`${TH} text-right`}>Écart</th>
             <th scope="col" className={TH}>Joker</th>
-            <th scope="col" className={`${TH} text-right`}>Points</th>
+            <th scope="col" className={`${TH} text-right`}>Malus</th>
           </tr>
         </thead>
         <tbody>
@@ -71,14 +77,12 @@ function HistoryTable({ profile }: { profile: PlayerProfile }) {
                   {item.title}
                 </Link>
               </th>
-              <td className={`${TD} tabular-nums`}>{answerText(item.answer, item.unit)}</td>
+              <td className={`${TD} tabular-nums`}>{item.answer ? answerText(item.answer, item.unit) : <span className="text-muted">Pas de prono</span>}</td>
               <td className={`${TD} tabular-nums`}>{answerText(item.real, item.unit)}</td>
-              <td className={`${TD} text-right tabular-nums`}>
-                {item.relativeError === null || !Number.isFinite(item.relativeError) ? "—" : formatPercent(item.relativeError)}
-              </td>
+              <td className={`${TD} text-right tabular-nums whitespace-nowrap`}>{gapText(item)}</td>
               <td className={TD}>
                 {item.joker ? (
-                  <span className="font-display font-extrabold uppercase tracking-[0.06em] text-accent-text">×{JOKER_MULTIPLIER}</span>
+                  <span className="font-display font-extrabold uppercase tracking-[0.06em] text-accent-text">÷{JOKER_DIVISOR}</span>
                 ) : (
                   <span className="text-muted">
                     <span aria-hidden>—</span>
@@ -86,7 +90,7 @@ function HistoryTable({ profile }: { profile: PlayerProfile }) {
                   </span>
                 )}
               </td>
-              <td className={`${TD} text-right font-display text-xl font-bold tabular-nums`}>{item.total}</td>
+              <td className={`${TD} text-right font-display text-xl font-bold tabular-nums`}>{formatMalus(item.malus)}</td>
             </tr>
           ))}
         </tbody>
@@ -96,8 +100,9 @@ function HistoryTable({ profile }: { profile: PlayerProfile }) {
 }
 
 /**
- * Public profile of a player (architecture §8.3): rank and points in the season shown, mean error,
- * Dans le mille, questions played, the 6 badges and the history of the resolved questions.
+ * Public profile of a player (architecture §8.3): rank and malus in the season shown, mean error,
+ * Dans le mille, questions played, the 6 badges and the history of the resolved questions, the
+ * ones without a prediction included, with the malus of the absence (v1.2).
  */
 export default async function PlayerPage({ params, searchParams }: PageProps<"/joueurs/[id]">) {
   const viewer = await requireUser();

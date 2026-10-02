@@ -1,17 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getQuestionHistory } from "@/lib/data/admin";
+import { eq } from "drizzle-orm";
 import { getHomeData } from "@/lib/data/home";
 import { getOpenQuestionsForViewer, getQuestionDetail, getQuestionPredictionsForViewer, getQuestionsList, isQuestionVisible } from "@/lib/data/questions";
+import { getQuestionResults } from "@/lib/data/results";
 import { getStandings } from "@/lib/data/standings";
 import type { Database } from "@/lib/db/client";
-import { predictionEvent } from "@/lib/db/schema";
+import { predictionEvent, question, season } from "@/lib/db/schema";
+import { utcToParisLocalInput } from "@/lib/game/time";
+import { setQuestionExtension } from "@/lib/services/extensions";
+import { savePrediction } from "@/lib/services/predictions";
 import { makeClock } from "../helpers/clock";
 import { createTestDb } from "../helpers/db";
 import { createCategory, createPrediction, createQuestion, createUser, ensureTestSeason } from "../helpers/factories";
 
 // Visibility of the predictions on the player pages (architecture §6.6, §11 É6): before the
 // closing, a player only receives their own prediction and the admin only states; after it,
-// everyone receives the values. Now is 5 October 2026, in the season 2026-2027 (from 28 September).
+// whoever predicted the question receives the values (v1.2: the others wait for the result, and the
+// prediction of a player whose extension runs stays hidden). Now is 5 October 2026, in the season
+// 2026-2027 (from 28 September).
 
 const clock = makeClock("2026-10-05T10:00:00Z");
 const now = clock.now;
@@ -126,7 +133,7 @@ describe("before the closing", () => {
 });
 
 describe("after the closing", () => {
-  it("everyone receives every value, with the jokers and the names", async () => {
+  it("whoever predicted the question receives every value, with the jokers and the names", async () => {
     const { admin, sarah, open } = await setUp();
     const afterClosing = clock.at("+3d");
     for (const viewer of [view(sarah), view(admin)]) {
@@ -235,9 +242,13 @@ describe("the player's reads", () => {
     await createPrediction(db, { questionId: resolved.id, userId: sarah.id, valueNumber: 240 });
     await createPrediction(db, { questionId: resolved.id, userId: julien.id, valueNumber: 300 });
     const list = await getQuestionsList(db, view(sarah), "resolved", now);
-    // 240 for 250: 4 %, 65 points, the closest (+20).
-    expect(list.items).toEqual([expect.objectContaining({ id: resolved.id, status: "resolved", state: "validated", myPoints: 85 })]);
+    // 240 for 250: a malus of 10 (v1.2), in hundredths.
+    expect(list.items).toEqual([expect.objectContaining({ id: resolved.id, status: "resolved", state: "validated", myMalus: 1_000, absent: false })]);
     expect((await getQuestionDetail(db, view(sarah), resolved.id, now))?.result).toEqual({ valueNumber: 250, optionId: null });
+    // The admin made no prediction: the malus of the worst one, 50 (Julien's 300).
+    const admin = (await db.select().from(question).where(eq(question.id, resolved.id)))[0].createdBy;
+    const adminList = await getQuestionsList(db, { id: admin, role: "admin" }, "resolved", now);
+    expect(adminList.items).toEqual([expect.objectContaining({ id: resolved.id, myMalus: 5_000, absent: true })]);
   });
 
   it("the home page: progress, the next closings, the standings and the jokers of the current season", async () => {
@@ -251,15 +262,157 @@ describe("the player's reads", () => {
     expect(home.closingSoon).toHaveLength(5);
     expect(home.closingSoon[0].id).toBe(open.id);
     expect(home.standings).toMatchObject({ season: { label: "2026-2027" }, resolvedCount: 1, mine: null });
-    // Julien: 100 + 20, with a joker.
-    expect(home.standings.top.map(({ name, points, rank }) => ({ name, points, rank }))).toEqual([
-      { name: "Julien", points: 240, rank: 1 },
-      { name: "Admin", points: 0, rank: 2 },
-      { name: "Sarah", points: 0, rank: 2 },
+    // Julien: exact, no malus, a Dans le mille; the only prediction is exact, so absent players take 0 (A4).
+    expect(home.standings.top.map(({ name, malus, rank }) => ({ name, malus, rank }))).toEqual([
+      { name: "Julien", malus: 0, rank: 1 },
+      { name: "Admin", malus: 0, rank: 2 },
+      { name: "Sarah", malus: 0, rank: 2 },
     ]);
     expect(home.standings.me).toMatchObject({ name: "Sarah", isViewer: true });
     expect(home.jokersLeft).toBe(2);
     // Julien has posed his 2 jokers of the season: on the open question and on the resolved one.
     expect((await getHomeData(db, view(julien), now)).jokersLeft).toBe(0);
+  });
+
+  it("v1.2: no jokers left to show in a season that does not allow them", async () => {
+    const { sarah } = await setUp();
+    await db.update(season).set({ jokersEnabled: false });
+    expect((await getHomeData(db, view(sarah), now)).jokersLeft).toBeNull();
+    expect((await getOpenQuestionsForViewer(db, view(sarah), now)).map(({ jokersLeft }) => jokersLeft)).toEqual([null]);
+  });
+});
+
+describe("v1.2: a closed question, an extension, players without a prediction (§6.6)", () => {
+  /** Witness value saved by the extended player: hidden from the others until his deadline. */
+  const EXTENDED_WITNESS = 555555;
+  const deadline = clock.at("+2d");
+
+  /**
+   * A question closed yesterday: Sarah 240, Julien the witness with a joker, the second admin 130.
+   * Mehdi, absent, has an extension until `deadline` and has saved a value; Léa and the first admin
+   * have no prediction.
+   */
+  async function closedSetUp() {
+    const admin = await createUser(db, { role: "admin", name: "Admin" });
+    const otherAdmin = await createUser(db, { role: "admin", name: "Bérénice" });
+    const sarah = await createUser(db, { name: "Sarah" });
+    const julien = await createUser(db, { name: "Julien" });
+    const mehdi = await createUser(db, { name: "Mehdi" });
+    const lea = await createUser(db, { name: "Léa" });
+    const categoryId = (await createCategory(db, "JPO")).id;
+    const q = await createQuestion(db, { categoryId, createdBy: admin.id, status: "published", opensAt: clock.at("-5d"), closesAt: clock.at("-1d") });
+    await createPrediction(db, { questionId: q.id, userId: sarah.id, valueNumber: 240 });
+    const julienPrediction = await createPrediction(db, { questionId: q.id, userId: julien.id, valueNumber: WITNESS, joker: true });
+    await createPrediction(db, { questionId: q.id, userId: otherAdmin.id, valueNumber: 130 });
+    await db.insert(predictionEvent).values({
+      predictionId: julienPrediction.id,
+      questionId: q.id,
+      ownerId: julien.id,
+      actorId: julien.id,
+      type: "saved",
+      valueNumber: WITNESS,
+      joker: false,
+      createdAt: clock.at("-3d"),
+    });
+    const adminActor = { id: admin.id, role: "admin" as const, banned: false };
+    expect(await setQuestionExtension(db, adminActor, { questionId: q.id, userId: mehdi.id, closesAt: utcToParisLocalInput(deadline) }, now)).toMatchObject({ ok: true });
+    expect(await savePrediction(db, { id: mehdi.id, role: "player", banned: false }, { questionId: q.id, rawValue: String(EXTENDED_WITNESS) }, now)).toMatchObject({
+      ok: true,
+    });
+    return { admin, otherAdmin, sarah, julien, mehdi, lea, q };
+  }
+
+  const names = (views: { name: string }[] | null) => views?.map(({ name }) => name);
+
+  it("a player who predicted sees the values, except the prediction of the player whose extension runs", async () => {
+    const { sarah, q } = await closedSetUp();
+    const views = await getQuestionPredictionsForViewer(db, view(sarah), q.id, now);
+    expect(views?.map(({ name, answer }) => [name, answer?.valueNumber])).toEqual([
+      ["Bérénice", 130],
+      ["Julien", WITNESS],
+      ["Sarah", 240],
+    ]);
+    const detail = await getQuestionDetail(db, view(sarah), q.id, now);
+    expect(detail?.othersExtended).toEqual({ count: 1, until: deadline });
+    const results = await getQuestionResults(db, view(sarah), detail!, now);
+    // The crowd leaves the hidden prediction out (§5.7).
+    expect(results?.crowd).toMatchObject({ kind: "number", count: 3 });
+    expectNoWitness([views, detail, results], [EXTENDED_WITNESS]);
+  });
+
+  it("a player without a prediction sees nothing before the result (decision of 02/10/2026)", async () => {
+    const { lea, q } = await closedSetUp();
+    expect(await getQuestionPredictionsForViewer(db, view(lea), q.id, now)).toEqual([]);
+    const detail = await getQuestionDetail(db, view(lea), q.id, now);
+    expect(detail).toMatchObject({ status: "closed", mine: null, othersExtended: { count: 1 } });
+    expectNoWitness([detail, await getQuestionResults(db, view(lea), detail!, now)], [WITNESS, EXTENDED_WITNESS, 240, 130]);
+  });
+
+  it("the extended player: open for him, his own prediction only, in his open questions with his deadline", async () => {
+    const { mehdi, sarah, q } = await closedSetUp();
+    const viewer = view(mehdi);
+    expect(names(await getQuestionPredictionsForViewer(db, viewer, q.id, now))).toEqual(["Mehdi"]);
+    const open = await getOpenQuestionsForViewer(db, viewer, now);
+    expect(open).toEqual([expect.objectContaining({ id: q.id, extendedUntil: deadline, deadline, isNew: false, state: "saved" })]);
+    expect((await getQuestionsList(db, viewer, "open", now)).items.map(({ id, extendedUntil }) => [id, extendedUntil])).toEqual([[q.id, deadline]]);
+    expect((await getQuestionsList(db, viewer, "closed", now)).items).toEqual([]);
+    expectNoWitness([open, await getQuestionDetail(db, viewer, q.id, now)], [WITNESS]);
+    // Not for another player.
+    expect(await getOpenQuestionsForViewer(db, view(sarah), now)).toEqual([]);
+  });
+
+  it("the back office: states only for an admin without a prediction; values except the extended player's for one who predicted", async () => {
+    const { admin, otherAdmin, q } = await closedSetUp();
+    const states = await getQuestionPredictionsForViewer(db, view(admin), q.id, now);
+    expect(states?.map(({ name, state, answer }) => [name, state, answer])).toEqual([
+      ["Bérénice", "validated", null],
+      ["Julien", "validated", null],
+      ["Mehdi", "saved", null],
+      ["Sarah", "validated", null],
+    ]);
+    const values = await getQuestionPredictionsForViewer(db, view(otherAdmin), q.id, now);
+    expect(values?.map(({ name, state, answer }) => [name, state, answer?.valueNumber ?? null])).toEqual([
+      ["Bérénice", "validated", 130],
+      ["Julien", "validated", WITNESS],
+      ["Mehdi", "saved", null],
+      ["Sarah", "validated", 240],
+    ]);
+    expectNoWitness([states, values], [EXTENDED_WITNESS]);
+    expectNoWitness(states, [WITNESS]);
+  });
+
+  it("the history: without values for an admin without a prediction; without the extended player's values otherwise", async () => {
+    const { admin, otherAdmin, q } = await closedSetUp();
+    const hidden = await getQuestionHistory(db, view(admin), q.id, now);
+    expect(hidden.map(({ ownerName, answer }) => [ownerName, answer])).toEqual([
+      ["Mehdi", null],
+      ["Julien", null],
+    ]);
+    expectNoWitness(hidden, [WITNESS, EXTENDED_WITNESS]);
+    const shown = await getQuestionHistory(db, view(otherAdmin), q.id, now);
+    expect(shown.map(({ ownerName, answer }) => [ownerName, answer?.valueNumber ?? null])).toEqual([
+      ["Mehdi", null],
+      ["Julien", WITNESS],
+    ]);
+    expectNoWitness(shown, [EXTENDED_WITNESS]);
+  });
+
+  it("after the deadline, the extended prediction shows to whoever predicted; at the result, to everyone", async () => {
+    const { sarah, lea, admin, q } = await closedSetUp();
+    const after = clock.at("+3d");
+    expect(names(await getQuestionPredictionsForViewer(db, view(sarah), q.id, after))).toEqual(["Bérénice", "Julien", "Mehdi", "Sarah"]);
+    expect(await getQuestionPredictionsForViewer(db, view(lea), q.id, after)).toEqual([]);
+    expect((await getQuestionDetail(db, view(lea), q.id, after))?.othersExtended).toBeNull();
+
+    await db.update(question).set({ resultNumber: 250, resolvedAt: after }).where(eq(question.id, q.id));
+    for (const viewer of [view(lea), view(admin)]) {
+      const views = await getQuestionPredictionsForViewer(db, viewer, q.id, after);
+      expect(views?.map(({ name, answer }) => [name, answer?.valueNumber])).toEqual([
+        ["Bérénice", 130],
+        ["Julien", WITNESS],
+        ["Mehdi", EXTENDED_WITNESS],
+        ["Sarah", 240],
+      ]);
+    }
   });
 });

@@ -35,6 +35,7 @@ export default async function NewQuestionPage() {
           description: "",
           unit: "",
           options: [],
+          wrongAnswerMalus: "",
           source: "",
           coefficient: 1,
           helpBiUrl: "",

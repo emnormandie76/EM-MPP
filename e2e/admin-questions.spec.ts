@@ -15,7 +15,7 @@ function parisLocal(days: number, time: string): string {
 
 async function createQuestion(
   page: Page,
-  question: { title: string; kind?: "Nombre" | "Choix"; unit?: string; options?: string[] },
+  question: { title: string; kind?: "Nombre" | "Choix"; unit?: string; options?: string[]; wrongAnswerMalus?: string },
 ): Promise<number> {
   await page.goto("/admin/questions/nouvelle");
   await page.getByRole("radio", { name: question.kind ?? "Nombre", exact: true }).check();
@@ -28,6 +28,7 @@ async function createQuestion(
       await page.getByLabel(`Réponse ${index + 1}`, { exact: true }).fill(label);
     }
   }
+  if (question.wrongAnswerMalus) await page.getByLabel("Malus d'une mauvaise réponse").fill(question.wrongAnswerMalus);
   await page.getByLabel("Source").fill("Tableau BI « JPO », feuilles d'émargement");
   await page.getByRole("button", { name: "Enregistrer le brouillon" }).click();
   // The page of the new question, with its notice; `?creee=1` leaves the address once shown (R-04).
@@ -36,8 +37,23 @@ async function createQuestion(
   return Number(/\/admin\/questions\/(\d+)/.exec(page.url())![1]);
 }
 
-test("the admin creates a number question and a choice question with 3 answers", async ({ page }) => {
+test("the admin creates a number question and a choice question with 3 answers and its malus", async ({ page }) => {
   await signIn(page, ACCOUNTS.admin);
+  // v1.2: no Juste Prix kind any more.
+  await page.goto("/admin/questions/nouvelle");
+  await expect(page.getByRole("radio", { name: /Juste Prix/ })).toHaveCount(0);
+  await expect(page.getByLabel("Malus d'une mauvaise réponse")).toHaveCount(0);
+
+  // A choice question without its malus of a wrong answer is refused.
+  await page.getByRole("radio", { name: "Oui/Non", exact: true }).check();
+  await page.getByLabel("Catégorie").selectOption({ label: "JPO" });
+  await page.getByLabel("Énoncé").fill("Le salon de Rouen dépassera-t-il 300 visiteurs ?");
+  await page.getByLabel("Source").fill("Compteur du stand");
+  await page.getByRole("button", { name: "Enregistrer le brouillon" }).click();
+  await expect(page.getByLabel("Malus d'une mauvaise réponse")).toHaveAccessibleDescription(/Indique le malus d'une mauvaise réponse\./);
+  await page.getByLabel("Malus d'une mauvaise réponse").fill("0");
+  await page.getByRole("button", { name: "Enregistrer le brouillon" }).click();
+  await expect(page.getByLabel("Malus d'une mauvaise réponse")).toHaveAccessibleDescription(/Le malus doit être supérieur à 0\./);
 
   const numberId = await createQuestion(page, { title: "Combien de participants au salon de Rouen ?", unit: "participants" });
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Combien de participants au salon de Rouen ?");
@@ -48,9 +64,12 @@ test("the admin creates a number question and a choice question with 3 answers",
     title: "Quel campus aura le plus de visiteurs au salon ?",
     kind: "Choix",
     options: ["Caen", "Le Havre", "Paris"],
+    wrongAnswerMalus: "150",
   });
   expect(choiceId).not.toBe(numberId);
   await expect(page.getByRole("radio", { name: "Choix", exact: true })).toBeChecked();
+  await expect(page.getByLabel("Malus d'une mauvaise réponse")).toHaveValue("150");
+  await expect(page.getByText("Mauvaise réponse : 150 de malus", { exact: true })).toBeVisible();
   for (const [index, label] of ["Caen", "Le Havre", "Paris"].entries()) {
     await expect(page.getByLabel(`Réponse ${index + 1}`, { exact: true })).toHaveValue(label);
   }
@@ -140,8 +159,10 @@ test("the admin enters, then corrects, the result of the seeded closed question"
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
   await expect(page.getByText("Clôturée", { exact: true })).toBeVisible();
 
-  // Before the result, the values of the closed question are visible to the admin.
-  await expect(page.getByRole("table", { name: "Suivi des joueurs" })).toContainText("262 visiteurs");
+  // v1.2: the admin did not predict this question: like the players, the values wait for the result.
+  await expect(page.getByText("Tu n'as pas pronostiqué cette question : comme les joueurs, tu verras les valeurs au résultat.")).toBeVisible();
+  await expect(page.getByRole("table", { name: "Suivi des joueurs" })).not.toContainText("262 visiteurs");
+  await expect(page.getByRole("table", { name: "Suivi des joueurs" })).toContainText("Validé");
 
   const value = page.getByLabel("Valeur réelle (visiteurs)");
   await value.fill("2.450");
@@ -157,6 +178,8 @@ test("the admin enters, then corrects, the result of the seeded closed question"
   await page.getByRole("button", { name: "Corriger le résultat" }).click();
   await expect(page.getByText("Résultat corrigé.", { exact: true })).toBeVisible();
   await expect(page.getByText(/Résultat corrigé le /)).toBeVisible();
+  // Once resolved, every value is shown.
+  await expect(page.getByRole("table", { name: "Suivi des joueurs" })).toContainText("262 visiteurs");
 
   await page.goto("/admin");
   await expect(page.getByRole("link", { name: `Saisir le résultat de « ${title} »` })).toHaveCount(0);

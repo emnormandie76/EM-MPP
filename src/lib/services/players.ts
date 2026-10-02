@@ -255,7 +255,7 @@ export async function anonymizeUser(
       .where(eq(user.id, target.id));
     await tx.delete(session).where(eq(session.userId, target.id));
     await tx.delete(allowedEmail).where(eq(allowedEmail.email, target.email));
-    // The palmarès keeps ranks and points, but not the name (decision of 30/09/2026).
+    // The palmarès keeps ranks and malus, but not the name (decision of 30/09/2026).
     await tx.update(seasonStanding).set({ nameSnapshot: name }).where(eq(seasonStanding.userId, target.id));
     return ok({ name });
   });

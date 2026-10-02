@@ -23,6 +23,19 @@ export function formatNumber(n: number): string {
   return numberFormat.format(n).replaceAll(NARROW_NBSP, NBSP);
 }
 
+/**
+ * A malus given in hundredths (§5.5, v1.2), as a positive number with at most 2 decimals: 25050
+ * gives "250,5". Never with a minus sign: the word "malus" says it all.
+ */
+export function formatMalus(hundredths: number): string {
+  return formatNumber(hundredths / 100);
+}
+
+/** "250,5 de malus". */
+export function malusText(hundredths: number): string {
+  return `${formatMalus(hundredths)} de malus`;
+}
+
 /** The first letter in lower case: a reason after a colon (« pas publiée : la clôture… », R-06). */
 export function lowerFirst(text: string): string {
   return text.charAt(0).toLocaleLowerCase("fr-FR") + text.slice(1);

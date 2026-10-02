@@ -12,12 +12,13 @@ import { type Actor, authorize, ERROR_MESSAGES, fail, type Failure, fieldErrorsO
 // Seasons, prizes and proclamation (architecture §5.1, §5.12, §5.13, §7.3). Seasons are created by
 // the admin (v1.1): each one ends where the next one starts, and a question belongs to the season
 // of its closing date. A change of the seasons recomputes the season of the questions in the same
-// transaction.
+// transaction. Each season allows jokers or not (v1.2).
 //
 // Locks: a change of the seasons (proclamation included) locks the season table (EXCLUSIVE), then
 // the questions. The question services read the seasons with FOR SHARE before locking their
 // question (`seasonsForQuestions`): a question never gets its season from a list being changed,
-// and the locks are always taken in the same order.
+// and the locks are always taken in the same order. setJoker reads them the same way, so that the
+// jokers of a season are not taken away while one is being posed.
 
 type SeasonRow = typeof season.$inferSelect;
 type SeasonShape = Pick<SeasonRow, "id" | "startsAt" | "proclaimedAt">;
@@ -114,14 +115,15 @@ async function applyMoves(tx: Database, moves: Move[], seasonIdOf: (id: number |
 // ---------------------------------------------------------------------------------------------
 // Create, update, delete (§5.13)
 
-const seasonInput = z.object({ label: seasonNameSchema, startsOn: seasonStartSchema });
+const seasonInput = z.object({ label: seasonNameSchema, startsOn: seasonStartSchema, jokersEnabled: z.boolean().optional() });
 
 /** Placeholder id of the season being created, while its moves are planned. */
 const NEW_SEASON = -1;
 
 /**
- * New season, with its name and start day. It takes its place in the list and takes over, from the
- * season before it, the questions that close from its start on. `moved`: questions that changed season.
+ * New season, with its name, start day and whether it allows jokers (yes by default). It takes its
+ * place in the list and takes over, from the season before it, the questions that close from its
+ * start on. `moved`: questions that changed season.
  */
 export async function createSeason(
   db: Database,
@@ -133,7 +135,7 @@ export async function createSeason(
   if (isFailure(me)) return me;
   const parsed = seasonInput.safeParse(input);
   if (!parsed.success) return fail("INVALID_INPUT", undefined, fieldErrorsOf(parsed.error.issues));
-  const { label, startsOn: startsAt } = parsed.data;
+  const { label, startsOn: startsAt, jokersEnabled = true } = parsed.data;
 
   try {
     return await db.transaction(async (tx) => {
@@ -146,7 +148,7 @@ export async function createSeason(
       });
       if (isFailure(planned)) return planned;
 
-      const [row] = await tx.insert(season).values({ label, startsAt, createdAt: now }).returning({ id: season.id });
+      const [row] = await tx.insert(season).values({ label, startsAt, jokersEnabled, createdAt: now }).returning({ id: season.id });
       await applyMoves(tx, planned.moves, (id) => (id === NEW_SEASON ? row.id : id), now);
       return ok({ id: row.id, moved: planned.moves.length });
     });
@@ -157,12 +159,23 @@ export async function createSeason(
   }
 }
 
-const updateInput = seasonInput.extend({ seasonId: z.coerce.number().int().positive() });
+const updateInput = seasonInput.partial().extend({ seasonId: z.coerce.number().int().positive() });
+
+/** Whether a joker is posed on a question of the season that is not cancelled (a cancelled one gave it back). */
+async function jokersPosed(tx: Database, seasonId: number): Promise<boolean> {
+  const [row] = await tx
+    .select({ n: count() })
+    .from(prediction)
+    .innerJoin(question, eq(question.id, prediction.questionId))
+    .where(and(eq(question.seasonId, seasonId), ne(question.status, "cancelled"), eq(prediction.joker, true)));
+  return row.n > 0;
+}
 
 /**
- * Renames a season and moves its start day, which stays strictly between the starts of the seasons
- * around it. The questions that change season are recomputed. A proclaimed season keeps its start
- * day, but can still be renamed.
+ * Renames a season, moves its start day, which stays strictly between the starts of the seasons
+ * around it, and allows or takes away its jokers; an absent field keeps its value. The questions
+ * that change season are recomputed. A proclaimed season keeps its start day and its jokers setting,
+ * but can still be renamed. The jokers cannot be taken away once one is posed in the season (v1.2).
  */
 export async function updateSeason(
   db: Database,
@@ -174,14 +187,25 @@ export async function updateSeason(
   if (isFailure(me)) return me;
   const parsed = updateInput.safeParse(input);
   if (!parsed.success) return fail("INVALID_INPUT", undefined, fieldErrorsOf(parsed.error.issues));
-  const { seasonId, label, startsOn: startsAt } = parsed.data;
+  const { seasonId } = parsed.data;
 
   try {
     return await db.transaction(async (tx) => {
       const seasons = await lockSeasons(tx);
       const current = seasons.find(({ id }) => id === seasonId);
       if (!current) return notFound();
+      const { label = current.label, startsOn: startsAt = current.startsAt, jokersEnabled = current.jokersEnabled } = parsed.data;
       if (await isNameTaken(tx, label, current.id)) return nameTaken();
+
+      if (jokersEnabled !== current.jokersEnabled) {
+        if (current.proclaimedAt) {
+          const message = "Cette saison est proclamée : le réglage des jokers ne peut plus changer.";
+          return fail("SEASON_PROCLAIMED", message, { jokersEnabled: message });
+        }
+        if (!jokersEnabled && (await jokersPosed(tx, current.id))) {
+          return fail("JOKERS_IN_USE", undefined, { jokersEnabled: ERROR_MESSAGES.JOKERS_IN_USE });
+        }
+      }
 
       let moves: Move[] = [];
       if (startsAt.getTime() !== current.startsAt.getTime()) {
@@ -204,7 +228,7 @@ export async function updateSeason(
         moves = planned.moves;
       }
 
-      await tx.update(season).set({ label, startsAt }).where(eq(season.id, current.id));
+      await tx.update(season).set({ label, startsAt, jokersEnabled }).where(eq(season.id, current.id));
       await applyMoves(tx, moves, (id) => id, now);
       return ok({ id: current.id, moved: moves.length });
     });
@@ -303,9 +327,10 @@ export function proclamationBlocker({ proclaimed, publishedCount, resolvedCount 
 
 /**
  * Freezes the final standings of a season (§5.12): computed as the standings page does (§5.6),
- * copied into `season_standing` with the names of the day, then `proclaimed_at = now`. Only once
- * every published question of the season is resolved. Irreversible: a later correction of a result
- * does not change the palmarès.
+ * copied into `season_standing` with the names of the day, then `proclaimed_at = now`. Since v1.2,
+ * the total malus goes to the `malus` column and `points` stays null. Only once every published
+ * question of the season is resolved (no extension runs then: it would have prevented the result).
+ * Irreversible: a later correction of a result does not change the palmarès.
  */
 export async function proclaimSeason(
   db: Database,
@@ -326,8 +351,8 @@ export async function proclaimSeason(
       .select({
         id: question.id,
         type: question.type,
-        priceIsRight: question.priceIsRight,
         coefficient: question.coefficient,
+        wrongAnswerMalus: question.wrongAnswerMalus,
         resultNumber: question.resultNumber,
         resultOptionId: question.resultOptionId,
         resolvedAt: question.resolvedAt,
@@ -368,7 +393,7 @@ export async function proclaimSeason(
           seasonId: current.id,
           userId: row.userId,
           rank: row.rank,
-          points: row.points,
+          malus: row.malus / 100,
           bullseyes: row.bullseyes,
           meanError: row.meanError,
           questionsPlayed: row.questionsPlayed,

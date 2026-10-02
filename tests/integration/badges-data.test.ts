@@ -13,8 +13,9 @@ import { createTestDb } from "../helpers/db";
 // - 2025-2026, proclaimed: candidatures (real 1 200), Sarah 1 210 (Dans le mille, closest), Inès, Julien,
 //   Camille, Thomas; choice "Oui": Sarah and Thomas wrong. Palmarès: Inès first. Sarah, Inès,
 //   Julien, Camille and Thomas played both questions (Assidu); Mehdi only the second.
-// - 2026-2027: Sarah closest on the JPO (P1) and on the Juste Prix (J3); Julien's joker on the JPO
-//   (2nd); Thomas's joker on the right campus.
+// - 2026-2027: Sarah closest on the JPO (P1) and on the BBA candidatures (A1, v1.2); Julien's joker
+//   on the JPO (2nd); Léa's joker on the BBA candidatures (3rd of 3: still among the 3 closest);
+//   Thomas's joker on the right campus.
 
 let db: Database;
 let close: () => Promise<void>;
@@ -52,7 +53,7 @@ describe("getPlayerBadges on the seed (§5.8)", () => {
     ["Camille", { sharpshooter: 1, assiduous: 1 }],
     ["Thomas", { joker_win: 1, assiduous: 1 }],
     ["Mehdi", {}],
-    ["Léa", {}],
+    ["Léa", { joker_win: 1 }],
     ["Hugo", {}],
     ["Admin", {}],
     ["Nora", {}],

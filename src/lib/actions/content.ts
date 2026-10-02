@@ -55,13 +55,19 @@ function seasonMessage(done: string, moved: number): string {
 }
 
 export async function createSeasonAction(_: FormState, formData: FormData): Promise<FormState> {
-  const input = { label: formData.get("label"), startsOn: formData.get("startsOn") };
+  const input = { label: formData.get("label"), startsOn: formData.get("startsOn"), jokersEnabled: formData.get("jokersEnabled") === "on" };
   const result = await createSeason(getDb(), await getActor(), input, new Date());
   return toFormState(result, seasonMessage("Saison créée.", result.ok ? result.data.moved : 0));
 }
 
 export async function updateSeasonAction(_: FormState, formData: FormData): Promise<FormState> {
-  const input = { seasonId: formData.get("seasonId"), label: formData.get("label"), startsOn: formData.get("startsOn") };
+  const input = {
+    seasonId: formData.get("seasonId"),
+    label: formData.get("label"),
+    startsOn: formData.get("startsOn"),
+    // An unchecked box is not sent; without the box (proclaimed season), the setting stays.
+    jokersEnabled: formData.has("jokersSent") ? formData.get("jokersEnabled") === "on" : undefined,
+  };
   const result = await updateSeason(getDb(), await getActor(), input, new Date());
   return toFormState(result, seasonMessage("Saison modifiée.", result.ok ? result.data.moved : 0));
 }

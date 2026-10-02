@@ -41,7 +41,6 @@ describe("getAdminQuestionsList", () => {
     });
     const previous = await createQuestion(db, {
       categoryId: candidatures.id,
-      priceIsRight: true,
       status: "published",
       opensAt: new Date("2026-09-01T08:00:00Z"),
       closesAt: new Date("2026-09-10T16:00:00Z"),
@@ -52,7 +51,7 @@ describe("getAdminQuestionsList", () => {
 
     const list = await getAdminQuestionsList(db, viewer, {}, now);
     expect(list.rows.map(({ id, kind, status, seasonLabel, predictionCount }) => ({ id, kind, status, seasonLabel, predictionCount }))).toEqual([
-      { id: previous.id, kind: "priceIsRight", status: "resolved", seasonLabel: "2025-2026", predictionCount: 0 },
+      { id: previous.id, kind: "number", status: "resolved", seasonLabel: "2025-2026", predictionCount: 0 },
       { id: open.id, kind: "yesNo", status: "open", seasonLabel: "2026-2027", predictionCount: 1 },
       { id: draft.id, kind: "number", status: "draft", seasonLabel: null, predictionCount: 0 },
     ]);
@@ -156,6 +155,8 @@ describe("getSeasonsAdmin", () => {
         id: current.id,
         label: "Saison 2026",
         startsAt: new Date("2026-09-27T22:00:00Z"),
+        jokersEnabled: true,
+        jokersPosed: false,
         endsAt: null,
         proclaimedAt: null,
         isCurrent: true,
@@ -169,6 +170,8 @@ describe("getSeasonsAdmin", () => {
         id: previous.id,
         label: "2025-2026",
         startsAt: new Date("2025-09-28T22:00:00Z"),
+        jokersEnabled: true,
+        jokersPosed: false,
         endsAt: new Date("2026-09-27T22:00:00Z"),
         proclaimedAt: clock.at("-10d"),
         isCurrent: false,

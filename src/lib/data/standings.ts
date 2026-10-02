@@ -8,8 +8,9 @@ import { defaultSeason, type SeasonSummary, seasonPlayers, type StandingRowWithM
 import { seasonEnd } from "@/lib/game/time";
 
 // Season standings (architecture §5.6, §7.4), recomputed on every read from the predictions of the
-// resolved questions, whose values are public. The predictions of the other questions of the
-// season are read without any value: they only tell whether a disabled account took part.
+// resolved questions, whose values are public: the fewest malus first (v1.2). The predictions of the
+// other questions of the season are read without any value: they only tell whether a disabled
+// account took part.
 
 type ViewerRole = Pick<Viewer, "id" | "role">;
 
@@ -78,8 +79,8 @@ export async function getStandings(
     .select({
       id: question.id,
       type: question.type,
-      priceIsRight: question.priceIsRight,
       coefficient: question.coefficient,
+      wrongAnswerMalus: question.wrongAnswerMalus,
       resultNumber: question.resultNumber,
       resultOptionId: question.resultOptionId,
       resolvedAt: question.resolvedAt,
@@ -125,4 +126,29 @@ export async function getStandings(
     resolvedCount: resolved.length,
     rows: rows.map((row) => ({ ...row, avatar: avatars.get(row.userId)!, isViewer: row.userId === viewer.id })),
   };
+}
+
+export type SeasonPlayer = { id: string; name: string; avatar: AvatarKey; inactive: boolean };
+
+/**
+ * The accounts listed in the standings of a season (§5.6): created before its end or with a
+ * prediction in it, and, for a disabled account, only with a prediction in it. They take the malus
+ * of an absence on the resolved questions they did not predict (v1.2).
+ */
+export async function getSeasonPlayers(db: Database, seasonId: number): Promise<SeasonPlayer[]> {
+  const seasons = await db.select({ id: season.id, startsAt: season.startsAt }).from(season);
+  const current = seasons.find(({ id }) => id === seasonId);
+  if (!current) return [];
+  const participants = await db
+    .selectDistinct({ userId: prediction.userId })
+    .from(prediction)
+    .innerJoin(question, eq(question.id, prediction.questionId))
+    .where(and(eq(question.seasonId, seasonId), eq(question.status, "published")));
+  const tookPart = new Set(participants.map(({ userId }) => userId));
+  const accounts = await db
+    .select({ id: user.id, name: user.name, banned: user.banned, avatar: user.avatar, createdAt: user.createdAt })
+    .from(user);
+  return seasonPlayers(accounts, seasonEnd(seasons, current), tookPart)
+    .filter(({ id, banned }) => banned !== true || tookPart.has(id))
+    .map(({ id, name, banned, avatar }) => ({ id, name, avatar: isAvatarKey(avatar) ? avatar : "maillot-bleu-uni", inactive: banned === true }));
 }

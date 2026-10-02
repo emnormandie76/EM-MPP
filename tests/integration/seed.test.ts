@@ -10,6 +10,7 @@ import {
   predictionEvent,
   prize,
   question,
+  questionExtension,
   season,
   seasonStanding,
   user,
@@ -19,7 +20,7 @@ import { questionStatus } from "@/lib/game/question-status";
 import { seasonAt, seasonStartFromLocalDate } from "@/lib/game/time";
 import { isNew, newReference } from "@/lib/game/visits";
 import { markAsProduction, openPglite, type ScriptDb } from "../../scripts/lib/db";
-import { SEED_PASSWORD, SeedRefusedError, seedDatabase, WITNESS_VALUE } from "../../scripts/lib/seed";
+import { CLOSED_WITNESS_VALUE, SEED_PASSWORD, SeedRefusedError, seedDatabase, WITNESS_VALUE } from "../../scripts/lib/seed";
 
 const MID_SEASON = new Date("2026-11-20T10:00:00Z");
 
@@ -58,10 +59,11 @@ describe("seed (scripts/seed.ts)", () => {
       categories: 4,
       seasons: { older: "2024-2025", previous: "2025-2026", current: "2026-2027" },
       questions: 15,
-      predictions: 58,
+      predictions: 59,
       announcements: 2,
       prizes: 3,
       standings: 9,
+      extensions: 1,
     });
 
     const users = await db.select().from(user);
@@ -87,7 +89,7 @@ describe("seed (scripts/seed.ts)", () => {
 
     expect(await db.select().from(announcement)).toHaveLength(2);
     expect(await db.select().from(prize)).toHaveLength(3);
-    expect(await db.select().from(prediction)).toHaveLength(58);
+    expect(await db.select().from(prediction)).toHaveLength(59);
     expect((await db.select().from(predictionEvent)).length).toBe(summary.events);
   });
 
@@ -120,14 +122,16 @@ describe("seed (scripts/seed.ts)", () => {
     expect(previousQuestions.every(({ resolvedAt }) => resolvedAt !== null)).toBe(true);
 
     const palmares = await db
-      .select({ name: seasonStanding.nameSnapshot, rank: seasonStanding.rank, points: seasonStanding.points })
+      .select({ name: seasonStanding.nameSnapshot, rank: seasonStanding.rank, malus: seasonStanding.malus, points: seasonStanding.points })
       .from(seasonStanding)
       .orderBy(seasonStanding.rank, seasonStanding.nameSnapshot);
-    // 1 200 candidatures: Sarah 1 210 (Dans le mille, +20), Inès 1 180 (+10), Julien 1 100 (+5)…
+    // v1.2, malus. 1 200 candidatures: Sarah 1 210 (10, Dans le mille), Inès 1 180 (20), Julien 1 100
+    // (100), Camille 1 500 and Thomas 900 (300, the worst gap: 300 for each absence). Oui/Non (malus
+    // 50): Sarah and Thomas wrong; Admin, Léa and Hugo absent, 50.
     expect(palmares.slice(0, 3)).toEqual([
-      { name: "Inès", rank: 1, points: 90 + 50 },
-      { name: "Sarah", rank: 2, points: 120 },
-      { name: "Julien", rank: 3, points: 50 + 50 },
+      { name: "Inès", rank: 1, malus: 20 + 0, points: null },
+      { name: "Sarah", rank: 2, malus: 10 + 50, points: null },
+      { name: "Julien", rank: 3, malus: 100 + 0, points: null },
     ]);
     expect(palmares.map(({ name }) => name)).not.toContain("Nora");
   });
@@ -158,6 +162,40 @@ describe("seed (scripts/seed.ts)", () => {
     for (const row of closed) {
       expect((await db.select().from(prediction).where(eq(prediction.questionId, row.id))).length).toBeGreaterThan(0);
     }
+  });
+
+  it("on the closed webinar question: a witness value, an extension and players without a prediction (v1.2, §9.6)", async () => {
+    target = await migratedDb();
+    const { db } = target;
+    await seedDatabase(db, { now: MID_SEASON, env: {} });
+
+    const [webinar] = await db.select().from(question).where(eq(question.title, "Combien d'inscrits au webinaire Grande École de septembre ?"));
+    const names = new Map((await db.select({ id: user.id, name: user.name }).from(user)).map(({ id, name }) => [id, name]));
+    const predicted = (await db.select().from(prediction).where(eq(prediction.questionId, webinar.id))).map((row) => ({
+      name: names.get(row.userId),
+      value: row.valueNumber,
+    }));
+    expect(predicted).toContainEqual({ name: "Camille", value: CLOSED_WITNESS_VALUE });
+
+    const [extension] = await db.select().from(questionExtension);
+    expect(extension).toMatchObject({ questionId: webinar.id, closesAt: new Date(MID_SEASON.getTime() + 2 * 86_400_000) });
+    expect([names.get(extension.userId), names.get(extension.grantedBy)]).toEqual(["Mehdi", "Admin"]);
+    expect(extension.grantedAt.getTime()).toBeGreaterThan(webinar.closesAt!.getTime());
+    expect(predicted.map(({ name }) => name)).not.toContain("Mehdi");
+    // Hugo has neither a prediction nor an extension: "Les pronos s'afficheront au résultat".
+    expect(predicted.map(({ name }) => name)).not.toContain("Hugo");
+  });
+
+  it("gives every choice question a malus of a wrong answer, no Juste Prix, and jokers in the three seasons (v1.2)", async () => {
+    target = await migratedDb();
+    const { db } = target;
+    await seedDatabase(db, { now: MID_SEASON, env: {} });
+
+    const choices = await db.select().from(question).where(eq(question.type, "choice"));
+    expect(choices).toHaveLength(4);
+    expect(choices.map(({ wrongAnswerMalus }) => wrongAnswerMalus).sort()).toEqual([100, 100, 50, 50]);
+    expect((await db.select().from(question)).filter(({ priceIsRight }) => priceIsRight)).toEqual([]);
+    expect((await db.select().from(season)).map(({ jokersEnabled }) => jokersEnabled)).toEqual([true, true, true]);
   });
 
   it("puts the witness value on the open question closing first, from another player than the admin", async () => {

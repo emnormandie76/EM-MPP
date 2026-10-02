@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db/client";
 import { prize, question, season } from "@/lib/db/schema";
 import { parisLocalToUtc, seasonAt, seasonStartFromLocalDate } from "@/lib/game/time";
+import { setJoker } from "@/lib/services/predictions";
 import { publishQuestions, setQuestionDates, updateQuestion } from "@/lib/services/questions";
 import type { Actor } from "@/lib/services/result";
 import { createSeason, deleteSeason, updateSeason, upsertPrizes } from "@/lib/services/seasons";
@@ -10,7 +11,7 @@ import { makeClock } from "../helpers/clock";
 import { createTestDb } from "../helpers/db";
 import { createCategory, createPrediction, createQuestion, createUser } from "../helpers/factories";
 
-// Seasons created by the admin (architecture §5.1, §5.13, vectors SA1 to SA8). Season A starts on
+// Seasons created by the admin (architecture §5.1, §5.13, vectors SA1 to SA13). Season A starts on
 // 29 September 2025, season B on 1 October 2026; now is 5 October 2026.
 
 const clock = makeClock("2026-10-05T10:00:00Z");
@@ -384,5 +385,69 @@ describe("proclaimed seasons (§5.13, decision of 30/09/2026)", () => {
     expect(await upsertPrizes(db, admin, { seasonId: A, prizes: [{ rankLabel: "1er", description: "Un mug" }] })).toMatchObject({
       code: "SEASON_PROCLAIMED",
     });
+  });
+});
+
+describe("jokers allowed by season (v1.2, §5.13, vectors SA9 to SA13)", () => {
+  /** An open question of season B, with a saved prediction of a new player. */
+  async function openWithPrediction(joker: boolean, status: "published" | "cancelled" = "published") {
+    const q = await createQuestion(db, { categoryId, status, opensAt: clock.at("-1d"), closesAt: clock.at("+5d") });
+    const player = await createUser(db);
+    await createPrediction(db, { questionId: q.id, userId: player.id, valueNumber: 240, joker });
+    return { q, player: { id: player.id, role: "player" as const, banned: false } };
+  }
+
+  it("a new season allows jokers by default, or not when the admin says so", async () => {
+    expect(await seasonRow(B)).toMatchObject({ jokersEnabled: true });
+    const without = await createSeason(db, admin, { label: "Sans jokers", startsOn: "2027-09-06", jokersEnabled: false }, now);
+    expect(await seasonRow(without.ok ? without.data.id : 0)).toMatchObject({ jokersEnabled: false });
+  });
+
+  it("SA9: takes the jokers away from a season without any joker posed; setJoker then refuses", async () => {
+    const { q, player } = await openWithPrediction(false);
+    expect(await updateSeason(db, admin, { seasonId: B, jokersEnabled: false }, now)).toMatchObject({ ok: true });
+    expect(await seasonRow(B)).toMatchObject({ label: "2026-2027", startsAt: seasonStartFromLocalDate("2026-10-01"), jokersEnabled: false });
+    expect(await setJoker(db, player, { questionId: q.id, enabled: true }, now)).toMatchObject({ code: "JOKERS_DISABLED" });
+  });
+
+  it("SA10: refuses to take the jokers away once a player has posed one; nothing changes", async () => {
+    await openWithPrediction(true);
+    expect(await updateSeason(db, admin, { seasonId: B, label: "Nouveau nom", jokersEnabled: false }, now)).toEqual({
+      ok: false,
+      code: "JOKERS_IN_USE",
+      message: "Des jokers sont déjà posés dans cette saison : impossible de les retirer.",
+      fieldErrors: { jokersEnabled: "Des jokers sont déjà posés dans cette saison : impossible de les retirer." },
+    });
+    expect(await seasonRow(B)).toMatchObject({ label: "2026-2027", jokersEnabled: true });
+  });
+
+  it("SA11: a joker posed on a cancelled question was given back: it does not prevent taking them away", async () => {
+    await openWithPrediction(true, "cancelled");
+    expect(await updateSeason(db, admin, { seasonId: B, jokersEnabled: false }, now)).toMatchObject({ ok: true });
+  });
+
+  it("SA12: allows the jokers again; setJoker works, with the limit of 2", async () => {
+    const { q, player } = await openWithPrediction(false);
+    await updateSeason(db, admin, { seasonId: B, jokersEnabled: false }, now);
+    expect(await updateSeason(db, admin, { seasonId: B, jokersEnabled: true }, now)).toMatchObject({ ok: true });
+    expect(await setJoker(db, player, { questionId: q.id, enabled: true }, now)).toMatchObject({ ok: true, data: { joker: true, jokersLeft: 1 } });
+  });
+
+  it("SA13: a proclaimed season keeps its jokers setting, either way", async () => {
+    await proclaim(A);
+    expect(await updateSeason(db, admin, { seasonId: A, jokersEnabled: false }, now)).toMatchObject({
+      ok: false,
+      code: "SEASON_PROCLAIMED",
+      fieldErrors: { jokersEnabled: "Cette saison est proclamée : le réglage des jokers ne peut plus changer." },
+    });
+    await db.update(season).set({ jokersEnabled: false }).where(eq(season.id, A));
+    expect(await updateSeason(db, admin, { seasonId: A, jokersEnabled: true }, now)).toMatchObject({ code: "SEASON_PROCLAIMED" });
+    // Sending the same setting, with a new name, is accepted.
+    expect(await updateSeason(db, admin, { seasonId: A, label: "Saison 2025", jokersEnabled: false }, now)).toMatchObject({ ok: true });
+  });
+
+  it("an update without a field keeps its value", async () => {
+    expect(await updateSeason(db, admin, { seasonId: B, label: "Renommée" }, now)).toMatchObject({ ok: true });
+    expect(await seasonRow(B)).toMatchObject({ label: "Renommée", startsAt: seasonStartFromLocalDate("2026-10-01"), jokersEnabled: true });
   });
 });

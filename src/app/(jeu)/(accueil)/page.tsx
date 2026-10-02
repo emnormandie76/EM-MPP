@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { requireUser } from "@/lib/auth/session";
 import { getHomeData, type HomeData } from "@/lib/data/home";
 import { getDb } from "@/lib/db/client";
-import { formatCount, rankSuffix } from "@/lib/format";
+import { formatCount, formatMalus, rankSuffix } from "@/lib/format";
 import { JOKERS_PER_SEASON } from "@/lib/game/constants";
 
 const SECTION_TITLE = "font-display text-[26px] font-extrabold uppercase leading-none";
@@ -89,16 +89,19 @@ export default async function HomePage() {
         <dl className="grid grid-cols-2 gap-4 lg:flex">
           <PositionTile standings={standings} />
           <StatTile
-            label="Points"
+            label="Malus"
             valueClassName="text-accent-text"
             sub={formatCount(standings.resolvedCount, "question résolue", "questions résolues")}
           >
-            {standings.me?.points ?? 0}
+            {formatMalus(standings.me?.malus ?? 0)}
           </StatTile>
-          <StatTile label="Jokers" sub={`${data.jokersLeft >= 2 ? "restants" : "restant"} cette saison`}>
-            {data.jokersLeft}
-            <span className="text-[28px] text-muted">/{JOKERS_PER_SEASON}</span>
-          </StatTile>
+          {/* No Jokers tile in a season that does not allow them (v1.2). */}
+          {data.jokersLeft !== null ? (
+            <StatTile label="Jokers" sub={`${data.jokersLeft >= 2 ? "restants" : "restant"} cette saison`}>
+              {data.jokersLeft}
+              <span className="text-[28px] text-muted">/{JOKERS_PER_SEASON}</span>
+            </StatTile>
+          ) : null}
         </dl>
       </section>
 

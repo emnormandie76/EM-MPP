@@ -2,10 +2,12 @@ import Link from "next/link";
 import { buttonClasses } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import type { PlayerQuestion } from "@/lib/data/questions";
+import { malusText } from "@/lib/format";
 import type { PredictionState } from "@/lib/game/prediction-state";
+import { toHundredths } from "@/lib/game/scoring";
 import { QUESTION_KIND_LABELS } from "@/lib/validation/question";
 import { Countdown } from "./Countdown";
-import { NewChip } from "./NewChip";
+import { ExtendedChip, NewChip } from "./NewChip";
 import { StatusChip } from "./StatusChip";
 
 const ACTIONS: Record<PredictionState, { label: string; variant: "primary" | "secondary" }> = {
@@ -14,7 +16,10 @@ const ACTIONS: Record<PredictionState, { label: string; variant: "primary" | "se
   validated: { label: "Voir", variant: "secondary" },
 };
 
-/** An open question (§8.2): category, badge, title, kind, countdown, state and the way to its page. */
+/**
+ * An open question (§8.2): category, badge, title, kind (with the malus of a wrong answer for a
+ * choice), countdown to the viewer's deadline (their extension's, v1.2), state and the way to its page.
+ */
 export function QuestionCard({ question: q, serverNow, headingLevel = 3 }: { question: PlayerQuestion; serverNow: number; headingLevel?: 2 | 3 }) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const action = ACTIONS[q.state];
@@ -27,20 +32,21 @@ export function QuestionCard({ question: q, serverNow, headingLevel = 3 }: { que
       <div className="flex min-w-0 grow flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Chip>{q.categoryName}</Chip>
-          {q.isNew ? <NewChip /> : null}
+          {q.extendedUntil ? <ExtendedChip /> : q.isNew ? <NewChip /> : null}
         </div>
         <Heading id={titleId} className="text-lg font-semibold">
           {q.title}
         </Heading>
         <p className="text-sm text-muted">
           {QUESTION_KIND_LABELS[q.kind]} · coef. ×{q.coefficient}
+          {q.wrongAnswerMalus !== null ? ` · mauvaise réponse : ${malusText(toHundredths(q.wrongAnswerMalus))}` : ""}
         </p>
       </div>
       <div className="hidden lg:block">
-        <Countdown closesAt={q.closesAt.getTime()} serverNow={serverNow} />
+        <Countdown closesAt={q.deadline.getTime()} serverNow={serverNow} />
       </div>
       <div className="lg:hidden">
-        <Countdown closesAt={q.closesAt.getTime()} serverNow={serverNow} variant="compact" />
+        <Countdown closesAt={q.deadline.getTime()} serverNow={serverNow} variant="compact" />
       </div>
       <div className="flex flex-wrap items-center gap-3 lg:flex-nowrap lg:gap-5">
         <StatusChip state={q.state} />

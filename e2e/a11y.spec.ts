@@ -65,6 +65,16 @@ for (const [tab, title] of [
   });
 }
 
+// v1.2 (§9.4): a closed question the player did not predict (« Les pronos s'afficheront au résultat »).
+test("/questions/<id> (closed, without a prediction) has no serious or critical accessibility violation", async ({ page }) => {
+  await signIn(page, ACCOUNTS.hugo);
+  await page.goto("/questions?onglet=en-attente");
+  const title = "Combien d'inscrits au webinaire Grande École de septembre ?";
+  await page.goto((await page.getByRole("link", { name: title }).getAttribute("href"))!);
+  await expect(page.getByText(/les pronos s'afficheront au résultat/)).toBeVisible();
+  expect(await blockingViolations(page)).toEqual([]);
+});
+
 test("/joueurs/<id> (player) has no serious or critical accessibility violation", async ({ page }) => {
   await signIn(page, ACCOUNTS.julien);
   await page.goto("/classement");
@@ -92,8 +102,13 @@ for (const url of ADMIN_PAGES) {
   });
 }
 
-// §9.4: /admin/questions/<id>, on an open question (follow-up) and on a closed one (result form).
-for (const title of ["Combien de participants à la JPO du 15 novembre ?", "Combien de visiteurs sur le stand du salon Studyrama ?"]) {
+// §9.4: /admin/questions/<id>, on an open question (follow-up), on a closed one (result form) and on
+// the closed one with an extension (v1.2).
+for (const title of [
+  "Combien de participants à la JPO du 15 novembre ?",
+  "Combien de visiteurs sur le stand du salon Studyrama ?",
+  "Combien d'inscrits au webinaire Grande École de septembre ?",
+]) {
   test(`/admin/questions/<id> « ${title} » has no serious or critical accessibility violation`, async ({ page }) => {
     await signIn(page, ACCOUNTS.admin);
     await page.goto("/admin/questions");

@@ -20,7 +20,8 @@ import {
 } from "@/lib/validation/question";
 
 // Question form of the back office (architecture §8.3): creation and editing. A locked field
-// (§5.11) is disabled, with its reason; disabled fields are not sent and keep their value.
+// (§5.11) is disabled, with its reason; disabled fields are not sent and keep their value. A choice
+// (or yes/no) question asks for the malus of a wrong answer (v1.2).
 
 export type QuestionFormValues = {
   kind: QuestionKind;
@@ -29,6 +30,8 @@ export type QuestionFormValues = {
   description: string;
   unit: string;
   options: string[];
+  /** Malus of a wrong answer, as typed (choice and yes/no). */
+  wrongAnswerMalus: string;
   source: string;
   coefficient: number;
   helpBiUrl: string;
@@ -179,7 +182,7 @@ export function QuestionForm({
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
   const contentLocked = readOnly || locks.content !== null;
   const otherLocked = readOnly || locks.other !== null;
-  const isNumber = kind === "number" || kind === "priceIsRight";
+  const isNumber = kind === "number";
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
@@ -190,7 +193,7 @@ export function QuestionForm({
         <LockNote reason={locks.content} />
         <fieldset className="flex min-w-0 flex-col gap-1.5" aria-describedby={errors.kind ? "kind-error" : undefined}>
           <legend className={`${LEGEND} mb-1.5`}>Type</legend>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {QUESTION_KINDS.map((value) => (
               <label key={value} className={TILE}>
                 <input
@@ -206,9 +209,6 @@ export function QuestionForm({
               </label>
             ))}
           </div>
-          {kind === "priceIsRight" ? (
-            <p className="text-[13px] text-muted">Juste Prix : le plus proche sans dépasser la valeur réelle.</p>
-          ) : null}
           {errors.kind ? (
             <p id="kind-error" className="text-sm font-medium text-hot">
               {errors.kind}
@@ -268,6 +268,18 @@ export function QuestionForm({
           <OptionsEditor initial={initial.options} disabled={contentLocked} error={errors.options} />
         )}
         {errors.options && kind === "yesNo" ? <p className="text-sm font-medium text-hot">{errors.options}</p> : null}
+        {isNumber ? null : (
+          <Field
+            name="wrongAnswerMalus"
+            label="Malus d'une mauvaise réponse"
+            inputMode="decimal"
+            autoComplete="off"
+            hint="Obligatoire, supérieur à 0. Compare-le aux écarts attendus sur les questions à nombre : quelques dizaines pour une JPO, quelques centaines pour des candidatures."
+            defaultValue={initial.wrongAnswerMalus}
+            disabled={contentLocked}
+            error={errors.wrongAnswerMalus}
+          />
+        )}
 
         <fieldset className="flex min-w-0 flex-col gap-1.5">
           <legend className={`${LEGEND} mb-1.5`}>Coefficient</legend>

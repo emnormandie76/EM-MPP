@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { ACCOUNTS, expect, signIn, test } from "./fixtures";
 
 // Player journey (architecture §11 É6). Seeded open questions, closing in 1 (urgent), 3, 5 and 6
-// days. Each test that writes uses its own accounts: Julien (Juste Prix saved, choice validated),
+// days. Each test that writes uses its own accounts: Julien (number saved, choice validated),
 // Léa (validation), Sarah (jokers, 2 left this season), Camille (the "Nouveau" badge).
 
 const OPEN = {
@@ -69,7 +69,8 @@ test("saving 2 450 shows the state « Enregistré »", async ({ page }) => {
 test("validating asks for a confirmation, then shows « Validé » and the field turns read-only", async ({ page }) => {
   await signIn(page, ACCOUNTS.lea);
   await openQuestion(page, OPEN.candidatures);
-  await expect(page.getByText("Juste Prix", { exact: true }).first()).toBeVisible();
+  // The Juste Prix is gone (v1.2).
+  await expect(page.getByText("Juste Prix")).toHaveCount(0);
   const value = page.getByLabel("Ton prono", { exact: true });
   await expect(value).toHaveValue(/^2\s300$/);
   await value.fill("2450");
@@ -108,7 +109,8 @@ test("jokers: the counter goes down, and no third joker can be posed", async ({ 
   await programme.getByRole("button", { name: "Enregistrer" }).click();
   await expect(programme.getByText("Prono enregistré.")).toBeVisible();
   const firstJoker = programme.getByRole("checkbox", { name: /joker/i });
-  await expect(firstJoker).toHaveAccessibleName(/2 restants cette saison/);
+  // v1.2: a joker divides the malus by 2.
+  await expect(firstJoker).toHaveAccessibleName(/^JOKER ÷2 Divise ton malus par deux · 2 restants cette saison$/);
   await firstJoker.check();
   await expect(programme.getByText("Joker posé.")).toBeVisible();
   await expect(firstJoker).toHaveAccessibleName(/1 restant cette saison/);
@@ -143,6 +145,8 @@ test("jokers: the counter goes down, and no third joker can be posed", async ({ 
 test("a choice question is validated", async ({ page }) => {
   await signIn(page, ACCOUNTS.julien);
   await openQuestion(page, OPEN.programme);
+  // The malus of a wrong answer, shown with the question and its form (v1.2).
+  await expect(page.getByText("Mauvaise réponse : 100 de malus", { exact: true })).toHaveCount(2);
   await expect(page.getByRole("button", { name: "Valider", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Valider", exact: true }).click();
   await expect(page.getByText("Choisis une réponse.")).toBeVisible();
@@ -175,7 +179,7 @@ test("the scheduled question is absent; a question cancelled while open shows in
   }
   await page.goto("/questions?onglet=annulees");
   await page.getByRole("link", { name: CANCELLED }).click();
-  await expect(page.getByText("Question annulée : aucun point n'est attribué et les jokers sont rendus.")).toBeVisible();
+  await expect(page.getByText("Question annulée : aucun malus n'est attribué et les jokers sont rendus.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Enregistrer" })).toHaveCount(0);
 });
 

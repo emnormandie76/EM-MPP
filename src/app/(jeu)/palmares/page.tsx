@@ -8,7 +8,7 @@ import { TableScroll } from "@/components/ui/TableScroll";
 import { requireUser } from "@/lib/auth/session";
 import { getPalmares, type PalmaresSeason } from "@/lib/data/content";
 import { getDb } from "@/lib/db/client";
-import { formatCount, formatDate, rankSuffix } from "@/lib/format";
+import { formatCount, formatDate, formatMalus, rankSuffix } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Palmarès" };
 
@@ -18,6 +18,19 @@ const TD = "px-3 py-2 align-middle";
 
 /** Final rank, ties included: the podium can hold more than 3 players. */
 const PODIUM_RANKS = 3;
+
+type PalmaresRow = PalmaresSeason["rows"][number];
+
+/**
+ * The frozen score of a row: the malus since v1.2, or the points of a season proclaimed with the
+ * v1.1 scale (none in production, decision of 02/10/2026).
+ */
+function score(row: PalmaresRow): { value: string; unit: string } {
+  return row.malus !== null ? { value: formatMalus(row.malus), unit: "de malus" } : { value: String(row.points ?? 0), unit: "points" };
+}
+
+/** Column title of a season: malus, or points for a season proclaimed before v1.2. */
+const scoreTitle = (season: PalmaresSeason) => (season.rows.some(({ malus }) => malus === null) ? "Points" : "Malus");
 
 function Podium({ season }: { season: PalmaresSeason }) {
   const podium = season.rows.filter(({ rank }) => rank <= PODIUM_RANKS);
@@ -39,8 +52,7 @@ function Podium({ season }: { season: PalmaresSeason }) {
             {row.isViewer ? " (toi)" : ""}
           </Link>
           <span className="font-display text-[22px] font-bold tabular-nums">
-            {row.points}
-            <span className="ml-1 text-sm uppercase text-muted">points</span>
+            {score(row).value} <span className="text-sm uppercase text-muted">{score(row).unit}</span>
           </span>
         </li>
       ))}
@@ -63,7 +75,7 @@ function FullStandings({ season }: { season: PalmaresSeason }) {
               <th scope="col" className={TH}>Joueur</th>
               <th scope="col" className={`${TH} text-right`}>Dans le mille</th>
               <th scope="col" className={`${TH} text-right`}>Questions jouées</th>
-              <th scope="col" className={`${TH} text-right`}>Points</th>
+              <th scope="col" className={`${TH} text-right`}>{scoreTitle(season)}</th>
             </tr>
           </thead>
           <tbody>
@@ -81,7 +93,7 @@ function FullStandings({ season }: { season: PalmaresSeason }) {
                 </th>
                 <td className={`${TD} text-right tabular-nums`}>{row.bullseyes}</td>
                 <td className={`${TD} text-right tabular-nums`}>{row.questionsPlayed}</td>
-                <td className={`${TD} text-right font-display text-xl font-bold tabular-nums`}>{row.points}</td>
+                <td className={`${TD} text-right font-display text-xl font-bold tabular-nums`}>{score(row).value}</td>
               </tr>
             ))}
           </tbody>

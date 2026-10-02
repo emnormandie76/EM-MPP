@@ -1,8 +1,8 @@
-import { asc, count, eq, inArray } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, max } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "@/lib/db/client";
-import { category, prediction, question, questionOption } from "@/lib/db/schema";
-import { formatNumber } from "@/lib/format";
+import { category, prediction, question, questionExtension, questionOption } from "@/lib/db/schema";
+import { formatDateTime, formatNumber } from "@/lib/format";
 import { COEFFICIENTS } from "@/lib/game/constants";
 import { parseNumberInput } from "@/lib/game/number-input";
 import { type QuestionStatus, questionStatus } from "@/lib/game/question-status";
@@ -46,7 +46,7 @@ const notFound = () => fail("NOT_FOUND", NOT_FOUND);
 
 /** What may still change, given the status and whether predictions exist; null means free. */
 export type EditRules = {
-  /** Type, title, description, unit, Juste Prix, answers, source, coefficient. */
+  /** Type, title, description, unit, answers, malus of a wrong answer, source, coefficient. */
   content: ErrorCode | null;
   /** Category, help and expected result date: locked only once cancelled. */
   other: ErrorCode | null;
@@ -78,7 +78,7 @@ export function editRules(status: QuestionStatus, predictionCount: number): Edit
  * that would close in a proclaimed season would never count (decision of 30/09/2026).
  */
 export function publicationProblems(
-  row: Pick<QuestionRow, "type" | "opensAt" | "closesAt" | "expectedResultAt" | "coefficient" | "seasonId">,
+  row: Pick<QuestionRow, "type" | "opensAt" | "closesAt" | "expectedResultAt" | "coefficient" | "seasonId" | "wrongAnswerMalus">,
   optionLabels: readonly string[],
   now: Date,
   proclaimedSeasonIds: ReadonlySet<number> = new Set(),
@@ -95,7 +95,8 @@ export function publicationProblems(
   }
   if (!(COEFFICIENTS as readonly number[]).includes(row.coefficient)) problems.push(QUESTION_MESSAGES.coefficient);
   if (row.type === "choice") {
-    const shape = shapeOf("choice", null, optionLabels);
+    // The database guarantees the malus of a wrong answer of a choice question.
+    const shape = shapeOf("choice", null, optionLabels, row.wrongAnswerMalus);
     if (!shape.ok) problems.push(shape.message);
   }
   return problems;
@@ -161,7 +162,10 @@ const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.
 // ---------------------------------------------------------------------------------------------
 // Create and update
 
-/** New draft: category, kind, title and source are required; dates are optional (§5.11). */
+/**
+ * New draft: category, kind, title and source are required, and the malus of a wrong answer for a
+ * choice (v1.2); dates are optional (§5.11).
+ */
 export async function createQuestion(
   db: Database,
   actor: Actor | null,
@@ -174,8 +178,8 @@ export async function createQuestion(
   if (!parsed.success) return fail("INVALID_INPUT", undefined, fieldErrorsOf(parsed.error.issues));
   const data = parsed.data;
 
-  const shaped = shapeOf(data.kind, data.unit, data.options);
-  if (!shaped.ok) return fail("INVALID_INPUT", undefined, { options: shaped.message });
+  const shaped = shapeOf(data.kind, data.unit, data.options, data.wrongAnswerMalus);
+  if (!shaped.ok) return fail("INVALID_INPUT", undefined, { [shaped.field]: shaped.message });
   const dates = { opensAt: data.opensAt ?? null, closesAt: data.closesAt ?? null, expectedResultAt: data.expectedResultAt ?? null };
   const errors = dateErrors(dates);
   if (Object.keys(errors).length > 0) return fail("INVALID_INPUT", undefined, errors);
@@ -184,7 +188,7 @@ export async function createQuestion(
     const seasons = await seasonsForQuestions(tx);
     const problem = await categoryProblem(tx, data.categoryId);
     if (problem) return problem;
-    const { type, priceIsRight, unit, options } = shaped.shape;
+    const { type, unit, options, wrongAnswerMalus } = shaped.shape;
     const [row] = await tx
       .insert(question)
       .values({
@@ -192,7 +196,7 @@ export async function createQuestion(
         seasonId: dates.closesAt ? (seasonAt(seasons, dates.closesAt)?.id ?? null) : null,
         categoryId: data.categoryId,
         type,
-        priceIsRight,
+        wrongAnswerMalus,
         title: data.title,
         description: data.description ?? null,
         unit,
@@ -239,17 +243,19 @@ export async function updateQuestion(
 
     let shape: QuestionShape = {
       type: current.type,
-      priceIsRight: current.priceIsRight,
       unit: current.unit,
       options: currentOptions,
+      wrongAnswerMalus: current.wrongAnswerMalus,
     };
-    if (patch.kind !== undefined || patch.options !== undefined || patch.unit !== undefined) {
+    if (patch.kind !== undefined || patch.options !== undefined || patch.unit !== undefined || patch.wrongAnswerMalus !== undefined) {
+      // A number switched to a choice needs the malus of a wrong answer; a choice switched to a number loses it.
       const shaped = shapeOf(
         patch.kind ?? kindOf(current, currentOptions),
         patch.unit !== undefined ? patch.unit : current.unit,
         patch.options ?? currentOptions,
+        patch.wrongAnswerMalus !== undefined ? patch.wrongAnswerMalus : current.wrongAnswerMalus,
       );
-      if (!shaped.ok) return fail("INVALID_INPUT", undefined, { options: shaped.message });
+      if (!shaped.ok) return fail("INVALID_INPUT", undefined, { [shaped.field]: shaped.message });
       shape = shaped.shape;
     }
     const pick = <K extends keyof typeof patch & keyof QuestionRow>(key: K) =>
@@ -262,7 +268,7 @@ export async function updateQuestion(
     const next = {
       categoryId: pick("categoryId"),
       type: shape.type,
-      priceIsRight: shape.priceIsRight,
+      wrongAnswerMalus: shape.wrongAnswerMalus,
       title: pick("title"),
       description: pick("description"),
       unit: shape.unit,
@@ -279,7 +285,7 @@ export async function updateQuestion(
     const optionsChanged = !sameList(shape.options, currentOptions);
     const contentChanged =
       optionsChanged ||
-      (["type", "priceIsRight", "title", "description", "unit", "source", "coefficient"] as const).some(
+      (["type", "wrongAnswerMalus", "title", "description", "unit", "source", "coefficient"] as const).some(
         (key) => next[key] !== current[key],
       );
     const otherChanged =
@@ -484,7 +490,8 @@ function formattedResult(row: QuestionRow, options: { id: number; label: string 
 
 /**
  * Copy in draft, without dates (§5.11): same category, kind, title, description, unit, source,
- * help, coefficient and answers. When the original is resolved, its result becomes "last year's value".
+ * help, coefficient, answers and malus of a wrong answer; not the extensions. When the original is
+ * resolved, its result becomes "last year's value".
  */
 export async function duplicateQuestion(
   db: Database,
@@ -507,7 +514,7 @@ export async function duplicateQuestion(
       .values({
         categoryId: original.categoryId,
         type: original.type,
-        priceIsRight: original.priceIsRight,
+        wrongAnswerMalus: original.wrongAnswerMalus,
         title: original.title,
         description: original.description,
         unit: original.unit,
@@ -529,9 +536,9 @@ export async function duplicateQuestion(
 }
 
 /**
- * Cancels a published question, whatever its status (§5.11): it leaves the points and its jokers
- * are given back, since jokers are only counted on questions that are not cancelled. A draft is
- * deleted instead.
+ * Cancels a published question, whatever its status (§5.11): no one takes a malus on it, absent
+ * players included, and its jokers are given back, since jokers are only counted on questions that
+ * are not cancelled. Its extensions are of no use any more, and stay. A draft is deleted instead.
  */
 export async function cancelQuestion(db: Database, actor: Actor | null, input: unknown, now: Date): Promise<Result> {
   const me = authorize(actor, { admin: true });
@@ -574,9 +581,11 @@ const resolveInput = idInput.extend({
 });
 
 /**
- * Real value or right answer (§5.11), once the question is closed. The first entry sets
+ * Real value or right answer (§5.11), once the question is closed and no extension runs on it (v1.2,
+ * §5.14): the extended player must not answer once the result is known. The first entry sets
  * `resolved_at`; a later different entry is a correction, dated by `corrected_at`. Entering the
- * same result again changes nothing.
+ * same result again changes nothing. The question is locked before its extensions are read
+ * (FOR UPDATE: it waits for the extension services, which lock it too).
  */
 export async function resolveQuestion(
   db: Database,
@@ -596,6 +605,13 @@ export async function resolveQuestion(
     const status = questionStatus(row, now);
     if (status === "cancelled") return fail("QUESTION_CANCELLED");
     if (status !== "closed" && status !== "resolved") return fail("RESULT_TOO_EARLY");
+    const [running] = await tx
+      .select({ closesAt: max(questionExtension.closesAt) })
+      .from(questionExtension)
+      .where(and(eq(questionExtension.questionId, row.id), gt(questionExtension.closesAt, now)));
+    if (running?.closesAt) {
+      return fail("EXTENSION_RUNNING", `Un joueur a une prolongation jusqu'au ${formatDateTime(running.closesAt, now)} : attends sa fin ou annule-la.`);
+    }
 
     let result: { resultNumber: number | null; resultOptionId: number | null };
     if (row.type === "number") {

@@ -4,6 +4,7 @@ import type { Viewer } from "@/lib/auth/session";
 import { type AvatarKey, isAvatarKey } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
 import { announcement, prize, season, seasonStanding, user } from "@/lib/db/schema";
+import { toHundredths } from "@/lib/game/scoring";
 
 // Announcements, prizes, the current season and the palmarès, visible to every signed-in account
 // (architecture §7.4).
@@ -36,15 +37,15 @@ export async function getPrizes(db: Database, _viewer: ViewerRole, seasonId: num
     .orderBy(asc(prize.position), asc(prize.id));
 }
 
-export type CurrentSeason = { id: number; label: string; startsAt: Date };
+export type CurrentSeason = { id: number; label: string; startsAt: Date; jokersEnabled: boolean };
 
 /**
  * The season containing `now` (§5.1): the latest start not after it. Null while the admin has not
- * created a season, or before the first one. Footer and /lots.
+ * created a season, or before the first one. Footer, /lots, the Jokers tile and the rules page.
  */
 export async function getCurrentSeason(db: Database, _viewer: ViewerRole, now: Date): Promise<CurrentSeason | null> {
   const [row] = await db
-    .select({ id: season.id, label: season.label, startsAt: season.startsAt })
+    .select({ id: season.id, label: season.label, startsAt: season.startsAt, jokersEnabled: season.jokersEnabled })
     .from(season)
     .where(lte(season.startsAt, now))
     .orderBy(desc(season.startsAt))
@@ -58,7 +59,10 @@ export type PalmaresRow = {
   name: string;
   avatar: AvatarKey;
   rank: number;
-  points: number;
+  /** Total malus, in hundredths (v1.2); null for a season proclaimed with the points of v1.1. */
+  malus: number | null;
+  /** Points of a season proclaimed with the v1.1 scale; null since v1.2. */
+  points: number | null;
   bullseyes: number;
   meanError: number | null;
   questionsPlayed: number;
@@ -94,6 +98,7 @@ export async function getPalmares(db: Database, viewer: ViewerRole): Promise<Pal
         name: seasonStanding.nameSnapshot,
         avatar: user.avatar,
         rank: seasonStanding.rank,
+        malus: seasonStanding.malus,
         points: seasonStanding.points,
         bullseyes: seasonStanding.bullseyes,
         meanError: seasonStanding.meanError,
@@ -107,7 +112,12 @@ export async function getPalmares(db: Database, viewer: ViewerRole): Promise<Pal
       label,
       proclaimedAt: proclaimedAt!,
       rows: rows
-        .map((row) => ({ ...row, avatar: isAvatarKey(row.avatar) ? row.avatar : ("maillot-bleu-uni" as const), isViewer: row.userId === viewer.id }))
+        .map((row) => ({
+          ...row,
+          malus: row.malus === null ? null : toHundredths(row.malus),
+          avatar: isAvatarKey(row.avatar) ? row.avatar : ("maillot-bleu-uni" as const),
+          isViewer: row.userId === viewer.id,
+        }))
         .sort((a, b) => a.rank - b.rank || byName.compare(a.name, b.name)),
       prizes: await getPrizes(db, viewer, id),
     });

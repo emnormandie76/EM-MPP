@@ -1,16 +1,16 @@
 import type { ReactNode } from "react";
 import type { QuestionDetail } from "@/lib/data/questions";
 import type { QuestionResults, ResultRow } from "@/lib/data/results";
-import { formatNumber, formatPercent } from "@/lib/format";
+import { formatMalus, formatNumber, formatPercent } from "@/lib/format";
 import { badgeName } from "@/lib/game/badges";
-import { JOKER_MULTIPLIER } from "@/lib/game/constants";
+import { JOKER_DIVISOR } from "@/lib/game/constants";
 import { BadgeList } from "./BadgeList";
 import { ChoiceDistribution } from "./ChoiceDistribution";
 import { StripChart } from "./StripChart";
 
 // What a question shows after its closing (§5.7, §8.2): the wisdom of the crowd (median and mean,
 // or the share of each answer), the strip chart and, once resolved, the real value, the "Ton
-// prono" band with the viewer's points, and the badges earned on this question.
+// prono" band with the viewer's malus (v1.2), and the badges earned on this question.
 
 const TILE_LABEL = "font-display text-[13px] font-extrabold uppercase tracking-[0.08em]";
 const TILE_VALUE = "font-display text-[34px] leading-none font-extrabold tabular-nums sm:text-[40px]";
@@ -34,52 +34,69 @@ function answerText(q: QuestionDetail, answer: { valueNumber: number | null; opt
   return q.options.find(({ id }) => id === answer.optionId)?.label ?? "—";
 }
 
-const points = (n: number) => (n === 0 ? "0 point" : `${n} pts`);
-
-/** "65 pts + 20 pts bonus podium (le plus proche) × 2 (joker)". */
-function scoreDetail(q: QuestionDetail, mine: ResultRow): string {
+/** "Écart 12 × 3 (coef) ÷ 2 (joker)", or "Mauvaise réponse : 100 × 2 (coef)". */
+function malusDetail(q: QuestionDetail, mine: ResultRow): string {
   const score = mine.score!;
-  const multipliers = [
-    q.coefficient > 1 ? ` × ${q.coefficient} (coef)` : "",
-    mine.answer.joker ? ` × ${JOKER_MULTIPLIER} (joker)` : "",
-  ].join("");
-  if (q.type === "choice") return `${points(score.basePoints)}${score.basePoints > 0 ? multipliers : ""}`;
-
-  const real = q.result?.valueNumber ?? 0;
-  if (q.priceIsRight && (mine.answer.valueNumber ?? 0) > real) return "Au-dessus de la valeur réelle : 0 point (Juste Prix)";
-  const rank = score.podiumRank;
-  const bonus =
-    score.podiumBonus > 0 && rank !== null ? ` + ${score.podiumBonus} pts bonus podium (${rank === 1 ? "le plus proche" : `${rank}e plus proche`})` : "";
-  const scored = score.basePoints + score.podiumBonus > 0;
-  return `${points(score.basePoints)}${bonus}${scored ? multipliers : ""}`;
+  const operations = [q.coefficient > 1 ? ` × ${q.coefficient} (coef)` : "", mine.answer.joker ? ` ÷ ${JOKER_DIVISOR} (joker)` : ""].join("");
+  if (q.type === "choice") return score.baseMalus === 0 ? "Bonne réponse : 0 de malus" : `Mauvaise réponse : ${formatMalus(score.baseMalus)}${operations}`;
+  return `Écart ${formatMalus(score.baseMalus)}${q.unit ? ` ${q.unit}` : ""}${operations}`;
 }
 
-/** "Ton prono : 240 · écart 4 %". */
+/** "Ton prono : 240 · écart 10 (4 %)". */
 function scoreHeadline(q: QuestionDetail, mine: ResultRow): string {
   const score = mine.score!;
   const parts = [`Ton prono : ${answerText(q, mine.answer)}`];
-  if (q.type === "choice") parts.push(score.basePoints > 0 ? "bonne réponse" : "mauvaise réponse");
-  else if (score.relativeError !== null && Number.isFinite(score.relativeError)) parts.push(`écart ${formatPercent(score.relativeError)}`);
+  if (q.type === "choice") parts.push(score.baseMalus === 0 ? "bonne réponse" : "mauvaise réponse");
+  else {
+    const relative = score.relativeError !== null && Number.isFinite(score.relativeError) ? ` (${formatPercent(score.relativeError)})` : "";
+    parts.push(`écart ${formatMalus(score.baseMalus)}${relative}`);
+  }
   if (score.bullseye) parts.push("Dans le mille");
   return parts.join(" · ");
 }
 
-function MyScore({ question: q, mine }: { question: QuestionDetail; mine: ResultRow | null }) {
+/** The malus in large type, with its word underneath. */
+function BigMalus({ hundredths }: { hundredths: number }) {
+  return (
+    <p className="ml-auto flex shrink-0 flex-col items-end">
+      <span className="font-display text-[44px] leading-none font-extrabold tabular-nums">
+        <span className="sr-only">Malus : </span>
+        {formatMalus(hundredths)}
+      </span>
+      <span aria-hidden className="font-display text-[13px] font-extrabold uppercase tracking-[0.08em]">
+        malus
+      </span>
+    </p>
+  );
+}
+
+/**
+ * The "Ton prono" band (§8.2, v1.2): raw gap, coefficient, joker and malus. Without a prediction, the
+ * malus of the worst prediction, when the viewer is in the standings of the season.
+ */
+function MyScore({ question: q, results }: { question: QuestionDetail; results: QuestionResults }) {
+  const { mine, absents, absentMalus } = results;
   if (!mine?.score) {
-    return <p className="rounded-field bg-raised px-4 py-3 text-[15px] text-ink-2">Tu n&apos;as pas fait de prono sur cette question.</p>;
+    if (absentMalus === null || !absents.some(({ isViewer }) => isViewer)) {
+      return <p className="rounded-field bg-raised px-4 py-3 text-[15px] text-ink-2">Tu n&apos;as pas fait de prono sur cette question.</p>;
+    }
+    return (
+      <div className="flex items-center gap-3.5 rounded-field bg-accent px-4 py-3 text-accent-ink">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="font-display text-lg font-extrabold uppercase">Pas de prono : malus du pire prono</p>
+          <p className="text-sm font-medium">Sans prono, tu prends le malus du prono le plus éloigné.</p>
+        </div>
+        <BigMalus hundredths={absentMalus} />
+      </div>
+    );
   }
-  const { total } = mine.score;
   return (
     <div className="flex items-center gap-3.5 rounded-field bg-accent px-4 py-3 text-accent-ink">
       <div className="flex min-w-0 flex-col gap-0.5">
         <p className="font-display text-lg font-extrabold uppercase">{scoreHeadline(q, mine)}</p>
-        <p className="text-sm font-medium">{scoreDetail(q, mine)}</p>
+        <p className="text-sm font-medium">{malusDetail(q, mine)}</p>
       </div>
-      <p className="ml-auto font-display text-[44px] leading-none font-extrabold tabular-nums">
-        <span className="sr-only">Total : </span>
-        {total > 0 ? `+${total}` : "0"}
-        <span className="sr-only"> points</span>
-      </p>
+      <BigMalus hundredths={mine.score.total} />
     </div>
   );
 }
@@ -94,7 +111,7 @@ export function ResultPanel({
   /** False when the page lists every prediction in its own table. */
   withChartTable?: boolean;
 }) {
-  const { crowd, mine, rows, badges } = results;
+  const { crowd, rows, badges } = results;
   const resolved = q.status === "resolved" && q.result !== null;
 
   return (
@@ -137,7 +154,7 @@ export function ResultPanel({
         </>
       )}
 
-      {resolved ? <MyScore question={q} mine={mine} /> : null}
+      {resolved ? <MyScore question={q} results={results} /> : null}
       {badges.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2.5">
           <BadgeList

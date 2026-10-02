@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Countdown } from "@/components/game/Countdown";
 import { hasHelp, HelpPanel } from "@/components/game/HelpPanel";
-import { NewChip } from "@/components/game/NewChip";
+import { ExtendedChip, NewChip } from "@/components/game/NewChip";
 import { PredictionForm } from "@/components/game/PredictionForm";
 import { predictionFormProps } from "@/components/game/prediction-form-props";
 import { Chip } from "@/components/ui/Chip";
@@ -12,7 +12,9 @@ import { Tabs } from "@/components/ui/Tabs";
 import { requireUser } from "@/lib/auth/session";
 import { getOpenQuestionsForViewer, type PlayerQuestion } from "@/lib/data/questions";
 import { getDb } from "@/lib/db/client";
+import { malusText } from "@/lib/format";
 import type { PredictionState } from "@/lib/game/prediction-state";
+import { toHundredths } from "@/lib/game/scoring";
 import { QUESTION_KIND_LABELS } from "@/lib/validation/question";
 
 export const metadata: Metadata = { title: "Mes pronos" };
@@ -39,15 +41,19 @@ function QuestionRow({ question: q, serverNow }: { question: PlayerQuestion; ser
         <div className="flex flex-wrap items-center gap-2">
           <Chip>{q.categoryName}</Chip>
           <Chip tone="outline">Coef ×{q.coefficient}</Chip>
-          {q.isNew ? <NewChip /> : null}
+          {q.extendedUntil ? <ExtendedChip /> : q.isNew ? <NewChip /> : null}
         </div>
         <h2 id={titleId} className="text-lg font-semibold">
           <Link href={`/questions/${q.id}`} className="hover:text-accent-text hover:underline">
             {q.title}
           </Link>
         </h2>
-        <p className="text-sm text-muted">{QUESTION_KIND_LABELS[q.kind]}</p>
-        <Countdown closesAt={q.closesAt.getTime()} serverNow={serverNow} variant="compact" />
+        <p className="text-sm text-muted">
+          {QUESTION_KIND_LABELS[q.kind]}
+          {q.wrongAnswerMalus !== null ? ` · mauvaise réponse : ${malusText(toHundredths(q.wrongAnswerMalus))}` : ""}
+        </p>
+        {/* Until the viewer's own deadline while their extension runs (v1.2). */}
+        <Countdown closesAt={q.deadline.getTime()} serverNow={serverNow} variant="compact" />
         {hasHelp(q.help) ? (
           <details className="group mt-1">
             <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-button border border-line-strong px-3 py-1.5 font-display text-base font-bold uppercase tracking-[0.06em] text-ink-2 hover:bg-chip [&::-webkit-details-marker]:hidden">

@@ -9,7 +9,7 @@ export function predictionFormProps(q: PlayerQuestion): PredictionFormProps {
     type: q.type,
     kind: q.kind,
     unit: q.unit,
-    priceIsRight: q.priceIsRight,
+    wrongAnswerMalus: q.wrongAnswerMalus,
     options: q.options,
     state: q.state,
     mine: q.mine ? { optionId: q.mine.optionId, joker: q.mine.joker, validatedAt: q.mine.validatedAt, savedAt: q.mine.savedAt } : null,

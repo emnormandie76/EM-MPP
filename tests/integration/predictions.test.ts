@@ -1,8 +1,11 @@
 import { and, asc, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db/client";
-import { prediction, predictionEvent, user } from "@/lib/db/schema";
+import { prediction, predictionEvent, season, user } from "@/lib/db/schema";
+import { getQuestionPredictionsForViewer } from "@/lib/data/questions";
 import { JOKERS_PER_SEASON } from "@/lib/game/constants";
+import { utcToParisLocalInput } from "@/lib/game/time";
+import { cancelQuestionExtension, setQuestionExtension } from "@/lib/services/extensions";
 import { cancelQuestion } from "@/lib/services/questions";
 import { savePrediction, setJoker, unlockPrediction, validatePrediction } from "@/lib/services/predictions";
 import { recordVisit } from "@/lib/services/profile";
@@ -350,6 +353,94 @@ describe("unlockPrediction (§5.4)", () => {
 
     expect(await unlockPrediction(db, admin, { predictionId: 999_999 }, now)).toMatchObject({ ok: false, code: "NOT_FOUND" });
     expect(await unlockPrediction(db, admin, { predictionId: "abc" }, now)).toMatchObject({ ok: false, code: "INVALID_INPUT" });
+  });
+});
+
+describe("jokers allowed by season (v1.2, §5.13)", () => {
+  it("JOKERS_DISABLED: no joker can be posed nor removed in a season that does not allow them", async () => {
+    const q = await openQuestion();
+    await createPrediction(db, { questionId: q.id, userId: player.id, valueNumber: 240, joker: true });
+    await db.update(season).set({ jokersEnabled: false }).where(eq(season.id, q.seasonId!));
+    expect(await setJoker(db, player, { questionId: q.id, enabled: false }, now)).toEqual({
+      ok: false,
+      code: "JOKERS_DISABLED",
+      message: "Pas de joker cette saison.",
+    });
+    const other = await openQuestion();
+    await savePrediction(db, player, { questionId: other.id, rawValue: "12" }, now);
+    expect(await setJoker(db, player, { questionId: other.id, enabled: true }, now)).toMatchObject({ code: "JOKERS_DISABLED" });
+    expect((await predictionOf(other.id)).joker).toBe(false);
+  });
+
+  it("a question that is not open stays « not open », whatever the season allows", async () => {
+    const closed = await openQuestion({ opensAt: clock.at("-3d"), closesAt: clock.at("-1d") });
+    await db.update(season).set({ jokersEnabled: false }).where(eq(season.id, closed.seasonId!));
+    expect(await setJoker(db, player, { questionId: closed.id, enabled: true }, now)).toMatchObject({ code: "QUESTION_NOT_OPEN" });
+  });
+});
+
+describe("extensions (v1.2, §5.2, §5.4, §5.14)", () => {
+  /** A question closed yesterday, without result, and an extension for the player until `deadline`. */
+  async function extended(deadline = clock.at("+2d")) {
+    const q = await openQuestion({ opensAt: clock.at("-5d"), closesAt: clock.at("-1d") });
+    const granted = await setQuestionExtension(db, admin, { questionId: q.id, userId: player.id, closesAt: utcToParisLocalInput(deadline) }, now);
+    expect(granted).toMatchObject({ ok: true });
+    return q;
+  }
+
+  it("the extended player saves, validates and poses a joker until the deadline; another player is still refused", async () => {
+    const q = await extended();
+    expect(await savePrediction(db, player, { questionId: q.id, rawValue: "240" }, now)).toMatchObject({ ok: true });
+    expect(await setJoker(db, player, { questionId: q.id, enabled: true }, now)).toMatchObject({ ok: true, data: { joker: true } });
+    const other = actorOf(await createUser(db));
+    expect(await savePrediction(db, other, { questionId: q.id, rawValue: "250" }, now)).toMatchObject({ code: "QUESTION_NOT_OPEN" });
+    expect(await validatePrediction(db, player, { questionId: q.id, rawValue: "245" }, clock.at("+1d"))).toMatchObject({ ok: true });
+    expect(await predictionOf(q.id)).toMatchObject({ valueNumber: 245, joker: true, validatedAt: clock.at("+1d") });
+  });
+
+  it("the deadline is excluded, like a closing: refused at the deadline, and a saved prediction counts as validated (PR9)", async () => {
+    const deadline = clock.at("+2d");
+    const q = await extended(deadline);
+    await savePrediction(db, player, { questionId: q.id, rawValue: "240" }, now);
+    const lastMoment = new Date(deadline.getTime() - 1);
+    expect(await savePrediction(db, player, { questionId: q.id, rawValue: "241" }, lastMoment)).toMatchObject({ ok: true });
+    expect(await savePrediction(db, player, { questionId: q.id, rawValue: "242" }, deadline)).toMatchObject({ code: "QUESTION_NOT_OPEN" });
+    expect(await setJoker(db, player, { questionId: q.id, enabled: true }, deadline)).toMatchObject({ code: "QUESTION_NOT_OPEN" });
+    const views = await getQuestionPredictionsForViewer(db, admin, q.id, deadline);
+    expect(views?.find(({ userId }) => userId === player.id)?.state).toBe("validated");
+    // Before the deadline, the same prediction was only saved.
+    const before = await getQuestionPredictionsForViewer(db, admin, q.id, lastMoment);
+    expect(before?.find(({ userId }) => userId === player.id)?.state).toBe("saved");
+  });
+
+  it("a prediction saved during the extension counts as validated once the extension is cancelled (PR8)", async () => {
+    const q = await extended();
+    await savePrediction(db, player, { questionId: q.id, rawValue: "240" }, now);
+    expect(await cancelQuestionExtension(db, admin, { questionId: q.id, userId: player.id }, now)).toEqual({ ok: true, data: { ended: "closed" } });
+    expect(await savePrediction(db, player, { questionId: q.id, rawValue: "241" }, now)).toMatchObject({ code: "QUESTION_NOT_OPEN" });
+    const views = await getQuestionPredictionsForViewer(db, admin, q.id, now);
+    expect(views?.find(({ userId }) => userId === player.id)?.state).toBe("validated");
+  });
+
+  it("the admin unlocks a prediction validated during the extension, and the player changes it", async () => {
+    const q = await extended();
+    await validatePrediction(db, player, { questionId: q.id, rawValue: "240" }, now);
+    const { id: predictionId } = await predictionOf(q.id);
+    expect(await unlockPrediction(db, admin, { predictionId }, now)).toEqual({ ok: true, data: undefined });
+    expect(await savePrediction(db, player, { questionId: q.id, rawValue: "250" }, now)).toMatchObject({ ok: true });
+    // After the deadline, no more unlocking.
+    await validatePrediction(db, player, { questionId: q.id }, now);
+    expect(await unlockPrediction(db, admin, { predictionId }, clock.at("+3d"))).toMatchObject({ code: "QUESTION_NOT_OPEN" });
+  });
+
+  it("counts the joker of the extended question in its season, with the limit of 2", async () => {
+    const q = await extended();
+    for (let posed = 0; posed < 2; posed += 1) {
+      const other = await openQuestion();
+      await createPrediction(db, { questionId: other.id, userId: player.id, valueNumber: 1, joker: true });
+    }
+    await savePrediction(db, player, { questionId: q.id, rawValue: "240" }, now);
+    expect(await setJoker(db, player, { questionId: q.id, enabled: true }, now)).toMatchObject({ code: "NO_JOKER_LEFT" });
   });
 });
 

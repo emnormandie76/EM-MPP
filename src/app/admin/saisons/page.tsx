@@ -89,6 +89,8 @@ export default async function SeasonsAdminPage() {
           <dl className="grid grid-cols-1 gap-x-8 gap-y-1 text-[15px] sm:grid-cols-[auto_1fr]">
             <dt className="text-muted">Dates</dt>
             <dd>{datesOf(season, now)}</dd>
+            <dt className="text-muted">Jokers</dt>
+            <dd>{season.jokersEnabled ? "autorisés" : "non"}</dd>
             <dt className="text-muted">Questions résolues</dt>
             <dd className="tabular-nums">
               {season.questionsResolved} / {season.questionsTotal}
@@ -110,6 +112,8 @@ export default async function SeasonsAdminPage() {
               startsOn: utcToParisLocalDate(season.startsAt),
               proclaimed: season.proclaimedAt !== null,
               prizeCount: season.prizes.length,
+              jokersEnabled: season.jokersEnabled,
+              jokersPosed: season.jokersPosed,
             }}
             deleteBlocked={deleteBlocked(season)}
           />

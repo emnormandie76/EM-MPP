@@ -1,6 +1,7 @@
 import "server-only";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import type { Viewer } from "@/lib/auth/session";
+import type { AvatarKey } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
 import { question } from "@/lib/db/schema";
 import type { BadgeKey } from "@/lib/game/badges";
@@ -8,11 +9,13 @@ import { choiceDistribution, numberCrowd, relativeGap } from "@/lib/game/crowd";
 import { type PredictionScore, scoreQuestion } from "@/lib/game/scoring";
 import { getBadgesOnQuestion } from "./badges";
 import { getQuestionDetail, getQuestionPredictionsForViewer, type PredictionAnswer, type PredictionView, type QuestionDetail } from "./questions";
+import { getSeasonPlayers } from "./standings";
 
-// What a question shows once closed (architecture §5.7, §6.6, §8.3): everyone's predictions, the
-// wisdom of the crowd and, once resolved, the points of each player. The predictions come from
-// getQuestionPredictionsForViewer, the only read of the others' predictions, which reveals them
-// only after the closing.
+// What a question shows once closed (architecture §5.7, §6.6, §8.3): the predictions the viewer may
+// see, the wisdom of the crowd and, once resolved, the malus of each player, absent players included
+// (v1.2). The predictions come from getQuestionPredictionsForViewer, the only read of the others'
+// predictions: before the result, it shows them only to whoever predicted the question, and hides
+// those of the players whose extension runs.
 
 type PlayerViewer = Pick<Viewer, "id" | "role" | "lastSeenAt" | "previousVisitAt">;
 
@@ -24,6 +27,9 @@ export type ResultRow = Omit<PredictionView, "answer"> & {
   isViewer: boolean;
   score: ResultScore | null;
 };
+
+/** A player of the standings without a prediction on a resolved question, with the malus of the absence. */
+export type AbsentRow = { userId: string; name: string; avatar: AvatarKey; inactive: boolean; isViewer: boolean; malus: number };
 
 export type NumberCrowdView = {
   kind: "number";
@@ -44,10 +50,14 @@ export type ChoiceCrowdView = {
 };
 
 export type QuestionResults = {
-  /** Closed: by name. Resolved: by total, highest first, then by name. */
+  /** Closed: by name. Resolved: by malus, the smallest first, then by name. */
   rows: ResultRow[];
   mine: ResultRow | null;
-  /** Null without any prediction. */
+  /** Resolved: the players of the standings without a prediction, by name (v1.2). */
+  absents: AbsentRow[];
+  /** Resolved: the malus of an absence, in hundredths (the worst prediction's); null before. */
+  absentMalus: number | null;
+  /** Null without any visible prediction. */
   crowd: NumberCrowdView | ChoiceCrowdView | null;
   /** Badges the viewer earned on this question, once resolved. */
   badges: BadgeKey[];
@@ -65,22 +75,26 @@ export async function getQuestionResults(db: Database, viewer: PlayerViewer, q: 
   if (!views) return null;
   const answered = views.flatMap((view) => (view.answer ? [{ ...view, answer: view.answer }] : []));
 
-  const scores: (ResultScore | null)[] = q.result
-    ? scoreQuestion(
-        { type: q.type, priceIsRight: q.priceIsRight, coefficient: q.coefficient, resultNumber: q.result.valueNumber, resultOptionId: q.result.optionId },
-        answered.map(({ answer }) => answer),
-      ).map(({ basePoints, podiumRank, podiumBonus, bullseye, relativeError, wentOver, total }) => ({
-        basePoints,
-        podiumRank,
-        podiumBonus,
-        bullseye,
-        relativeError,
-        wentOver,
-        total,
-      }))
-    : answered.map(() => null);
+  let scores: (ResultScore | null)[] = answered.map(() => null);
+  let absents: AbsentRow[] = [];
+  let absentMalus: number | null = null;
+  if (q.result) {
+    // Resolved: every prediction is visible (§6.6), so the malus of an absence is the true one.
+    const scored = scoreQuestion(
+      { type: q.type, coefficient: q.coefficient, resultNumber: q.result.valueNumber, resultOptionId: q.result.optionId, wrongAnswerMalus: q.wrongAnswerMalus },
+      answered.map(({ answer }) => answer),
+    );
+    scores = scored.scores.map(({ baseMalus, total, bullseye, relativeError, podiumRank }) => ({ baseMalus, total, bullseye, relativeError, podiumRank }));
+    absentMalus = scored.absentMalus;
+    const predicted = new Set(answered.map(({ userId }) => userId));
+    const seasonId = await seasonOf(db, q.id);
+    absents = (seasonId === null ? [] : await getSeasonPlayers(db, seasonId))
+      .filter(({ id }) => !predicted.has(id))
+      .map((player) => ({ userId: player.id, name: player.name, avatar: player.avatar, inactive: player.inactive, isViewer: player.id === viewer.id, malus: scored.absentMalus }))
+      .sort((a, b) => byName.compare(a.name, b.name));
+  }
   const rows: ResultRow[] = answered.map((view, index) => ({ ...view, isViewer: view.userId === viewer.id, score: scores[index] }));
-  rows.sort((a, b) => (b.score?.total ?? 0) - (a.score?.total ?? 0) || byName.compare(a.name, b.name));
+  rows.sort((a, b) => (a.score?.total ?? 0) - (b.score?.total ?? 0) || byName.compare(a.name, b.name));
   const mine = rows.find(({ isViewer }) => isViewer) ?? null;
 
   let crowd: QuestionResults["crowd"] = null;
@@ -111,7 +125,12 @@ export async function getQuestionResults(db: Database, viewer: PlayerViewer, q: 
   }
 
   const badges = q.status === "resolved" && mine ? await getBadgesOnQuestion(db, viewer, viewer.id, q.id) : [];
-  return { rows, mine, crowd, badges };
+  return { rows, mine, absents, absentMalus, crowd, badges };
+}
+
+async function seasonOf(db: Database, questionId: number): Promise<number | null> {
+  const [row] = await db.select({ seasonId: question.seasonId }).from(question).where(eq(question.id, questionId));
+  return row?.seasonId ?? null;
 }
 
 export type LatestResult = { question: QuestionDetail; results: QuestionResults };

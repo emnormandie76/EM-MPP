@@ -40,7 +40,7 @@ export default async function StandingsPage({ searchParams }: PageProps<"/classe
             Après {formatCount(resolvedCount, "question résolue", "questions résolues")}. Les flèches montrent l&apos;évolution
             depuis le résultat précédent.
           </p>
-          {/* On a phone, the compact list keeps the points in sight (decision of 01/10/2026). */}
+          {/* On a phone, the compact list keeps the malus in sight (decision of 01/10/2026). */}
           <div className="sm:hidden">
             <StandingsTable rows={rows} label={`Classement de la saison ${season.label}`} seasonId={season.id} />
           </div>
@@ -50,7 +50,7 @@ export default async function StandingsPage({ searchParams }: PageProps<"/classe
         </Card>
       )}
 
-      <p className="text-[15px] text-ink-2">Départage : nombre de Dans le mille, puis écart moyen le plus faible.</p>
+      <p className="text-[15px] text-ink-2">Le moins de malus est en tête. Départage : nombre de Dans le mille, puis écart moyen le plus faible.</p>
       {season?.proclaimed ? (
         <p className="text-[15px] text-ink-2">
           Le classement final de cette saison est proclamé :{" "}

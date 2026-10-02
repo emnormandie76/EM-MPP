@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatars/Avatar";
+import { ExtensionControls } from "@/components/admin/ExtensionControls";
 import { QuestionActions } from "@/components/admin/QuestionActions";
 import { QuestionForm, type QuestionFormLocks } from "@/components/admin/QuestionForm";
 import { QuestionStatusChip } from "@/components/admin/QuestionStatusChip";
@@ -16,7 +17,8 @@ import { TableScroll } from "@/components/ui/TableScroll";
 import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { type AdminQuestion, getAdminQuestion, getQuestionHistory, type HistoryEvent, type HistoryEventType, type TrackingRow } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
-import { formatCount, formatDateTime, formatNumber } from "@/lib/format";
+import { formatCount, formatDateTime, formatNumber, malusText } from "@/lib/format";
+import { toHundredths } from "@/lib/game/scoring";
 import { ERROR_MESSAGES } from "@/lib/services/result";
 import { NO_SEASON_YET } from "@/lib/validation/question";
 import type { PredictionState } from "@/lib/game/prediction-state";
@@ -33,7 +35,7 @@ const TD = "px-3 py-2.5 align-middle";
 
 const CONTENT_LOCKS = {
   QUESTION_LOCKED:
-    "Des pronos existent : le type, l'énoncé, la description, l'unité, les réponses, la source et le coefficient ne peuvent plus changer. Pour les modifier, annule la question et crée une nouvelle question.",
+    "Des pronos existent : le type, l'énoncé, la description, l'unité, les réponses, le malus d'une mauvaise réponse, la source et le coefficient ne peuvent plus changer. Pour les modifier, annule la question et crée une nouvelle question.",
   QUESTION_CLOSED: "La question est clôturée : seuls la catégorie, l'aide et la date de résultat prévue peuvent encore changer.",
   QUESTION_CANCELLED: "La question est annulée : elle ne peut plus être modifiée.",
 } as const;
@@ -96,10 +98,33 @@ function answerText(answer: TrackingRow["answer"], detail: AdminQuestion): strin
   return detail.options.find(({ id }) => id === optionId)?.label ?? "—";
 }
 
+const HOUR_MS = 3_600_000;
+const EXTENSION_MS = 48 * HOUR_MS;
+
+/**
+ * Prefill of a new deadline (§8.2 ExtensionDialog): 48 h after now, or after the closing if it is
+ * later (absence planned on an open question), on the hour.
+ */
+function defaultDeadline(closesAt: Date | null, now: Date): string {
+  const from = Math.max(now.getTime(), closesAt?.getTime() ?? 0) + EXTENSION_MS;
+  return utcToParisLocalInput(new Date(Math.ceil(from / HOUR_MS) * HOUR_MS));
+}
+
+/** Why the values are not shown in the follow-up, or null when they are (§6.6, v1.2). */
+function hiddenValuesNote(detail: AdminQuestion, revealed: boolean): string | null {
+  if (revealed) return null;
+  const status = detail.question.computedStatus;
+  if (status === "closed") return "Tu n'as pas pronostiqué cette question : comme les joueurs, tu verras les valeurs au résultat.";
+  if (status === "cancelled") return "La question est annulée : seuls les états sont visibles.";
+  return "Avant la clôture, seuls les états sont visibles : personne ne voit les valeurs, pas même l'admin.";
+}
+
 function Tracking({ detail, rows, now }: { detail: AdminQuestion; rows: TrackingRow[]; now: Date }) {
   const revealed = rows.some(({ answer }) => answer !== null);
-  // Unlocking is possible while the question is open, on a validated prediction (§5.4).
-  const canUnlock = detail.question.computedStatus === "open";
+  const note = hiddenValuesNote(detail, revealed);
+  // Unlocking (§5.4) and extensions (§5.14): the actions each row allows.
+  const withActions = rows.some(({ canUnlock, canExtend, canChangeExtension }) => canUnlock || canExtend || canChangeExtension);
+  const withExtensions = withActions || rows.some(({ extension }) => extension !== null);
   const active = rows.filter(({ inactive }) => !inactive);
   const validated = active.filter(({ state }) => state === "validated").length;
   return (
@@ -112,11 +137,7 @@ function Tracking({ detail, rows, now }: { detail: AdminQuestion; rows: Tracking
           Validés {validated} / {active.length}
         </p>
       </div>
-      {!revealed ? (
-        <p className="text-[15px] text-ink-2">
-          Avant la clôture, seuls les états sont visibles : personne ne voit les valeurs, pas même l&apos;admin.
-        </p>
-      ) : null}
+      {note ? <p className="text-[15px] text-ink-2">{note}</p> : null}
       <TableScroll label="Suivi des joueurs">
         <table className="w-full min-w-140 text-left text-[15px]">
           <caption className="sr-only">Suivi des joueurs</caption>
@@ -125,7 +146,8 @@ function Tracking({ detail, rows, now }: { detail: AdminQuestion; rows: Tracking
               <th scope="col" className={TH}>Joueur</th>
               <th scope="col" className={TH}>État</th>
               <th scope="col" className={TH}>Validé le</th>
-              {canUnlock ? (
+              {withExtensions ? <th scope="col" className={TH}>Prolongation</th> : null}
+              {withActions ? (
                 <th scope="col" className={TH}>
                   <span className="sr-only">Action</span>
                 </th>
@@ -152,11 +174,33 @@ function Tracking({ detail, rows, now }: { detail: AdminQuestion; rows: Tracking
                   <StateLabel state={row.state} />
                 </td>
                 <td className={`${TD} whitespace-nowrap text-muted`}>{row.validatedAt ? formatDateTime(row.validatedAt, now) : "—"}</td>
-                {canUnlock ? (
+                {withExtensions ? (
+                  <td className={`${TD} whitespace-nowrap`}>
+                    {row.extension ? (
+                      <span className={row.extension.running ? "font-semibold" : "text-muted"}>
+                        {row.extension.running ? "jusqu'au " : "terminée le "}
+                        {formatDateTime(row.extension.closesAt, now)}
+                      </span>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
+                ) : null}
+                {withActions ? (
                   <td className={TD}>
-                    {row.state === "validated" && row.predictionId !== null ? (
-                      <UnlockButton predictionId={row.predictionId} playerName={row.name} />
-                    ) : null}
+                    <div className="flex flex-col items-start gap-2">
+                      {row.canUnlock && row.predictionId !== null ? <UnlockButton predictionId={row.predictionId} playerName={row.name} /> : null}
+                      <ExtensionControls
+                        questionId={detail.question.id}
+                        userId={row.userId}
+                        playerName={row.name}
+                        canExtend={row.canExtend}
+                        canChange={row.canChangeExtension}
+                        defaultClosesAt={
+                          row.extension?.running ? utcToParisLocalInput(row.extension.closesAt) : defaultDeadline(detail.question.closesAt, now)
+                        }
+                      />
+                    </div>
                   </td>
                 ) : null}
                 {revealed ? (
@@ -182,7 +226,7 @@ const EVENT_LABELS: Record<HistoryEventType, string> = {
   joker_off: "Joker retiré",
 };
 
-/** History of the predictions (§8.3): without values before the closing (§6.6). */
+/** History of the predictions (§8.3): without values before the closing, and v1.2 cases (§6.6). */
 function History({ detail, events, now }: { detail: AdminQuestion; events: HistoryEvent[]; now: Date }) {
   const revealed = events.some(({ answer }) => answer !== null);
   return (
@@ -194,7 +238,13 @@ function History({ detail, events, now }: { detail: AdminQuestion; events: Histo
         <p className="text-[15px] text-ink-2">Aucun prono pour l&apos;instant.</p>
       ) : (
         <>
-          {!revealed ? <p className="text-[15px] text-ink-2">Avant la clôture, l&apos;historique ne montre ni les valeurs ni les réponses.</p> : null}
+          {!revealed ? (
+            <p className="text-[15px] text-ink-2">
+              {detail.question.computedStatus === "closed"
+                ? "Tu n'as pas pronostiqué cette question : l'historique ne montre les valeurs qu'au résultat."
+                : "Avant la clôture, l'historique ne montre ni les valeurs ni les réponses."}
+            </p>
+          ) : null}
           <TableScroll label="Historique des pronos">
             <table className="w-full min-w-140 text-left text-[15px]">
               <caption className="sr-only">Historique des pronos</caption>
@@ -265,7 +315,7 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
           <QuestionStatusChip status={status} />
           <Chip>{q.categoryName}</Chip>
           <Chip tone="outline">Coef ×{q.coefficient}</Chip>
-          {q.priceIsRight ? <Chip tone="outline">Juste Prix</Chip> : null}
+          {q.wrongAnswerMalus !== null ? <Chip tone="outline">Mauvaise réponse : {malusText(toHundredths(q.wrongAnswerMalus))}</Chip> : null}
         </div>
         <h1 className="font-display text-[32px] font-extrabold uppercase leading-tight">{q.title}</h1>
         <p className="text-[15px] text-muted">
@@ -309,7 +359,13 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
             {!q.resolvedAt && q.expectedResultAt ? ` Résultat prévu le ${formatDateTime(q.expectedResultAt, now)}.` : ""}
           </p>
           <p className="text-[15px] text-ink-2">Source : {q.source}</p>
+          {detail.extensionBlocker ? (
+            <p className="rounded-field bg-raised px-3 py-2 text-[15px] text-ink-2">
+              {detail.extensionBlocker} Le résultat se saisit après sa fin, ou une fois la prolongation annulée.
+            </p>
+          ) : null}
           <ResultForm
+            blocked={detail.extensionBlocker !== null}
             questionId={q.id}
             type={q.type}
             unit={q.unit}
@@ -339,6 +395,7 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
           description: q.description ?? "",
           unit: q.unit ?? "",
           options: options.map(({ label }) => label),
+          wrongAnswerMalus: q.wrongAnswerMalus === null ? "" : formatNumber(q.wrongAnswerMalus),
           source: q.source,
           coefficient: q.coefficient,
           helpBiUrl: q.helpBiUrl ?? "",

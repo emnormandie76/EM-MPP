@@ -67,7 +67,7 @@ async function seasonOfClosing(db: Database, closesAt: Date) {
 
 /**
  * A question, draft by default. With a closing date, its season is set as the services do (§4.5).
- * A choice question gets `options` (default: Oui, Non).
+ * A choice question gets `options` (default: Oui, Non) and a malus of a wrong answer (default: 50).
  */
 export async function createQuestion(db: Database, overrides: Partial<QuestionInsert> & { options?: string[] } = {}) {
   const { options, ...values } = overrides;
@@ -85,6 +85,7 @@ export async function createQuestion(db: Database, overrides: Partial<QuestionIn
       title: "Combien de participants à la JPO ?",
       unit: "participants",
       source: "Tableau BI « JPO », total du jour",
+      ...(values.type === "choice" ? { wrongAnswerMalus: 50 } : {}),
       ...values,
       categoryId,
       createdBy,

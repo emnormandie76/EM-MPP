@@ -13,10 +13,11 @@
   --color-ink: #0b0e13;
   --color-ink-2: #2f3642;
   --color-muted: #5b6472;
-  --color-accent: #1f5bff;
+  /* v1.2: main color #0036B3, chosen by the user on 02/10/2026 (it replaces the #1F5BFF of the mock-up). */
+  --color-accent: #0036b3;
   --color-accent-ink: #ffffff;
-  --color-accent-text: #1a4fe0;
-  --color-accent-soft: rgb(31 91 255 / 0.12);
+  --color-accent-text: #0036b3;
+  --color-accent-soft: rgb(0 54 179 / 0.12);
   --color-hot: #d2352b;
   --color-warn: #a15c00;
   --color-up: #15803d;

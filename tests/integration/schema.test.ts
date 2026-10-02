@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db/client";
-import { allowedEmail, category, prediction, question, questionOption, season } from "@/lib/db/schema";
+import { allowedEmail, category, prediction, question, questionExtension, questionOption, season, seasonStanding } from "@/lib/db/schema";
 import { createTestDb } from "../helpers/db";
 import { createCategory, createPrediction, createQuestion, createUser } from "../helpers/factories";
 
@@ -102,8 +102,19 @@ describe("database schema", () => {
       );
     });
 
-    it("refuses Juste Prix on a choice question", async () => {
-      expect(await refusal(createQuestion(db, { type: "choice", priceIsRight: true }))).toContain("question_price_is_right_number");
+    it("refuses the Juste Prix, removed in v1.2, on any question", async () => {
+      expect(await refusal(createQuestion(db, { priceIsRight: true }))).toContain("question_price_is_right_removed");
+      expect(await refusal(createQuestion(db, { type: "choice", priceIsRight: true }))).toContain("question_price_is_right_removed");
+    });
+
+    it("refuses a choice question without the malus of a wrong answer, and a number question with one (v1.2)", async () => {
+      expect(await refusal(createQuestion(db, { type: "choice", wrongAnswerMalus: null }))).toContain("question_wrong_answer_malus");
+      expect(await refusal(createQuestion(db, { type: "number", wrongAnswerMalus: 50 }))).toContain("question_wrong_answer_malus");
+      expect((await createQuestion(db, { type: "choice", wrongAnswerMalus: 12.5 })).wrongAnswerMalus).toBe(12.5);
+    });
+
+    it("refuses a malus of a wrong answer of 0 (v1.2)", async () => {
+      expect(await refusal(createQuestion(db, { type: "choice", wrongAnswerMalus: 0 }))).toContain("question_wrong_answer_malus_positive");
     });
 
     it("refuses a title shorter than 5 or longer than 200 characters", async () => {
@@ -141,6 +152,32 @@ describe("database schema", () => {
     });
   });
 
+  describe("extensions (v1.2)", () => {
+    it("keeps one extension per player and question, and refuses an extension granted to oneself", async () => {
+      const admin = await createUser(db, { role: "admin" });
+      const player = await createUser(db);
+      const q = await createQuestion(db, { status: "published", opensAt, closesAt });
+      const values = { questionId: q.id, userId: player.id, closesAt: new Date(closesAt.getTime() + 86_400_000), grantedBy: admin.id, grantedAt: closesAt };
+      await db.insert(questionExtension).values(values);
+      expect(await refusal(db.insert(questionExtension).values(values))).toContain("question_extension_question_id_user_id_pk");
+      expect(await refusal(db.insert(questionExtension).values({ ...values, userId: admin.id, grantedBy: admin.id }))).toContain(
+        "question_extension_not_self",
+      );
+    });
+  });
+
+  describe("palmarès (v1.2)", () => {
+    it("stores the malus with its decimals, and refuses a row with neither malus nor points", async () => {
+      const [row] = await db.insert(season).values({ label: "Saison du palmarès", startsAt: new Date("2041-09-01T22:00:00Z") }).returning();
+      const player = await createUser(db);
+      const standing = { seasonId: row.id, userId: player.id, rank: 1, bullseyes: 0, meanError: null, questionsPlayed: 1, nameSnapshot: player.name };
+      expect(await refusal(db.insert(seasonStanding).values(standing))).toContain("season_standing_score");
+      await db.insert(seasonStanding).values({ ...standing, malus: 250.5 });
+      const [read] = await db.select().from(seasonStanding).where(eq(seasonStanding.seasonId, row.id));
+      expect([read.malus, read.points]).toEqual([250.5, null]);
+    });
+  });
+
   describe("other tables", () => {
     it("keeps category names unique whatever the case", async () => {
       await createCategory(db, "Salons");
@@ -157,11 +194,13 @@ describe("database schema", () => {
   describe("seasons (v1.1)", () => {
     const startsAt = new Date("2030-09-01T22:00:00Z");
 
-    it("has no end date any more: a season ends where the next one starts", async () => {
+    it("has no end date any more: a season ends where the next one starts; jokers are allowed by default (v1.2)", async () => {
       const result = (await db.execute(sql`
         select column_name from information_schema.columns where table_schema = 'public' and table_name = 'season'
       `)) as unknown as { rows: { column_name: string }[] };
-      expect(result.rows.map(({ column_name }) => column_name).sort()).toEqual(["created_at", "id", "label", "proclaimed_at", "starts_at"]);
+      expect(result.rows.map(({ column_name }) => column_name).sort()).toEqual(["created_at", "id", "jokers_enabled", "label", "proclaimed_at", "starts_at"]);
+      const [row] = await db.insert(season).values({ label: "Saison par défaut", startsAt: new Date("2040-09-01T22:00:00Z") }).returning();
+      expect(row.jokersEnabled).toBe(true);
     });
 
     it("keeps names unique whatever the case, between 2 and 40 characters, with any format", async () => {
@@ -204,6 +243,7 @@ describe("database schema", () => {
         "question_season_status_idx",
         "question_closes_at_idx",
         "prediction_event_question_created_idx",
+        "question_extension_user_idx",
       ]),
     );
   });

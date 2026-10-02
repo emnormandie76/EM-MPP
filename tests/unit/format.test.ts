@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, formatDate, formatDateTime, formatNumber, formatPercent, formatRelative, lowerFirst, rankSuffix } from "@/lib/format";
+import { formatCount, formatDate, formatDateTime, formatMalus, formatNumber, formatPercent, formatRelative, lowerFirst, malusText, rankSuffix } from "@/lib/format";
 
 const NBSP = " ";
+
+describe("formatMalus", () => {
+  it("shows a malus in hundredths as a positive number with at most 2 decimals (v1.2)", () => {
+    expect(formatMalus(25_050)).toBe("250,5");
+    expect(formatMalus(5)).toBe("0,05");
+    expect(formatMalus(0)).toBe("0");
+    expect(formatMalus(2_400_000)).toBe(`24${NBSP}000`);
+    expect(malusText(25_000)).toBe("250 de malus");
+  });
+});
 
 describe("formatNumber", () => {
   it("groups thousands with a no-break space, not the narrow one, too thin to see (R-07)", () => {

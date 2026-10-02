@@ -1,7 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db/client";
-import { category, question, questionOption, season } from "@/lib/db/schema";
+import { category, question, questionExtension, questionOption, season } from "@/lib/db/schema";
 import { formatNumber } from "@/lib/format";
 import { parseNumberInput } from "@/lib/game/number-input";
 import {
@@ -18,6 +18,7 @@ import {
 import type { Actor } from "@/lib/services/result";
 import { makeClock } from "../helpers/clock";
 import { createTestDb } from "../helpers/db";
+import { cancelQuestionExtension } from "@/lib/services/extensions";
 import { createCategory, createPrediction, createQuestion as insertQuestion, createUser, ensureTestSeason } from "../helpers/factories";
 
 // Back-office questions (architecture §5.11, §11 É5). Dates are typed in Paris time. The admin has
@@ -145,6 +146,7 @@ describe("creation (§5.11)", () => {
     expect(q).toMatchObject({
       type: "number",
       priceIsRight: false,
+      wrongAnswerMalus: null,
       unit: "participants",
       description: "Tous programmes.",
       coefficient: 3,
@@ -160,18 +162,37 @@ describe("creation (§5.11)", () => {
     });
   });
 
-  it("creates a Juste Prix number question", async () => {
-    expect(await created({ kind: "priceIsRight" })).toMatchObject({ type: "number", priceIsRight: true, options: [] });
+  // v1.2: the Juste Prix is removed (decision of the user, 02/10/2026); this test replaces
+  // "creates a Juste Prix number question".
+  it("refuses the Juste Prix kind, removed in v1.2", async () => {
+    const result = await createQuestion(db, admin, base({ kind: "priceIsRight" }), now);
+    expect(result).toMatchObject({ ok: false, code: "INVALID_INPUT", fieldErrors: { kind: "Choisis un type de question." } });
+    expect(await db.select().from(question)).toEqual([]);
   });
 
-  it("creates a choice question with its answers in order, without unit", async () => {
-    const q = await created({ kind: "choice", options: [" BBA ", "Grande École", "MSc"] });
-    expect(q).toMatchObject({ type: "choice", priceIsRight: false, unit: null, options: ["BBA", "Grande École", "MSc"] });
+  it("creates a choice question with its answers in order, without unit, with the malus of a wrong answer", async () => {
+    const q = await created({ kind: "choice", options: [" BBA ", "Grande École", "MSc"], wrongAnswerMalus: "1 200,5" });
+    expect(q).toMatchObject({ type: "choice", priceIsRight: false, unit: null, wrongAnswerMalus: 1200.5, options: ["BBA", "Grande École", "MSc"] });
   });
 
   it("the yes/no template creates the answers « Oui » and « Non »", async () => {
-    const q = await created({ kind: "yesNo", options: ["Peut-être"] });
-    expect(q).toMatchObject({ type: "choice", unit: null, options: ["Oui", "Non"] });
+    const q = await created({ kind: "yesNo", options: ["Peut-être"], wrongAnswerMalus: "50" });
+    expect(q).toMatchObject({ type: "choice", unit: null, wrongAnswerMalus: 50, options: ["Oui", "Non"] });
+  });
+
+  it("a choice question needs a malus of a wrong answer, typed like a prediction and above 0 (v1.2)", async () => {
+    const refused = async (wrongAnswerMalus: string | undefined) =>
+      (await createQuestion(db, admin, base({ kind: "choice", options: ["A", "B"], wrongAnswerMalus }), now)) as { fieldErrors?: Record<string, string> };
+    expect((await refused(undefined)).fieldErrors).toEqual({ wrongAnswerMalus: "Indique le malus d'une mauvaise réponse." });
+    expect((await refused("  ")).fieldErrors).toEqual({ wrongAnswerMalus: "Indique le malus d'une mauvaise réponse." });
+    expect((await refused("0")).fieldErrors).toEqual({ wrongAnswerMalus: "Le malus doit être supérieur à 0." });
+    expect((await refused("2.450")).fieldErrors).toEqual({ wrongAnswerMalus: (parseNumberInput("2.450") as { message: string }).message });
+    expect((await refused("-5")).fieldErrors?.wrongAnswerMalus).toBeDefined();
+    expect(await db.select().from(question)).toEqual([]);
+  });
+
+  it("a number question has no malus of a wrong answer, even when one is sent", async () => {
+    expect(await created({ kind: "number", wrongAnswerMalus: "200" })).toMatchObject({ type: "number", wrongAnswerMalus: null });
   });
 
   it("a choice question needs at least 2 answers, non-empty and unique whatever the case", async () => {
@@ -297,7 +318,7 @@ describe("publication (§5.11)", () => {
   });
 
   it("is refused when the opening is not before the closing (the database already forbids storing it)", () => {
-    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: 1 };
+    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: 1, wrongAnswerMalus: null };
     expect(publicationProblems({ ...rules, opensAt: clock.at("+2d"), closesAt: clock.at("+2d") }, [], now)).toEqual([
       "La clôture doit être après l'ouverture.",
     ]);
@@ -308,10 +329,14 @@ describe("publication (§5.11)", () => {
     expect(publicationProblems({ ...rules, type: "choice", opensAt: clock.at("+1d"), closesAt: clock.at("+2d") }, ["Seule"], now)).toEqual([
       "Une question à choix a de 2 à 10 réponses.",
     ]);
+    // A choice question needs its malus of a wrong answer (v1.2; the database guarantees it too).
+    const choice = { ...rules, type: "choice" as const, opensAt: clock.at("+1d"), closesAt: clock.at("+2d") };
+    expect(publicationProblems(choice, ["Oui", "Non"], now)).toEqual(["Indique le malus d'une mauvaise réponse."]);
+    expect(publicationProblems({ ...choice, wrongAnswerMalus: 50 }, ["Oui", "Non"], now)).toEqual([]);
   });
 
   it("is refused while no season covers the closing date (v1.1)", () => {
-    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: null };
+    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: null, wrongAnswerMalus: null };
     expect(publicationProblems({ ...rules, opensAt: clock.at("+1d"), closesAt: clock.at("+2d") }, [], now)).toEqual([
       "Aucune saison ne couvre cette date de clôture : crée d'abord la saison dans Saisons et lots.",
     ]);
@@ -426,20 +451,39 @@ describe("dates in series (§5.11)", () => {
 });
 
 describe("editing locks (§5.11)", () => {
-  it("without prediction, every field can change, the answers included", async () => {
-    const q = await created({ kind: "choice", options: ["A", "B"], opensAt: "2026-10-14T09:00", closesAt: "2026-10-21T18:00" });
+  it("without prediction, every field can change, the answers and the malus of a wrong answer included", async () => {
+    const q = await created({ kind: "choice", options: ["A", "B"], wrongAnswerMalus: "100", opensAt: "2026-10-14T09:00", closesAt: "2026-10-21T18:00" });
     await publishQuestions(db, admin, { questionIds: [q.id] }, now);
     const result = await updateQuestion(
       db,
       admin,
-      { questionId: q.id, kind: "choice", title: "Quel programme gagnera ?", options: ["BBA", "MSc", "Grande École"], coefficient: "2" },
+      { questionId: q.id, kind: "choice", title: "Quel programme gagnera ?", options: ["BBA", "MSc", "Grande École"], coefficient: "2", wrongAnswerMalus: "150" },
       now,
     );
     expect(result).toEqual({ ok: true, data: { id: q.id } });
-    expect(await load(q.id)).toMatchObject({ title: "Quel programme gagnera ?", coefficient: 2, options: ["BBA", "MSc", "Grande École"] });
+    expect(await load(q.id)).toMatchObject({ title: "Quel programme gagnera ?", coefficient: 2, wrongAnswerMalus: 150, options: ["BBA", "MSc", "Grande École"] });
 
+    // A choice switched to a number loses its malus of a wrong answer (v1.2).
     expect(await updateQuestion(db, admin, { questionId: q.id, kind: "number", unit: "candidatures" }, now)).toMatchObject({ ok: true });
-    expect(await load(q.id)).toMatchObject({ type: "number", unit: "candidatures", options: [] });
+    expect(await load(q.id)).toMatchObject({ type: "number", unit: "candidatures", wrongAnswerMalus: null, options: [] });
+
+    // A number switched to a choice needs one.
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "yesNo" }, now)).toMatchObject({
+      ok: false,
+      code: "INVALID_INPUT",
+      fieldErrors: { wrongAnswerMalus: "Indique le malus d'une mauvaise réponse." },
+    });
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "yesNo", wrongAnswerMalus: "40" }, now)).toMatchObject({ ok: true });
+    expect(await load(q.id)).toMatchObject({ type: "choice", wrongAnswerMalus: 40, options: ["Oui", "Non"] });
+  });
+
+  it("with a prediction, the malus of a wrong answer is locked; sent unchanged, it is accepted (v1.2)", async () => {
+    const q = await openQuestionWithPrediction({ type: "choice", unit: null, wrongAnswerMalus: 80, options: ["Oui", "Non"] });
+    expect(await updateQuestion(db, admin, { questionId: q.id, wrongAnswerMalus: "90" }, now)).toMatchObject({ ok: false, code: "QUESTION_LOCKED" });
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "yesNo", wrongAnswerMalus: "80", helpHint: "Nouvel indice" }, now)).toMatchObject({
+      ok: true,
+    });
+    expect(await load(q.id)).toMatchObject({ wrongAnswerMalus: 80, helpHint: "Nouvel indice" });
   });
 
   it("with a prediction: title refused, help accepted, closing moved earlier refused, later accepted", async () => {
@@ -450,7 +494,13 @@ describe("editing locks (§5.11)", () => {
       code: "QUESTION_LOCKED",
       message: "Des pronos existent : ce champ ne peut plus changer. Pour le modifier, annule la question et crée une nouvelle question.",
     });
-    for (const patch of [{ kind: "priceIsRight" }, { unit: "visiteurs" }, { source: "Autre source" }, { coefficient: 2 }, { description: "Précision" }]) {
+    for (const patch of [
+      { kind: "choice", options: ["A", "B"], wrongAnswerMalus: "10" },
+      { unit: "visiteurs" },
+      { source: "Autre source" },
+      { coefficient: 2 },
+      { description: "Précision" },
+    ]) {
       expect(await updateQuestion(db, admin, { questionId: q.id, ...patch }, now)).toMatchObject({ ok: false, code: "QUESTION_LOCKED" });
     }
 
@@ -568,11 +618,15 @@ describe("duplication (§5.11)", () => {
       helpHint: "Regarde l'an dernier.",
       helpLastYear: "BBA",
       coefficient: 3,
+      wrongAnswerMalus: 75,
       status: "published",
       opensAt: clock.at("-1d"),
       closesAt: clock.at("+1d"),
       options: ["BBA", "MSc", "Grande École"],
     });
+    // An extension of the original is not copied (§5.11).
+    const player = await createUser(db);
+    await db.insert(questionExtension).values({ questionId: original.id, userId: player.id, closesAt: clock.at("+3d"), grantedBy: admin.id, grantedAt: now });
     const result = await duplicateQuestion(db, admin, { questionId: original.id }, now);
     expect(result.ok).toBe(true);
     const copy = await load(result.ok ? result.data.id : 0);
@@ -585,6 +639,7 @@ describe("duplication (§5.11)", () => {
       helpHint: "Regarde l'an dernier.",
       helpLastYear: "BBA",
       coefficient: 3,
+      wrongAnswerMalus: 75,
       status: "draft",
       opensAt: null,
       closesAt: null,
@@ -595,6 +650,7 @@ describe("duplication (§5.11)", () => {
       options: ["BBA", "MSc", "Grande École"],
     });
     expect(copy.id).not.toBe(original.id);
+    expect(await db.select().from(questionExtension).where(eq(questionExtension.questionId, copy.id))).toEqual([]);
   });
 
   it("fills last year's value from the result of a resolved original", async () => {
@@ -706,6 +762,28 @@ describe("result (§5.11)", () => {
     });
     expect(await resolveQuestion(db, admin, { questionId: q.id, optionId: q.options[1].id }, now)).toMatchObject({ ok: true });
     expect(await load(q.id)).toMatchObject({ resultOptionId: q.options[1].id, resolvedAt: now });
+  });
+
+  it("is refused while an extension runs, accepted after its deadline or its cancellation (v1.2, PR7)", async () => {
+    const q = await insertQuestion(db, { categoryId, status: "published", opensAt: clock.at("-3d"), closesAt: clock.at("-1d") });
+    const player = await createUser(db);
+    const deadline = new Date("2026-10-07T16:00:00Z");
+    await db.insert(questionExtension).values({ questionId: q.id, userId: player.id, closesAt: deadline, grantedBy: admin.id, grantedAt: clock.at("-12h") });
+
+    expect(await resolveQuestion(db, admin, { questionId: q.id, rawValue: "250" }, now)).toEqual({
+      ok: false,
+      code: "EXTENSION_RUNNING",
+      message: "Un joueur a une prolongation jusqu'au mer. 7 oct. à 18 h : attends sa fin ou annule-la.",
+    });
+    expect((await load(q.id)).resolvedAt).toBeNull();
+    // At the deadline (excluded), the extension is over.
+    expect(await resolveQuestion(db, admin, { questionId: q.id, rawValue: "250" }, deadline)).toMatchObject({ ok: true });
+
+    const other = await insertQuestion(db, { categoryId, status: "published", opensAt: clock.at("-3d"), closesAt: clock.at("-1d") });
+    await db.insert(questionExtension).values({ questionId: other.id, userId: player.id, closesAt: deadline, grantedBy: admin.id, grantedAt: clock.at("-12h") });
+    expect(await resolveQuestion(db, admin, { questionId: other.id, rawValue: "250" }, now)).toMatchObject({ code: "EXTENSION_RUNNING" });
+    expect(await cancelQuestionExtension(db, admin, { questionId: other.id, userId: player.id }, now)).toMatchObject({ ok: true });
+    expect(await resolveQuestion(db, admin, { questionId: other.id, rawValue: "250" }, now)).toMatchObject({ ok: true });
   });
 
   it("is refused on a draft, a scheduled or a cancelled question", async () => {

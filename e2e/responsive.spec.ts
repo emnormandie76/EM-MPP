@@ -50,7 +50,7 @@ test("the player pages do not scroll sideways at 390 px", async ({ page }) => {
   }
 });
 
-// Open (number, Juste Prix), closed and resolved (number with a joker, choice) questions.
+// Open (two numbers), closed and resolved (number with a joker, choice) questions.
 for (const [tab, title] of [
   ["", "Combien de participants à la JPO du 15 novembre ?"],
   ["", "Combien de candidatures Grande École au 31 mai ?"],
@@ -78,13 +78,13 @@ test("on an open question at 390 px, the prediction field and both buttons fit t
   }
 });
 
-test("/classement shows the compact standings at 390 px, with the points and the links to the profiles", async ({ page }) => {
+test("/classement shows the compact standings at 390 px, with the malus and the links to the profiles", async ({ page }) => {
   await signIn(page, ACCOUNTS.hugo);
   await page.goto("/classement");
-  // The wide table is hidden on a phone: it would push the points out of the screen.
+  // The wide table is hidden on a phone: it would push the malus out of the screen.
   await expect(page.getByRole("table")).toHaveCount(0);
   const list = page.getByRole("list", { name: `Classement de la saison ${SEASONS.current.label}` });
-  await expect(list.getByRole("listitem").first()).toContainText(/^Rang 1.*Julien.*\d+ points$/);
+  await expect(list.getByRole("listitem").first()).toContainText(/^Rang 1.*Sarah.*\d+ de malus$/);
   await expect(list.getByRole("listitem").filter({ hasText: "Hugo" })).toContainText("(toi)");
   const julien = list.getByRole("link", { name: "Julien" });
   await expect(julien).toBeInViewport();
@@ -157,11 +157,31 @@ test("the back-office pages do not scroll sideways at 390 px", async ({ page }) 
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expectNoSidewaysScroll(page);
   }
-  // An open question (follow-up, history) and a choice question (editor of the answers).
-  for (const title of ["Combien de participants à la JPO du 15 novembre ?", "Quel programme recevra le plus de candidatures en décembre ?"]) {
+  // An open question (follow-up, history), a choice question (editor of the answers) and the closed
+  // webinar question (extensions, v1.2).
+  for (const title of [
+    "Combien de participants à la JPO du 15 novembre ?",
+    "Quel programme recevra le plus de candidatures en décembre ?",
+    "Combien d'inscrits au webinaire Grande École de septembre ?",
+  ]) {
     await page.goto("/admin/questions");
     await page.goto((await page.getByRole("link", { name: title }).getAttribute("href"))!);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
     await expectNoSidewaysScroll(page);
   }
+});
+
+test("the extension dialog fits the screen at 390 px (v1.2)", async ({ page }) => {
+  await signIn(page, ACCOUNTS.admin);
+  await page.goto("/admin/questions");
+  await page.goto((await page.getByRole("link", { name: "Combien d'inscrits au webinaire Grande École de septembre ?" }).getAttribute("href"))!);
+  // Mehdi's extension, from the seed: its date can be changed.
+  await page.getByRole("button", { name: "Changer la date limite de Mehdi" }).click();
+  const dialog = page.getByRole("dialog", { name: "Changer la date de Mehdi" });
+  for (const target of [dialog.getByLabel("Date limite (heure de Paris)"), dialog.getByRole("button", { name: "Annuler" }), dialog.getByRole("button", { name: "Enregistrer" })]) {
+    await expect(target).toBeInViewport({ ratio: 1 });
+  }
+  await expectNoSidewaysScroll(page);
+  await dialog.getByRole("button", { name: "Annuler" }).click();
+  await expect(dialog).toBeHidden();
 });

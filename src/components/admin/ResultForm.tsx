@@ -12,7 +12,8 @@ const TILE =
 
 /**
  * Real value or right answer of a closed question (§5.11): the number is read like a prediction
- * (§5.3). A later different entry is a correction, shown on the question's page.
+ * (§5.3). A later different entry is a correction, shown on the question's page. Disabled while an
+ * extension runs (v1.2, §5.14): the page says why.
  */
 export function ResultForm({
   questionId,
@@ -22,6 +23,7 @@ export function ResultForm({
   currentValue,
   currentOptionId,
   resolved,
+  blocked = false,
 }: {
   questionId: number;
   type: "number" | "choice";
@@ -31,6 +33,8 @@ export function ResultForm({
   currentValue: string;
   currentOptionId: number | null;
   resolved: boolean;
+  /** An extension runs: the result cannot be entered yet. */
+  blocked?: boolean;
 }) {
   const [state, onSubmit, pending] = useFormAction<FormState>(resolveQuestionAction, null);
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
@@ -67,12 +71,12 @@ export function ResultForm({
         // The error of the value is already shown under the field: here, it is only announced.
         className={state && !state.ok && state.fieldErrors?.rawValue ? "sr-only" : undefined}
       />
-      <Button type="submit" pending={pending} className="self-start">
+      <Button type="submit" pending={pending} disabled={blocked} className="self-start">
         {resolved ? "Corriger le résultat" : "Enregistrer le résultat"}
       </Button>
       {resolved ? (
         <p className="text-[13px] text-muted">
-          Une correction recalcule les points ; la page de la question indique la date de la correction.
+          Une correction recalcule les malus ; la page de la question indique la date de la correction.
         </p>
       ) : null}
     </form>

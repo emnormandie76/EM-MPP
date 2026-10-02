@@ -15,8 +15,10 @@ import { createTestDb } from "../helpers/db";
 import { createCategory, createQuestion, createUser, ensureTestSeason } from "../helpers/factories";
 
 // Proclamation of the final standings (architecture §5.12, §11 É7), on the seed: the older season
-// 2024-2025 is resolved but not proclaimed. Its only question (real 180): Camille 185 (2,8 %, 80 + 20
-// = 100), Sarah 170 (5,6 %, 45 + 10 = 55), Julien 200 (11,1 %, 25 + 5 = 30), Thomas 150 (16,7 %, 25).
+// 2024-2025 is resolved but not proclaimed. Its only question (real 180), in malus (v1.2): Camille
+// 185 (2,8 %, 5), Sarah 170 (5,6 %, 10), Julien 200 (11,1 %, 20), Thomas 150 (16,7 %, 30, the worst:
+// 30 for each absent player). Since v1.2, the palmarès stores the malus, and `points` stays null;
+// these expectations replace those of the points scale (decision of the user, 02/10/2026).
 
 const clock = makeClock("2026-11-20T10:00:00Z");
 const now = clock.now;
@@ -92,25 +94,27 @@ describe("proclaimSeason (§5.12)", () => {
     const rows = await db.select().from(seasonStanding).where(eq(seasonStanding.seasonId, older));
     const byName = Object.fromEntries(rows.map((r) => [r.nameSnapshot, r]));
     expect(Object.keys(byName).sort()).toEqual(["Admin", "Camille", "Hugo", "Inès", "Julien", "Léa", "Mehdi", "Sarah", "Thomas"]);
-    expect(byName.Camille).toMatchObject({ userId: ids.Camille, rank: 1, points: 100, bullseyes: 0, questionsPlayed: 1 });
+    expect(byName.Camille).toMatchObject({ userId: ids.Camille, rank: 1, malus: 5, points: null, bullseyes: 0, questionsPlayed: 1 });
     expect(byName.Camille.meanError).toBeCloseTo(5 / 180, 6);
-    expect(byName.Sarah).toMatchObject({ rank: 2, points: 55, questionsPlayed: 1 });
+    expect(byName.Sarah).toMatchObject({ rank: 2, malus: 10, questionsPlayed: 1 });
     expect(byName.Sarah.meanError).toBeCloseTo(10 / 180, 6);
-    expect(byName.Julien).toMatchObject({ rank: 3, points: 30 });
-    expect(byName.Thomas).toMatchObject({ rank: 4, points: 25 });
-    // Active accounts without a prediction: 0 point, tied; Nora (disabled, no prediction) is left out.
+    expect(byName.Julien).toMatchObject({ rank: 3, malus: 20 });
+    expect(byName.Thomas).toMatchObject({ rank: 4, malus: 30 });
+    // Active accounts without a prediction: the malus of the worst prediction (30), tied behind Thomas,
+    // who has a mean error; Nora (disabled, no prediction) is left out.
     for (const name of ["Admin", "Hugo", "Inès", "Léa", "Mehdi"]) {
-      expect(byName[name]).toMatchObject({ rank: 5, points: 0, bullseyes: 0, meanError: null, questionsPlayed: 0 });
+      expect(byName[name]).toMatchObject({ rank: 5, malus: 30, points: null, bullseyes: 0, meanError: null, questionsPlayed: 0 });
     }
 
     // The palmarès reads this table: the older season comes after the previous one.
     const palmares = await getPalmares(db, { id: ids.Sarah, role: "player" });
     expect(palmares.map(({ label }) => label)).toEqual(["2025-2026", "2024-2025"]);
-    expect(palmares[1].rows.slice(0, 4).map(({ name, rank, points }) => [name, rank, points])).toEqual([
-      ["Camille", 1, 100],
-      ["Sarah", 2, 55],
-      ["Julien", 3, 30],
-      ["Thomas", 4, 25],
+    // In hundredths, like every malus until it is displayed.
+    expect(palmares[1].rows.slice(0, 4).map(({ name, rank, malus }) => [name, rank, malus])).toEqual([
+      ["Camille", 1, 500],
+      ["Sarah", 2, 1_000],
+      ["Julien", 3, 2_000],
+      ["Thomas", 4, 3_000],
     ]);
     expect(palmares[1].rows.find(({ isViewer }) => isViewer)?.name).toBe("Sarah");
   });
@@ -152,7 +156,7 @@ describe("proclaimSeason (§5.12)", () => {
     });
     expect(await db.select().from(seasonStanding).where(eq(seasonStanding.seasonId, older))).toEqual(before);
     const palmares = await getPalmares(db, { id: ids.Sarah, role: "player" });
-    expect(palmares.find(({ label }) => label === "2024-2025")?.rows[0]).toMatchObject({ name: "Camille", points: 100 });
+    expect(palmares.find(({ label }) => label === "2024-2025")?.rows[0]).toMatchObject({ name: "Camille", malus: 500 });
   });
 
   it("gives the Champion and Assidu badges of the season", async () => {
@@ -190,7 +194,7 @@ describe("proclamationBlocker (§5.12)", () => {
 });
 
 describe("anonymization after a proclamation (decision of 30/09/2026)", () => {
-  it("replaces the name in the palmarès, and keeps ranks and points", async () => {
+  it("replaces the name in the palmarès, and keeps ranks and malus", async () => {
     const result = await anonymizeUser(db, admin, { userId: ids.Inès }, now);
     expect(result).toMatchObject({ ok: true });
     const anonymous = result.ok ? result.data.name : "";
@@ -200,7 +204,7 @@ describe("anonymization after a proclamation (decision of 30/09/2026)", () => {
       .select()
       .from(seasonStanding)
       .where(and(eq(seasonStanding.userId, ids.Inès), eq(seasonStanding.seasonId, await seasonId("2025-2026"))));
-    expect(row).toMatchObject({ nameSnapshot: anonymous, rank: 1, points: 140 });
+    expect(row).toMatchObject({ nameSnapshot: anonymous, rank: 1, malus: 20 });
     const [palmares] = await getPalmares(db, { id: ids.Sarah, role: "player" });
     expect(palmares.rows[0]).toMatchObject({ name: anonymous, rank: 1 });
     expect(palmares.rows.map(({ name }) => name)).not.toContain("Inès");

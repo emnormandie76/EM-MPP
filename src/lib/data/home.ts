@@ -6,8 +6,9 @@ import { getJokersLeft, getOpenQuestionsForViewer, type PlayerQuestion } from ".
 import { getLatestResult, type LatestResult } from "./results";
 import { getStandings, type Standings, type StandingView } from "./standings";
 
-// Home page (architecture §7.4, §8.3): announcements, welcome and progress, rank, points and
-// jokers, the next closings, the top of the standings and the latest result.
+// Home page (architecture §7.4, §8.3): announcements, welcome and progress, rank, malus and
+// jokers, the next closings (the viewer's extensions included, at their deadline), the top of the
+// standings and the latest result.
 
 type PlayerViewer = Pick<Viewer, "id" | "role" | "lastSeenAt" | "previousVisitAt">;
 
@@ -28,8 +29,8 @@ export type HomeData = {
     /** The viewer's row, wherever they are. */
     me: StandingView | null;
   };
-  /** Jokers left in the current season (§5.4). */
-  jokersLeft: number;
+  /** Jokers left in the current season (§5.4); null when the season does not allow jokers (v1.2). */
+  jokersLeft: number | null;
   /** The latest resolved question, or null before the first result. */
   latestResult: LatestResult | null;
 };
@@ -47,7 +48,7 @@ export async function getHomeData(db: Database, viewer: PlayerViewer, now: Date)
     progress: { open: open.length, validated: open.filter(({ state }) => state === "validated").length },
     closingSoon: open.slice(0, HOME_CLOSINGS),
     standings: { ...standings, top, me, mine: me && !top.includes(me) ? me : null },
-    jokersLeft: await getJokersLeft(db, viewer, current?.id ?? null),
+    jokersLeft: await getJokersLeft(db, viewer, current),
     latestResult: await getLatestResult(db, viewer, now),
   };
 }

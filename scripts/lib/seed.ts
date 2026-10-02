@@ -12,6 +12,7 @@ import {
   predictionEvent,
   prize,
   question,
+  questionExtension,
   questionOption,
   season,
   seasonStanding,
@@ -33,10 +34,19 @@ import { seedSeasons } from "./seed-seasons";
 // Dates are relative to `now`. The past questions of the current season must close after its
 // start: just after 1 October, the past gaps are shrunk to fit, so the data set stays consistent
 // on any day. Otherwise "3 days ago" is exactly 3 days ago, and future dates are always exact.
+//
+// v1.2 (step 8c): malus, every choice question with its malus of a wrong answer, jokers allowed in
+// the three seasons, and the closed webinar question with a witness value, an extension and players
+// without a prediction (§9.6).
 
 export const SEED_PASSWORD = "Test-1234!";
 /** Value of another player's prediction on an open question: must never reach the page (§9.3). */
 export const WITNESS_VALUE = 987654;
+/**
+ * Value of a prediction on the closed webinar question: it must never reach the page of a player who
+ * did not predict it, nor of the player whose extension runs on it (v1.2, §9.3).
+ */
+export const CLOSED_WITNESS_VALUE = 876543;
 
 export class SeedRefusedError extends Error {}
 
@@ -85,6 +95,7 @@ export type SeedSummary = {
   announcements: number;
   prizes: number;
   standings: number;
+  extensions: number;
 };
 
 /** Erases every table of the public schema except app_meta, and restarts the identities. */
@@ -126,7 +137,8 @@ function seedCalendar(now: Date) {
 type QuestionSpec = {
   category: string;
   type: "number" | "choice";
-  priceIsRight?: boolean;
+  /** Malus of a wrong answer, required for a choice question (v1.2). */
+  wrongAnswerMalus?: number;
   title: string;
   description?: string;
   unit?: string;
@@ -237,7 +249,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
           seasonId: questionSeason?.id ?? null,
           categoryId: categoryId.get(spec.category)!,
           type: spec.type,
-          priceIsRight: spec.priceIsRight ?? false,
+          wrongAnswerMalus: spec.wrongAnswerMalus ?? null,
           title: spec.title,
           description: spec.description ?? null,
           unit: spec.unit ?? null,
@@ -272,8 +284,8 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
         await tx.update(question).set({ resultOptionId }).where(eq(question.id, row.id));
       }
       questionCount += 1;
-      const { id, type, priceIsRight, coefficient, resultNumber, resolvedAt } = row;
-      const scoring = resolvedAt ? { id, type, priceIsRight, coefficient, resultNumber, resultOptionId, resolvedAt } : null;
+      const { id, type, coefficient, resultNumber, wrongAnswerMalus, resolvedAt } = row;
+      const scoring = resolvedAt ? { id, type, coefficient, resultNumber, resultOptionId, wrongAnswerMalus, resolvedAt } : null;
       return { id, optionIds, scoring };
     }
 
@@ -332,7 +344,8 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       result: 180,
       resolvedAt: olderSeasonDay(80),
     });
-    // 180 participants: Camille 185 (+20), Sarah 170 (+10), Julien 200 (+5), Thomas 150.
+    // 180 participants: Camille 185 (malus 5), Sarah 170 (10), Julien 200 (20), Thomas 150 (30, the
+    // worst: 30 for each absent player).
     await addPredictions(old, playedOn(oldCloses), [
       { person: "camille", answer: 185, validated: true },
       { person: "sarah", answer: 170, validated: true },
@@ -361,6 +374,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       type: "choice",
       title: "Le campus du Havre dépassera-t-il 400 intégrés à la rentrée ?",
       source: "Tableau BI « Intégration », effectif au 15/09",
+      wrongAnswerMalus: 50,
       status: "published",
       opensAt: weekBefore(pr2Closes),
       closesAt: pr2Closes,
@@ -386,7 +400,8 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       ])),
     ];
 
-    // Current season, resolved: vector P1 (podium with ties), vector J3 (Juste Prix), a choice.
+    // Current season, resolved: vector P1 (proximity ranks with ties), vector A1 (an absent player's
+    // malus, a joker) and a choice. Sarah keeps her 2 jokers of the season for e2e/player.spec.ts.
     const r1Closes = daysAgo(20);
     const r1 = await addQuestion({
       category: "JPO",
@@ -405,15 +420,15 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
     const r2 = await addQuestion({
       category: "Candidatures",
       type: "number",
-      priceIsRight: true,
       title: "Combien de candidatures BBA pendant la semaine de rentrée ?",
       unit: "candidatures",
       source: "Tableau BI « Candidatures », semaine 37",
+      coefficient: 2,
       status: "published",
       opensAt: weekBefore(r2Closes),
       closesAt: r2Closes,
       expectedResultAt: daysAgo(8),
-      result: 250,
+      result: 1000,
       resolvedAt: daysAgo(8),
       correctedAt: daysAgo(7),
     });
@@ -424,6 +439,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       title: "Quel campus comptera le plus d'intégrés en Bachelor ?",
       source: "Tableau BI « Intégration », effectifs par campus",
       coefficient: 2,
+      wrongAnswerMalus: 100,
       status: "published",
       opensAt: weekBefore(r3Closes),
       closesAt: r3Closes,
@@ -438,10 +454,12 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       { person: "camille", answer: 235 },
       { person: "thomas", answer: 300, validated: true },
     ]);
+    // Vector A1 (real 1 000, coefficient 2): Mehdi 900 (200), Léa 1 300 with a joker (300), Sarah
+    // 1 050 (100); the worst gap, 300 × 2 = 600, for each absent player.
     await addPredictions(r2, playedOn(r2Closes), [
-      { person: "mehdi", answer: 251, validated: true },
-      { person: "sarah", answer: 245, validated: true },
-      { person: "lea", answer: 230 },
+      { person: "mehdi", answer: 900, validated: true },
+      { person: "lea", answer: 1300, joker: true, validated: true },
+      { person: "sarah", answer: 1050 },
     ]);
     await addPredictions(r3, playedOn(r3Closes), [
       { person: "sarah", answer: "Caen", validated: true },
@@ -477,6 +495,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       { person: "hugo", answer: 262, validated: true },
     ]);
     // A second one, left without result by every test: e2e/admin-questions.spec.ts resolves the first.
+    // v1.2: Camille has the witness value, Mehdi an extension (no prediction), Hugo neither.
     const webinarCloses = daysAgo(1);
     const webinar = await addQuestion({
       category: "Candidatures",
@@ -496,7 +515,17 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       { person: "thomas", answer: 95, validated: true },
       { person: "lea", answer: 130 },
       { person: "admin", answer: 110, validated: true },
+      { person: "camille", answer: CLOSED_WITNESS_VALUE, validated: true },
     ]);
+    // Mehdi was away: the admin reopened the question for him until 2 days from now (§5.14).
+    await tx.insert(questionExtension).values({
+      questionId: webinar.id,
+      userId: ids.mehdi,
+      closesAt: shift(2 * DAY),
+      grantedBy: ids.admin,
+      // Between the closing and now, whatever the day (the past gaps shrink near 1 October).
+      grantedAt: new Date((webinarCloses.getTime() + now.getTime()) / 2),
+    });
 
     // Current season, open: closing in 1 day (urgent), 3, 5 and 6 days.
     const o1 = await addQuestion({
@@ -519,7 +548,6 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
     const o2 = await addQuestion({
       category: "Candidatures",
       type: "number",
-      priceIsRight: true,
       title: "Combien de candidatures Grande École au 31 mai ?",
       unit: "candidatures",
       source: "Tableau BI « Candidatures », total au 31/05 à minuit",
@@ -536,6 +564,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       title: "Quel programme recevra le plus de candidatures en décembre ?",
       source: "Tableau BI « Candidatures », total de décembre par programme",
       help: { hint: "Regarde la saisonnalité des trois dernières années." },
+      wrongAnswerMalus: 100,
       status: "published",
       opensAt: openOpening,
       closesAt: daysAhead(5),
@@ -547,6 +576,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       type: "choice",
       title: "Le taux d'intégration du Bachelor dépassera-t-il 60 % ?",
       source: "Tableau BI « Intégration », taux au 30/09",
+      wrongAnswerMalus: 50,
       status: "published",
       // Opened 1 hour ago: new to Camille, whose last visit was 2 hours ago.
       opensAt: shift(-HOUR),
@@ -622,7 +652,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
         seasonId: previousSeasonId,
         userId: row.userId,
         rank: row.rank,
-        points: row.points,
+        malus: row.malus / 100,
         bullseyes: row.bullseyes,
         meanError: row.meanError,
         questionsPlayed: row.questionsPlayed,
@@ -661,6 +691,7 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
       announcements: announcements.length,
       prizes: prizes.length,
       standings: standings.length,
+      extensions: 1,
     };
   });
 }

@@ -99,3 +99,40 @@ test("once a new season is deleted, its creation message goes and the form offer
   await expect(start).toHaveValue(offered.start);
   await expect(name).toHaveValue(offered.name);
 });
+
+// v1.2 (§5.13): jokers allowed or not for each season; they cannot be taken away once posed.
+test("the jokers of a season: allowed by default, not taken away once a player has posed one", async ({ page }) => {
+  await signIn(page, ACCOUNTS.admin);
+  await page.goto("/admin/saisons");
+  const currentSeason = seedSeasons(new Date()).current.label;
+  const card = (label: string) => page.locator("section").filter({ has: page.getByRole("heading", { name: `Saison ${label}`, exact: true }) });
+
+  // The seed's current season allows jokers, and players have posed some.
+  await expect(card(currentSeason)).toContainText(/Jokers\s*autorisés/);
+  await card(currentSeason).getByRole("button", { name: `Modifier la saison ${currentSeason}` }).click();
+  const jokers = card(currentSeason).getByLabel("Jokers autorisés (2 par joueur)");
+  await expect(jokers).toBeChecked();
+  await expect(jokers).toHaveAccessibleDescription("Des jokers sont déjà posés dans cette saison : ils ne peuvent plus être retirés.");
+  await jokers.uncheck();
+  await card(currentSeason).getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await expect(card(currentSeason).getByText("Des jokers sont déjà posés dans cette saison : impossible de les retirer.")).toBeVisible();
+  await card(currentSeason).getByRole("button", { name: "Annuler" }).click();
+  await expect(card(currentSeason)).toContainText(/Jokers\s*autorisés/);
+
+  // A new season, far ahead, without jokers; then allowed; then deleted.
+  const create = page.getByLabel("Jokers autorisés (2 par joueur)");
+  await expect(create).toBeChecked();
+  await page.getByLabel("Date de début").fill(utcToParisLocalDate(inDays(320)));
+  await page.getByLabel("Nom", { exact: true }).fill("Test e2e sans jokers");
+  await create.uncheck();
+  await page.getByRole("button", { name: "Créer la saison" }).click();
+  await expect(page.getByText(/^Saison créée\./)).toBeVisible();
+  await expect(card("Test e2e sans jokers")).toContainText(/Jokers\s*non/);
+  await card("Test e2e sans jokers").getByRole("button", { name: "Modifier la saison Test e2e sans jokers" }).click();
+  await card("Test e2e sans jokers").getByLabel("Jokers autorisés (2 par joueur)").check();
+  await card("Test e2e sans jokers").getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await expect(card("Test e2e sans jokers")).toContainText(/Jokers\s*autorisés/);
+  await card("Test e2e sans jokers").getByRole("button", { name: "Supprimer la saison Test e2e sans jokers" }).click();
+  await page.getByRole("dialog", { name: "Supprimer la saison Test e2e sans jokers ?" }).getByRole("button", { name: "Supprimer" }).click();
+  await expect(page.getByRole("heading", { name: "Saison Test e2e sans jokers" })).toHaveCount(0);
+});

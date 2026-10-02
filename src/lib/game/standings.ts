@@ -1,7 +1,8 @@
 import { scoreQuestion, type ScoringPrediction, type ScoringQuestion } from "./scoring";
 import { previousSeason, seasonAt } from "./time";
 
-// Season standings (architecture §5.6), recomputed on every read from predictions and results.
+// Season standings (architecture §5.6, v1.2), recomputed on every read from predictions and results:
+// the fewest malus first. Malus are in hundredths (§5.5).
 
 /** A published, resolved and not cancelled question of the season. */
 export type StandingsQuestion = ScoringQuestion & { id: number; resolvedAt: Date };
@@ -23,9 +24,10 @@ export type StandingTotals = {
   name: string;
   /** Disabled account, listed because it has predictions in the season. */
   inactive: boolean;
-  points: number;
+  /** Malus of the predictions, plus the malus of each absence, in hundredths. */
+  malus: number;
   bullseyes: number;
-  /** Mean of the finite relative errors on number questions (Juste Prix included), or null. */
+  /** Mean of the finite relative errors of the number questions played (absences excluded), or null. */
   meanError: number | null;
   questionsPlayed: number;
 };
@@ -54,9 +56,9 @@ function compareMeanErrors(a: number | null, b: number | null): number {
   return Math.abs(a - b) <= MEAN_ERROR_TOLERANCE ? 0 : a - b;
 }
 
-/** Negative when `a` ranks before `b`: points, then Dans le mille, then lowest mean error. */
+/** Negative when `a` ranks before `b`: fewest malus, then most Dans le mille, then lowest mean error. */
 function compareTotals(a: StandingTotals, b: StandingTotals): number {
-  if (a.points !== b.points) return b.points - a.points;
+  if (a.malus !== b.malus) return a.malus - b.malus;
   if (a.bullseyes !== b.bullseyes) return b.bullseyes - a.bullseyes;
   return compareMeanErrors(a.meanError, b.meanError);
 }
@@ -79,23 +81,27 @@ export function computeStandings({ questions, predictions, players }: StandingsI
   const totals = new Map<string, StandingTotals & { errors: number[] }>();
   for (const { id, name, banned } of players) {
     if (banned && !tookPart.has(id)) continue;
-    totals.set(id, { userId: id, name, inactive: banned, points: 0, bullseyes: 0, meanError: null, questionsPlayed: 0, errors: [] });
+    totals.set(id, { userId: id, name, inactive: banned, malus: 0, bullseyes: 0, meanError: null, questionsPlayed: 0, errors: [] });
   }
 
   for (const question of questions) {
-    const scores = scoreQuestion(
+    const { scores, absentMalus } = scoreQuestion(
       question,
       predictions.filter(({ questionId }) => questionId === question.id),
     );
+    const played = new Set<string>();
     for (const score of scores) {
       const row = totals.get(score.prediction.userId);
       if (!row) continue;
-      row.points += score.total;
+      played.add(row.userId);
+      row.malus += score.total;
       row.questionsPlayed += 1;
       if (score.bullseye) row.bullseyes += 1;
-      // A Juste Prix prediction that went over scores nothing, and does not help the tie-break either.
-      if (!score.wentOver && score.relativeError !== null && Number.isFinite(score.relativeError)) row.errors.push(score.relativeError);
+      if (score.relativeError !== null && Number.isFinite(score.relativeError)) row.errors.push(score.relativeError);
     }
+    // No prediction: the malus of the worst prediction (decision of 02/10/2026), even for a player
+    // who arrived after the result; otherwise not answering would be the best strategy.
+    for (const row of totals.values()) if (!played.has(row.userId)) row.malus += absentMalus;
   }
 
   return rankStandings(
@@ -109,7 +115,7 @@ export function computeStandings({ questions, predictions, players }: StandingsI
 /**
  * Accounts that belong to the standings of a season (decision of 30/09/2026): those created before
  * its end, and those with a prediction in it. A colleague who arrives after a season does not show
- * in it, nor in its palmarès; one who arrives during it does, even at 0. The last season, which has
+ * in it, nor in its palmarès; one who arrives during it does, with the malus of its absences. The last season, which has
  * no end (§5.1), keeps every account. `computeStandings` then leaves out the disabled accounts
  * without predictions.
  */

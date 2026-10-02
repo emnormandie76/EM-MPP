@@ -2,20 +2,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
-import { TableScroll } from "@/components/ui/TableScroll";
 import { requireUser } from "@/lib/auth/session";
-import { formatNumber } from "@/lib/format";
-import { CHOICE_POINTS, COEFFICIENTS, JOKER_MULTIPLIER, JOKERS_PER_SEASON, PODIUM_BONUS, SCORE_TIERS } from "@/lib/game/constants";
+import { getCurrentSeason } from "@/lib/data/content";
+import { getDb } from "@/lib/db/client";
+import { formatMalus } from "@/lib/format";
+import { BULLSEYE_PERCENT, COEFFICIENTS, JOKER_DIVISOR, JOKERS_PER_SEASON } from "@/lib/game/constants";
 import { scoreQuestion } from "@/lib/game/scoring";
 
 export const metadata: Metadata = { title: "Règlement" };
 
-// The rules page (architecture §5.5, §8.3) is generated from the scoring constants, and its example
-// is computed by the scoring itself: the published rules and the computation cannot diverge.
+// The rules page (architecture §5.5, §8.3, v1.2) is generated from the scoring constants, and its
+// examples are computed by the scoring itself: the published rules and the computation cannot
+// diverge.
 
 const SECTION_TITLE = "font-display text-[26px] font-extrabold uppercase leading-none";
-const TH = "px-3 py-2 font-display text-[13px] font-bold uppercase tracking-[0.08em] text-muted";
-const TD = "px-3 py-2";
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
@@ -29,26 +29,40 @@ function Section({ id, title, children }: { id: string; title: string; children:
 }
 
 const LIST = "flex list-disc flex-col gap-1.5 pl-5";
-const bonus = (points: number) => `+${points}`;
 const coefficients = COEFFICIENTS.map((c) => `×${c}`).join(", ").replace(/, (?=[^,]*$)/, " ou ");
-const podiumBonuses = PODIUM_BONUS.map(bonus).join(", ").replace(/, (?=[^,]*$)/, " et ");
+const guess = (valueNumber: number, joker = false) => ({ valueNumber, optionId: null, joker });
+const numberQuestion = (resultNumber: number, coefficient = 1) => ({
+  type: "number" as const,
+  coefficient,
+  resultNumber,
+  resultOptionId: null,
+  wrongAnswerMalus: null,
+});
 
-/** The example of the rules (cahier des charges §5.3), scored by the rules themselves. */
-function example() {
-  const question = { type: "number" as const, priceIsRight: false, coefficient: 1, resultNumber: 250, resultOptionId: null };
-  const guess = (valueNumber: number, joker = false) => ({ valueNumber, optionId: null, joker });
-  const [closest] = scoreQuestion(question, [guess(240)]);
-  const [withJoker] = scoreQuestion(question, [guess(240, true)]);
-  const [far] = scoreQuestion(question, [guess(300)]);
-  return { closest, withJoker, far };
+/** The examples of the rules (cahier des charges §5.2, §5.4, §5.5), scored by the rules themselves. */
+function examples() {
+  const malusOf = (resultNumber: number, value: number, { joker = false, coefficient = 1 } = {}) =>
+    formatMalus(scoreQuestion(numberQuestion(resultNumber, coefficient), [guess(value, joker)]).scores[0].total);
+  return {
+    // Real value 1 000: the same malus below and above, and no cap.
+    below: malusOf(1000, 500),
+    above: malusOf(1000, 1500),
+    typo: malusOf(1000, 25000),
+    // JPO, real value 250.
+    jpo: malusOf(250, 240),
+    jpoJoker: malusOf(250, 240, { joker: true }),
+    jpoFar: malusOf(250, 300),
+    jpoCoefficient: malusOf(250, 300, { coefficient: 3 }),
+    // The worst of 240 and 300: the malus of an absent player.
+    absent: formatMalus(scoreQuestion(numberQuestion(250), [guess(240), guess(300)]).absentMalus),
+  };
 }
 
-/** Rules (architecture §8.3), in the order of the specification. */
+/** Rules (architecture §8.3, v1.2), in the order of the specification. */
 export default async function RulesPage() {
-  await requireUser();
-  const { closest, withJoker, far } = example();
-  const [bullseye] = SCORE_TIERS;
-  const lastTier = SCORE_TIERS[SCORE_TIERS.length - 1];
+  const viewer = await requireUser();
+  const season = await getCurrentSeason(getDb(), viewer, new Date());
+  const e = examples();
 
   return (
     <>
@@ -57,8 +71,9 @@ export default async function RulesPage() {
       <Section id="principe" title="Principe">
         <p>
           L&apos;admin pose des questions sur les chiffres de l&apos;école : participants à une JPO, candidatures, intégrés… Tu
-          pronostiques, et plus ton prono est proche de la réalité, plus tu gagnes de points. Le classement de la saison désigne
-          les gagnants des lots.
+          pronostiques, et chaque question résolue te donne un <strong>malus</strong> : plus ton prono est loin de la réalité,
+          plus il est lourd. Le classement additionne les malus de la saison : <strong>le moins de malus gagne</strong>. Le
+          classement final désigne les gagnants des lots.
         </p>
       </Section>
 
@@ -68,10 +83,10 @@ export default async function RulesPage() {
             <strong>Nombre</strong> : tu saisis une valeur, par exemple le nombre de participants à une JPO.
           </li>
           <li>
-            <strong>Nombre « Juste Prix »</strong> : gagne le plus proche sans dépasser.
+            <strong>Choix</strong> : tu choisis une réponse parmi celles proposées.
           </li>
           <li>
-            <strong>Choix</strong> : tu choisis une réponse parmi celles proposées. Le oui/non est un choix à deux réponses.
+            <strong>Oui/non</strong> : un choix à deux réponses.
           </li>
         </ul>
       </Section>
@@ -88,118 +103,126 @@ export default async function RulesPage() {
             déverrouillage est tracé.
           </li>
           <li>
-            Avant la clôture, personne ne voit les pronos des autres, pas même l&apos;admin. À la clôture, chacun voit les pronos
-            de tous et la sagesse de la foule : moyenne, médiane et graphique, ou répartition des réponses.
+            Avant la clôture, personne ne voit les pronos des autres, pas même l&apos;admin. À la clôture, chaque joueur qui a
+            pronostiqué la question voit les pronos de tous et la sagesse de la foule : moyenne, médiane et graphique, ou
+            répartition des réponses. Si tu n&apos;as pas pronostiqué, tu les verras au résultat.
           </li>
         </ul>
       </Section>
 
-      <Section id="bareme" title="Barème">
+      <Section id="malus-nombre" title="Malus d'une question à nombre">
         <p>
-          Sur une question à nombre, on note l&apos;<strong>écart relatif</strong> : |prono − valeur réelle| / valeur réelle. Se
-          tromper de 50 n&apos;a pas le même sens pour une JPO de 200 personnes et pour plusieurs milliers de candidatures.
-        </p>
-        <TableScroll label="Points selon l'écart relatif">
-          <table className="w-full max-w-120 text-left">
-            <caption className="sr-only">Points selon l&apos;écart relatif</caption>
-            <thead>
-              <tr className="border-b border-line">
-                <th scope="col" className={TH}>Écart</th>
-                <th scope="col" className={`${TH} text-right`}>Points</th>
-              </tr>
-            </thead>
-            <tbody className="text-ink">
-              {SCORE_TIERS.map((tier) => (
-                <tr key={tier.maxPercent} className="border-b border-line">
-                  <th scope="row" className={`${TD} font-normal`}>
-                    {tier.maxPercent} % ou moins
-                    {tier === bullseye ? <strong className="ml-2 font-semibold text-accent-text">Dans le mille</strong> : null}
-                  </th>
-                  <td className={`${TD} text-right font-display text-xl font-bold tabular-nums`}>{tier.points}</td>
-                </tr>
-              ))}
-              <tr>
-                <th scope="row" className={`${TD} font-normal`}>
-                  plus de {lastTier.maxPercent} %
-                </th>
-                <td className={`${TD} text-right font-display text-xl font-bold tabular-nums`}>0</td>
-              </tr>
-            </tbody>
-          </table>
-        </TableScroll>
-        <p>
-          <strong>Total d&apos;une question</strong> = (points du barème + bonus podium) × coefficient × {JOKER_MULTIPLIER} avec
-          un joker.
+          Le malus est l&apos;<strong>écart brut</strong> entre ton prono et la valeur réelle, dans l&apos;unité de la question :
+          |prono − valeur réelle|, <strong>sans plafond</strong>. Les décimales comptent.
         </p>
         <p>
-          <em>Exemple</em> : JPO, coefficient ×1, valeur réelle 250. Un prono de 240 donne un écart de{" "}
-          {formatNumber(closest.relativeError! * 100)} %, soit {closest.basePoints} points. S&apos;il est le plus proche de tous,
-          il gagne {bonus(closest.podiumBonus)}, soit {closest.total} points ; avec un joker, {withJoker.total} points. Un prono
-          de 300 donne un écart de {formatNumber(far.relativeError! * 100)} %, soit {far.basePoints} points au barème.
+          <em>Exemple</em> : valeur réelle 1 000. Un prono de 500 donne {e.below} de malus, et un prono de 1 500 aussi : {e.above}.
+          Une faute de frappe, 25 000, en donne {e.typo} : vérifie bien ta saisie avant de valider.
+        </p>
+        <p>
+          Une question sur un grand nombre (des milliers de candidatures) pèse donc beaucoup plus qu&apos;une question sur un petit
+          nombre (une JPO, un taux).
         </p>
       </Section>
 
-      <Section id="podium" title="Bonus podium">
+      <Section id="dans-le-mille" title="« Dans le mille »">
         <p>
-          Sur une question à nombre, les trois pronos les plus proches gagnent {podiumBonuses} points, même si leur écart ne
-          rapporte rien au barème : sur une question très dure, le meilleur est quand même récompensé. Les ex æquo reçoivent le
-          même bonus.
-        </p>
-      </Section>
-
-      <Section id="juste-prix" title="Juste Prix">
-        <p>
-          Un prono supérieur à la valeur réelle rapporte 0 point, ne joue pas le podium et ne compte pas dans l&apos;écart moyen
-          du départage. Les autres sont notés avec le barème, et le bonus podium se joue entre eux.
+          Un prono à {BULLSEYE_PERCENT} % ou moins de la valeur réelle est « Dans le mille ». Il ne change pas ton malus, mais il
+          compte pour les badges et pour le départage. Si la valeur réelle vaut 0, seul le prono 0 est « Dans le mille ».
         </p>
       </Section>
 
       <Section id="choix" title="Questions à choix">
         <p>
-          Bonne réponse : {CHOICE_POINTS} points. Mauvaise réponse : 0 point. Pas de bonus podium. Pour une question à choix plus
-          difficile, l&apos;admin augmente le coefficient.
+          Bonne réponse : 0 malus. Mauvaise réponse : le <strong>malus d&apos;une mauvaise réponse</strong>, fixé par l&apos;admin
+          sur chaque question et affiché avec elle.
         </p>
       </Section>
 
       <Section id="coefficient" title="Coefficient">
-        <p>L&apos;admin applique un coefficient {coefficients} à chaque question, affiché sur la question.</p>
+        <p>L&apos;admin applique un coefficient {coefficients} à chaque question, affiché sur la question : il multiplie le malus.</p>
+        <p>
+          <strong>Malus d&apos;une question</strong> = malus × coefficient, ÷ {JOKER_DIVISOR} avec un joker.
+        </p>
+        <p>
+          <em>Exemple</em> : JPO, coefficient ×1, valeur réelle 250. Un prono de 240 donne {e.jpo} de malus ; avec un joker,{" "}
+          {e.jpoJoker}. Un prono de 300 donne {e.jpoFar} ; avec un coefficient ×3, ce serait {e.jpoCoefficient}.
+        </p>
       </Section>
 
       <Section id="jokers" title="Jokers">
+        <p className="font-semibold text-ink">
+          {season
+            ? season.jokersEnabled
+              ? `Cette saison : jokers autorisés (${JOKERS_PER_SEASON} par joueur).`
+              : "Cette saison : pas de jokers."
+            : "L'admin choisit, pour chaque saison, si les jokers sont autorisés."}
+        </p>
         <ul className={LIST}>
           <li>
-            Tu as {JOKERS_PER_SEASON} jokers par saison. Un joker multiplie par {JOKER_MULTIPLIER} les points de la question.
+            Quand la saison les autorise, tu as {JOKERS_PER_SEASON} jokers. Un joker divise par {JOKER_DIVISOR} le malus de la
+            question : pose-le là où tu es le moins sûr.
           </li>
           <li>Il se pose sur un prono enregistré, avant sa validation.</li>
           <li>Si la question est annulée, le joker t&apos;est rendu.</li>
         </ul>
       </Section>
 
+      <Section id="pas-de-prono" title="Pas de prono">
+        <p>
+          Sans prono sur une question résolue, tu prends le malus du <strong>pire prono</strong> de la question : l&apos;écart le
+          plus grand de l&apos;équipe (question à nombre), ou le malus d&apos;une mauvaise réponse (question à choix), multiplié
+          par le coefficient. Si personne n&apos;a pronostiqué, personne ne prend de malus.
+        </p>
+        <p>
+          <em>Exemple</em> : dans l&apos;exemple de la JPO, avec des pronos de 240 et de 300, un joueur sans prono prend {e.absent}{" "}
+          de malus. Ne pas répondre ne rapporte jamais rien.
+        </p>
+      </Section>
+
+      <Section id="prolongation" title="Prolongation pour un absent">
+        <ul className={LIST}>
+          <li>
+            Si tu n&apos;as pas pu pronostiquer (absence), l&apos;admin peut rouvrir la question pour toi seul, jusqu&apos;à une
+            date limite personnelle, tant que le résultat n&apos;est pas saisi. Il te prévient lui-même.
+          </li>
+          <li>
+            Tu retrouves la question dans tes questions ouvertes, avec « Prolongée pour toi » et ton propre compte à rebours. Ton
+            prono est validé automatiquement à ta date limite.
+          </li>
+          <li>
+            C&apos;est pour cela qu&apos;on ne voit pas les pronos des autres sans avoir pronostiqué : sinon, une prolongation
+            donnerait les réponses. Le prono d&apos;un joueur prolongé reste caché des autres jusqu&apos;à sa date limite.
+          </li>
+          <li>Le résultat ne peut pas être saisi tant qu&apos;une prolongation court.</li>
+        </ul>
+      </Section>
+
       <Section id="departage" title="Départage">
-        <p>À égalité de points au classement :</p>
+        <p>Au classement :</p>
         <ol className="flex list-decimal flex-col gap-1.5 pl-5">
-          <li>le plus grand nombre de « Dans le mille » ;</li>
-          <li>puis l&apos;écart relatif moyen le plus faible sur les questions à nombre (sans les pronos Juste Prix qui dépassent) ;</li>
+          <li>le moins de malus ;</li>
+          <li>puis le plus grand nombre de « Dans le mille » ;</li>
+          <li>puis l&apos;écart relatif moyen le plus faible (|prono − réel| / réel), sur les questions à nombre que tu as pronostiquées ;</li>
           <li>sinon, ex æquo.</li>
         </ol>
       </Section>
 
       <Section id="cas-particuliers" title="Cas particuliers">
         <ul className={LIST}>
-          <li>Prono enregistré mais pas validé à la clôture : il est validé automatiquement et compte.</li>
-          <li>Aucun prono : 0 point, sans pénalité.</li>
+          <li>Prono enregistré mais pas validé à la clôture (ou à la fin de ta prolongation) : il est validé automatiquement et compte.</li>
+          <li>Aucun prono : le malus du pire prono.</li>
+          <li>Résultat corrigé après sa publication : les malus sont recalculés, et la correction est signalée sur la question.</li>
+          <li>Question annulée : aucun malus pour personne, et le joker éventuellement posé est rendu.</li>
           <li>
-            Valeur réelle égale à 0 : l&apos;écart relatif ne se calcule pas. {bullseye.points} points si ton prono vaut 0, sinon
-            0.
+            Arrivée en cours de saison : tu joues les questions encore ouvertes ; sur les questions déjà résolues, tu prends le malus
+            d&apos;absence. Pour une question clôturée sans résultat, l&apos;admin peut te l&apos;ouvrir par une prolongation.
           </li>
-          <li>Résultat corrigé après sa publication : les points sont recalculés, et la correction est signalée sur la question.</li>
-          <li>Question annulée : aucun point pour personne, et le joker éventuellement posé est rendu.</li>
+          <li>Départ de l&apos;équipe : le compte est désactivé, son historique est conservé.</li>
           <li>
             Une fois des pronos reçus, l&apos;admin peut encore modifier l&apos;aide et repousser la clôture, mais pas changer
-            l&apos;énoncé ni les réponses possibles, ni avancer la clôture.
+            l&apos;énoncé, les réponses possibles ni le malus d&apos;une mauvaise réponse, ni avancer la clôture.
           </li>
-          <li>Arrivée en cours de saison : tu joues les questions encore ouvertes.</li>
-          <li>Départ de l&apos;équipe : le compte est désactivé, son historique est conservé.</li>
           <li>Toutes les dates et heures sont celles de Paris.</li>
         </ul>
       </Section>

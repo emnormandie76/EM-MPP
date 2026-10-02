@@ -14,14 +14,22 @@ import {
 } from "@/lib/game/standings";
 import { seasonStartFromLocalDate } from "@/lib/game/time";
 
+// Standings (architecture §5.6, v1.2): the fewest malus first. Malus are in hundredths.
+
 const day = (n: number) => new Date(Date.UTC(2026, 10, n, 10));
 
 function numberQuestion(id: number, resultNumber: number, resolvedAt: Date, overrides: Partial<StandingsQuestion> = {}): StandingsQuestion {
-  return { id, type: "number", priceIsRight: false, coefficient: 1, resultNumber, resultOptionId: null, resolvedAt, ...overrides };
+  return { id, type: "number", coefficient: 1, resultNumber, resultOptionId: null, wrongAnswerMalus: null, resolvedAt, ...overrides };
 }
 
-function choiceQuestion(id: number, resultOptionId: number, resolvedAt: Date, overrides: Partial<StandingsQuestion> = {}): StandingsQuestion {
-  return { id, type: "choice", priceIsRight: false, coefficient: 1, resultNumber: null, resultOptionId, resolvedAt, ...overrides };
+function choiceQuestion(
+  id: number,
+  resultOptionId: number,
+  wrongAnswerMalus: number,
+  resolvedAt: Date,
+  overrides: Partial<StandingsQuestion> = {},
+): StandingsQuestion {
+  return { id, type: "choice", coefficient: 1, resultNumber: null, resultOptionId, wrongAnswerMalus, resolvedAt, ...overrides };
 }
 
 function guess(questionId: number, userId: string, valueNumber: number, joker = false): StandingsPrediction {
@@ -37,48 +45,54 @@ function player(id: string, name = id, banned = false): StandingsPlayer {
 }
 
 function totals(userId: string, overrides: Partial<StandingTotals> = {}): StandingTotals {
-  return { userId, name: userId, inactive: false, points: 0, bullseyes: 0, meanError: null, questionsPlayed: 0, ...overrides };
+  return { userId, name: userId, inactive: false, malus: 0, bullseyes: 0, meanError: null, questionsPlayed: 0, ...overrides };
 }
 
 const ranks = (rows: { userId: string; rank: number }[]) => rows.map(({ userId, rank }) => [userId, rank]);
+const byId = <R extends { userId: string }>(rows: R[]) => Object.fromEntries(rows.map((row) => [row.userId, row]));
 
 describe("rankStandings: order and ties", () => {
-  it("C1: same points, more Dans le mille first", () => {
-    const rows = rankStandings([totals("B", { points: 200, bullseyes: 1 }), totals("A", { points: 200, bullseyes: 2 })]);
+  it("C1: same malus, more Dans le mille first", () => {
+    const rows = rankStandings([totals("B", { malus: 30_000, bullseyes: 1 }), totals("A", { malus: 30_000, bullseyes: 2 })]);
     expect(ranks(rows)).toEqual([["A", 1], ["B", 2]]);
   });
 
-  it("C2: same points and Dans le mille, lower mean error first", () => {
+  it("C2: same malus and Dans le mille, lower mean error first", () => {
     const rows = rankStandings([
-      totals("B", { points: 200, bullseyes: 1, meanError: 0.05 }),
-      totals("A", { points: 200, bullseyes: 1, meanError: 0.03 }),
+      totals("B", { malus: 30_000, bullseyes: 1, meanError: 0.05 }),
+      totals("A", { malus: 30_000, bullseyes: 1, meanError: 0.03 }),
     ]);
     expect(ranks(rows)).toEqual([["A", 1], ["B", 2]]);
   });
 
   it("C3: strictly identical players share the rank, the next one is skipped", () => {
     const rows = rankStandings([
-      totals("C", { points: 100 }),
-      totals("A", { points: 200, bullseyes: 1, meanError: 0.03 }),
-      totals("B", { points: 200, bullseyes: 1, meanError: 0.03 }),
+      totals("C", { malus: 50_000 }),
+      totals("A", { malus: 30_000, bullseyes: 1, meanError: 0.03 }),
+      totals("B", { malus: 30_000, bullseyes: 1, meanError: 0.03 }),
     ]);
     expect(ranks(rows)).toEqual([["A", 1], ["B", 1], ["C", 3]]);
   });
 
-  it("sorts by points first, whatever the tie-breakers", () => {
-    const rows = rankStandings([totals("A", { points: 100, bullseyes: 5, meanError: 0 }), totals("B", { points: 101 })]);
+  it("C7: the fewest malus first, whatever the tie-breakers", () => {
+    const rows = rankStandings([totals("B", { malus: 15_000, bullseyes: 2, meanError: 0 }), totals("A", { malus: 10_000 })]);
+    expect(ranks(rows)).toEqual([["A", 1], ["B", 2]]);
+  });
+
+  it("compares the malus to the hundredth", () => {
+    const rows = rankStandings([totals("A", { malus: 25_051 }), totals("B", { malus: 25_050 })]);
     expect(ranks(rows)).toEqual([["B", 1], ["A", 2]]);
   });
 
   it("puts a missing mean error after any mean error", () => {
-    const rows = rankStandings([totals("A", { points: 50 }), totals("B", { points: 50, meanError: 0.9 })]);
+    const rows = rankStandings([totals("A", { malus: 5_000 }), totals("B", { malus: 5_000, meanError: 0.9 })]);
     expect(ranks(rows)).toEqual([["B", 1], ["A", 2]]);
   });
 
   it("treats mean errors equal within 1e-12 as a tie", () => {
     const rows = rankStandings([
-      totals("A", { points: 50, meanError: 0.1 + 0.2 }),
-      totals("B", { points: 50, meanError: 0.3 }),
+      totals("A", { malus: 5_000, meanError: 0.1 + 0.2 }),
+      totals("B", { malus: 5_000, meanError: 0.3 }),
     ]);
     expect(ranks(rows)).toEqual([["A", 1], ["B", 1]]);
   });
@@ -100,76 +114,51 @@ describe("rankStandings: order and ties", () => {
 });
 
 describe("computeStandings: totals per player", () => {
-  // Number question from vector P1 (real 250) and Juste Prix from vector J3 (real 250).
+  // Vector P1 (real 250), vector A1 (real 1 000, coefficient 2) and a choice question (coefficient 2,
+  // wrong answer: 100). The players without a prediction take the malus of the worst prediction.
   const q1 = numberQuestion(1, 250, day(1));
-  const q2 = numberQuestion(2, 250, day(2), { priceIsRight: true });
-  const q3 = choiceQuestion(3, 30, day(3), { coefficient: 2 });
+  const q2 = numberQuestion(2, 1000, day(2), { coefficient: 2 });
+  const q3 = choiceQuestion(3, 30, 100, day(3), { coefficient: 2 });
   const input: StandingsInput = {
     questions: [q1, q2, q3],
     predictions: [
-      guess(1, "A", 240), // 65 + 20
-      guess(1, "B", 262, true), // (65 + 10) × 2
-      guess(1, "C", 235), // 45 + 5
-      guess(1, "D", 235), // 45 + 5
-      guess(1, "E", 300), // 25
-      guess(2, "A", 251), // over: 0
-      guess(2, "B", 245), // 80 + 20
-      guess(2, "C", 230), // 45 + 10
-      pick(3, "A", 30), // 50 × 2
-      pick(3, "E", 31), // 0
+      guess(1, "A", 240), // 10
+      guess(1, "B", 262, true), // 12 ÷ 2 = 6
+      guess(1, "C", 235), // 15
+      guess(1, "D", 235), // 15
+      guess(1, "E", 300), // 50, the worst: 50 for an absence
+      guess(2, "A", 900), // 100 × 2 = 200
+      guess(2, "B", 1300, true), // 300 × 2 ÷ 2 = 300; worst gap 300 × 2 = 600 for an absence
+      pick(3, "A", 30), // 0
+      pick(3, "E", 31), // 100 × 2 = 200, as an absence
     ],
     players: ["A", "B", "C", "D", "E"].map((id) => player(id)),
   };
 
-  it("adds the totals of every resolved question", () => {
-    const byId = Object.fromEntries(computeStandings(input).map((row) => [row.userId, row]));
-    expect(byId.A.points).toBe(85 + 0 + 100);
-    expect(byId.B.points).toBe(150 + 100);
-    expect(byId.C.points).toBe(50 + 55);
-    expect(byId.D.points).toBe(50);
-    expect(byId.E.points).toBe(25);
+  it("adds the malus of every resolved question, absences included", () => {
+    const rows = byId(computeStandings(input));
+    expect(rows.A.malus).toBe(1_000 + 20_000 + 0);
+    expect(rows.B.malus).toBe(600 + 30_000 + 20_000);
+    expect(rows.C.malus).toBe(1_500 + 60_000 + 20_000);
+    expect(rows.D.malus).toBe(1_500 + 60_000 + 20_000);
+    expect(rows.E.malus).toBe(5_000 + 60_000 + 20_000);
   });
 
-  it("counts the questions played, including a wrong answer or a prediction that goes over", () => {
-    const byId = Object.fromEntries(computeStandings(input).map((row) => [row.userId, row]));
-    expect([byId.A.questionsPlayed, byId.B.questionsPlayed, byId.D.questionsPlayed, byId.E.questionsPlayed]).toEqual([3, 2, 1, 2]);
+  it("ranks the players, the fewest malus first", () => {
+    expect(ranks(computeStandings(input))).toEqual([["A", 1], ["B", 2], ["C", 3], ["D", 3], ["E", 5]]);
   });
 
-  it("averages the relative errors of number questions, Juste Prix included, except a prediction that goes over", () => {
-    const byId = Object.fromEntries(computeStandings(input).map((row) => [row.userId, row]));
-    // A went over on the Juste Prix (251): 0 point, and out of the tie-break (decision of 01/10/2026).
-    expect(byId.A.meanError).toBeCloseTo(10 / 250, 12);
-    // C stayed under (230): counted.
-    expect(byId.C.meanError).toBeCloseTo((15 / 250 + 20 / 250) / 2, 12);
-    expect(byId.D.meanError).toBeCloseTo(15 / 250, 12);
+  it("counts the questions played, a wrong answer included, absences excluded", () => {
+    const rows = byId(computeStandings(input));
+    expect([rows.A, rows.B, rows.C, rows.D, rows.E].map(({ questionsPlayed }) => questionsPlayed)).toEqual([3, 2, 1, 1, 2]);
   });
 
-  it("a player whose only number prediction went over a Juste Prix has no mean error", () => {
-    const rows = computeStandings({ questions: [q2], predictions: [guess(2, "A", 251), guess(2, "B", 245)], players: [player("A"), player("B")] });
-    const byId = Object.fromEntries(rows.map((row) => [row.userId, row]));
-    expect(byId.A.meanError).toBeNull();
-    expect(byId.B.meanError).toBeCloseTo(5 / 250, 12);
-  });
-
-  it("test report of 01/10/2026: going over a Juste Prix by 0,4 % no longer wins the tie-break", () => {
-    // Juste Prix (real 250): A 251, over by 0,4 % (0 point); B 245 (80 + 20 = 100). Number question
-    // (real 1 000): A alone, 970 (80 + 20 = 100). 100 points each, no Dans le mille. Counting the 0,4 %,
-    // A would win on the mean error (1,7 % against 2 %); without it, B wins (2 % against 3 %).
-    const rows = computeStandings({
-      questions: [q2, numberQuestion(4, 1000, day(4))],
-      predictions: [guess(2, "A", 251), guess(2, "B", 245), guess(4, "A", 970)],
-      players: [player("A"), player("B")],
-    });
-    const byId = Object.fromEntries(rows.map((row) => [row.userId, row]));
-    expect([byId.A.points, byId.B.points]).toEqual([100, 100]);
-    expect([byId.A.bullseyes, byId.B.bullseyes]).toEqual([0, 0]);
-    expect(byId.A.meanError).toBeCloseTo(0.03, 12);
-    expect(byId.B.meanError).toBeCloseTo(0.02, 12);
-    expect(ranks(rows)).toEqual([["B", 1], ["A", 2]]);
-  });
-
-  it("ranks the players", () => {
-    expect(ranks(computeStandings(input))).toEqual([["B", 1], ["A", 2], ["C", 3], ["D", 4], ["E", 5]]);
+  it("averages the relative errors of the number questions played; absences do not count", () => {
+    const rows = byId(computeStandings(input));
+    expect(rows.A.meanError).toBeCloseTo((10 / 250 + 100 / 1000) / 2, 12);
+    expect(rows.B.meanError).toBeCloseTo((12 / 250 + 300 / 1000) / 2, 12);
+    expect(rows.C.meanError).toBeCloseTo(15 / 250, 12);
+    expect(rows.E.meanError).toBeCloseTo(50 / 250, 12);
   });
 
   it("counts the Dans le mille", () => {
@@ -182,38 +171,75 @@ describe("computeStandings: totals per player", () => {
   });
 
   it("leaves out infinite errors (real value 0) from the mean error", () => {
+    const rows = byId(
+      computeStandings({
+        questions: [numberQuestion(1, 0, day(1)), numberQuestion(2, 100, day(2))],
+        predictions: [guess(1, "A", 5), guess(2, "A", 90), guess(1, "B", 3)],
+        players: [player("A"), player("B")],
+      }),
+    );
+    expect(rows.A.meanError).toBeCloseTo(0.1, 12);
+    expect(rows.B.meanError).toBeNull();
+    expect(rows.B.questionsPlayed).toBe(1);
+  });
+
+  it("C6: an active player without any prediction takes the malus of the worst predictions", () => {
     const rows = computeStandings({
-      questions: [numberQuestion(1, 0, day(1)), numberQuestion(2, 100, day(2))],
-      predictions: [guess(1, "A", 5), guess(2, "A", 90), guess(1, "B", 3)],
-      players: [player("A"), player("B")],
+      questions: [numberQuestion(1, 1000, day(1)), numberQuestion(2, 200, day(2))],
+      predictions: [guess(1, "A", 1120), guess(1, "B", 1010), guess(2, "A", 240), guess(2, "B", 200)],
+      players: [player("A"), player("B"), player("F", "Fanny")],
     });
-    const byId = Object.fromEntries(rows.map((row) => [row.userId, row]));
-    expect(byId.A.meanError).toBeCloseTo(0.1, 12);
-    expect(byId.B.meanError).toBeNull();
-    expect(byId.B.questionsPlayed).toBe(1);
+    expect(rows.find(({ userId }) => userId === "F")).toMatchObject({
+      name: "Fanny",
+      malus: 12_000 + 4_000,
+      bullseyes: 0,
+      meanError: null,
+      questionsPlayed: 0,
+      inactive: false,
+    });
   });
 
-  it("C6: an active player without any prediction is listed with 0 point", () => {
-    const rows = computeStandings({ ...input, players: [...input.players, player("F", "Fanny")] });
-    expect(rows.at(-1)).toMatchObject({ userId: "F", name: "Fanny", points: 0, bullseyes: 0, meanError: null, questionsPlayed: 0, inactive: false });
+  it("C8: an account created after a result of the season takes the malus of its absence", () => {
+    const end = new Date(Date.UTC(2027, 8, 30));
+    const accounts = [
+      { id: "A", name: "A", banned: false, createdAt: day(0) },
+      { id: "N", name: "Newcomer", banned: false, createdAt: day(10) },
+    ];
+    const rows = byId(
+      computeStandings({
+        questions: [numberQuestion(1, 250, day(1))],
+        predictions: [guess(1, "A", 240)],
+        players: seasonPlayers(accounts, end, new Set(["A"])),
+      }),
+    );
+    expect(rows.N).toMatchObject({ malus: 1_000, questionsPlayed: 0 });
   });
 
-  it("lists a disabled player only if they have a prediction in the season, marked inactive", () => {
+  it("C9: a disabled account is listed only with a prediction in the season, inactive, with its absences", () => {
     const rows = computeStandings({
       questions: [q1],
       predictions: [guess(1, "A", 240), guess(1, "X", 250), guess(99, "Y", 12)],
       players: [player("A"), player("X", "Xavier", true), player("Y", "Yann", true), player("Z", "Zoé", true)],
     });
-    expect(rows.map(({ userId, inactive, points }) => [userId, inactive, points])).toEqual([
-      ["X", true, 120],
-      ["A", false, 75],
-      ["Y", true, 0],
+    expect(rows.map(({ userId, inactive, malus }) => [userId, inactive, malus])).toEqual([
+      ["X", true, 0],
+      ["A", false, 1_000],
+      // Yann played another question of the season: listed, with the malus of his absence here.
+      ["Y", true, 1_000],
     ]);
   });
 
   it("ignores predictions on questions that are not in the list (unresolved)", () => {
     const rows = computeStandings({ questions: [q1], predictions: [guess(1, "A", 240), guess(7, "A", 1)], players: [player("A")] });
-    expect(rows[0]).toMatchObject({ points: 85, questionsPlayed: 1 });
+    expect(rows[0]).toMatchObject({ malus: 1_000, questionsPlayed: 1 });
+  });
+
+  it("a question without any prediction gives no malus to anyone (A3)", () => {
+    const rows = computeStandings({ questions: [q1], predictions: [], players: [player("A"), player("B")] });
+    expect(rows.map(({ malus, rank }) => [malus, rank])).toEqual([
+      [0, 1],
+      [0, 1],
+    ]);
   });
 
   it("returns an empty list without players", () => {
@@ -222,9 +248,10 @@ describe("computeStandings: totals per player", () => {
 });
 
 describe("withMovement: arrows since the previous result", () => {
-  // Question 1: B 120, C 55, A 30. Question 2 (choice, coefficient 3): only A is right, 150.
+  // Question 1 (real 100): B 0, C 10, A 20. Question 2 (choice, coefficient 3, wrong answer: 10):
+  // only A is right; B 30, C absent 30. Totals: A 20, B 30, C 40.
   const q1 = numberQuestion(1, 100, day(1));
-  const q2 = choiceQuestion(2, 5, day(2), { coefficient: 3 });
+  const q2 = choiceQuestion(2, 5, 10, day(2), { coefficient: 3 });
   const predictions = [guess(1, "B", 100), guess(1, "C", 90), guess(1, "A", 80), pick(2, "A", 5), pick(2, "B", 6)];
   const players = [player("A"), player("B"), player("C")];
 
@@ -253,7 +280,7 @@ describe("withMovement: arrows since the previous result", () => {
   });
 
   it("on the same resolution date, removes the question with the highest id", () => {
-    const sameDay = choiceQuestion(2, 5, day(1), { coefficient: 3 });
+    const sameDay = choiceQuestion(2, 5, 10, day(1), { coefficient: 3 });
     const rows = withMovement({ questions: [sameDay, q1], predictions, players });
     expect(rows.find(({ userId }) => userId === "A")?.delta).toBe(2);
 
@@ -266,13 +293,14 @@ describe("withMovement: arrows since the previous result", () => {
     expect(rowsSwapped.find(({ userId }) => userId === "A")?.delta).toBe(0);
   });
 
-  it("keeps in the previous standings, at 0 point, a disabled player whose only prediction is on the latest question", () => {
+  it("keeps in the previous standings a disabled player whose only prediction is on the latest question", () => {
     const rows = withMovement({
       questions: [q1, q2],
       predictions: [...predictions, pick(2, "X", 5)],
       players: [...players, player("X", "Xavier", true)],
     });
-    expect(rows.find(({ userId }) => userId === "X")).toMatchObject({ rank: 2, delta: 2, inactive: true });
+    // Before question 2, X was listed with the malus of an absence (20), behind A on the mean error.
+    expect(rows.find(({ userId }) => userId === "X")).toMatchObject({ rank: 2, delta: 2, inactive: true, malus: 2_000 });
   });
 });
 

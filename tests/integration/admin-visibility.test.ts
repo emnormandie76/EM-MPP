@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getAdminDashboard, getAdminQuestion } from "@/lib/data/admin";
 import { getQuestionPredictionsForViewer } from "@/lib/data/questions";
 import type { Database } from "@/lib/db/client";
+import { questionExtension } from "@/lib/db/schema";
+import { validatePrediction } from "@/lib/services/predictions";
 import { makeClock } from "../helpers/clock";
 import { createTestDb } from "../helpers/db";
 import { createCategory, createPrediction, createQuestion, createUser } from "../helpers/factories";
@@ -100,7 +102,7 @@ describe("before the closing, the admin only receives states", () => {
   });
 });
 
-describe("after the closing, the values are revealed to everyone", () => {
+describe("after the closing, the values are revealed to whoever predicted the question", () => {
   it("the follow-up shows each answer, a saved prediction counts as validated", async () => {
     const { admin, sarah, open } = await setUp();
     const afterClosing = clock.at("+2d");
@@ -156,4 +158,73 @@ it("the back-office reads are refused to a player", async () => {
   const { sarah, open } = await setUp();
   await expect(getAdminDashboard(db, playerView(sarah), now)).rejects.toThrow("FORBIDDEN");
   await expect(getAdminQuestion(db, playerView(sarah), open.id, now)).rejects.toThrow("FORBIDDEN");
+});
+
+describe("v1.2: extensions in the back office (§5.14, §8.3)", () => {
+  /** Closed yesterday: Sarah predicted; Julien, absent, has an extension until in 2 days; Inès and the admin have no prediction. */
+  async function extendedSetUp() {
+    const { admin, sarah, julien, ines, categoryId } = await setUp();
+    const closed = await createQuestion(db, {
+      categoryId,
+      createdBy: admin.id,
+      title: "Combien d'inscrits au webinaire ?",
+      status: "published",
+      opensAt: clock.at("-5d"),
+      closesAt: clock.at("-1d"),
+    });
+    await createPrediction(db, { questionId: closed.id, userId: sarah.id, valueNumber: WITNESS, validatedAt: clock.at("-2d") });
+    const deadline = clock.at("+2d");
+    await db.insert(questionExtension).values({ questionId: closed.id, userId: julien.id, closesAt: deadline, grantedBy: admin.id, grantedAt: clock.at("-1h") });
+    return { admin, sarah, julien, ines, closed, deadline };
+  }
+
+  it("the dashboard: the result is blocked with the reason, and the running extensions are listed", async () => {
+    const { admin, closed, deadline } = await extendedSetUp();
+    const dashboard = await getAdminDashboard(db, adminView(admin), now);
+    expect(dashboard.toResolve).toEqual([expect.objectContaining({ id: closed.id, blocker: "Prolongation de Julien jusqu'au mer. 7 oct. à 12 h." })]);
+    expect(dashboard.extensions).toEqual([
+      { questionId: closed.id, questionTitle: "Combien d'inscrits au webinaire ?", player: expect.objectContaining({ name: "Julien" }), closesAt: deadline, state: "todo" },
+    ]);
+    expectNoValue(dashboard);
+
+    const after = await getAdminDashboard(db, adminView(admin), deadline);
+    // At the deadline, the open question of setUp closes too: both are waiting for their result.
+    expect(after.toResolve.find(({ id }) => id === closed.id)).toMatchObject({ blocker: null });
+    expect(after.extensions).toEqual([]);
+  });
+
+  it("the follow-up: the extension of each player, and what the admin can do on each row", async () => {
+    const { admin, closed, deadline } = await extendedSetUp();
+    const detail = await getAdminQuestion(db, adminView(admin), closed.id, now);
+    expect(detail?.extensionBlocker).toBe("Prolongation de Julien jusqu'au mer. 7 oct. à 12 h.");
+    expect(
+      detail?.tracking?.map(({ name, state, extension, canExtend, canChangeExtension, canUnlock }) => ({ name, state, extension, canExtend, canChangeExtension, canUnlock })),
+    ).toEqual([
+      // The admin does not extend a question for themselves.
+      { name: "Admin", state: "todo", extension: null, canExtend: false, canChangeExtension: false, canUnlock: false },
+      { name: "Inès", state: "todo", extension: null, canExtend: true, canChangeExtension: false, canUnlock: false },
+      { name: "Julien", state: "todo", extension: { closesAt: deadline, running: true }, canExtend: false, canChangeExtension: true, canUnlock: false },
+      { name: "Sarah", state: "validated", extension: null, canExtend: false, canChangeExtension: false, canUnlock: false },
+    ]);
+    // The admin did not predict the question: states only (v1.2).
+    expectNoValue(detail);
+  });
+
+  it("a prediction validated during the extension can be unlocked; after the deadline, nothing is possible any more", async () => {
+    const { admin, julien, closed, deadline } = await extendedSetUp();
+    await validatePrediction(db, { id: julien.id, role: "player", banned: false }, { questionId: closed.id, rawValue: "120" }, now);
+    const during = await getAdminQuestion(db, adminView(admin), closed.id, now);
+    expect(during?.tracking?.find(({ name }) => name === "Julien")).toMatchObject({ state: "validated", canUnlock: true, canChangeExtension: true, answer: null });
+
+    const after = await getAdminQuestion(db, adminView(admin), closed.id, deadline);
+    expect(after?.extensionBlocker).toBeNull();
+    expect(after?.tracking?.find(({ name }) => name === "Julien")).toMatchObject({
+      extension: { closesAt: deadline, running: false },
+      canUnlock: false,
+      canExtend: false,
+      canChangeExtension: false,
+    });
+    // Inès can still get one: the question has no result yet.
+    expect(after?.tracking?.find(({ name }) => name === "Inès")).toMatchObject({ canExtend: true });
+  });
 });

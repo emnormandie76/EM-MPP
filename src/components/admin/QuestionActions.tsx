@@ -61,7 +61,7 @@ export function QuestionActions({
 
       <Dialog open={dialog === "cancel"} onClose={() => setDialog(null)} title="Annuler la question ?">
         <p className="text-[15px] text-ink-2">
-          La question sort du calcul des points et les jokers posés dessus sont rendus. Les joueurs la verront comme
+          La question sort du calcul des malus et les jokers posés dessus sont rendus. Les joueurs la verront comme
           annulée. Ce n&apos;est pas réversible.
         </p>
         <div className="flex flex-wrap justify-end gap-2">

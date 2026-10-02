@@ -9,7 +9,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { requireUser } from "@/lib/auth/session";
 import { getQuestionsList, type QuestionListItem, type QuestionListTab } from "@/lib/data/questions";
 import { getDb } from "@/lib/db/client";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatMalus } from "@/lib/format";
 import { QUESTION_KIND_LABELS } from "@/lib/validation/question";
 
 export const metadata: Metadata = { title: "Questions" };
@@ -26,7 +26,7 @@ const TABS: { key: string; tab: QuestionListTab; label: string; empty: string }[
 function Dates({ item, now }: { item: QuestionListItem; now: Date }) {
   switch (item.status) {
     case "open":
-      return <>Clôture {formatDateTime(item.closesAt, now)}</>;
+      return item.extendedUntil ? <>Prolongée pour toi jusqu&apos;au {formatDateTime(item.extendedUntil, now)}</> : <>Clôture {formatDateTime(item.closesAt, now)}</>;
     case "closed":
       return (
         <>
@@ -60,12 +60,13 @@ function QuestionItem({ item, now }: { item: QuestionListItem; now: Date }) {
       </div>
       {item.status === "resolved" ? (
         <p className="font-display text-[26px] leading-none font-extrabold tabular-nums">
-          {item.myPoints === null ? (
+          {item.myMalus === null ? (
             <span className="text-base font-bold uppercase tracking-[0.06em] text-muted">Pas de prono</span>
           ) : (
             <>
-              <span className="text-accent-text">{item.myPoints}</span>
-              <span className="ml-1 text-sm font-bold uppercase tracking-[0.06em] text-muted">pts</span>
+              {item.absent ? <span className="mr-2 text-base font-bold uppercase tracking-[0.06em] text-muted">Pas de prono ·</span> : null}
+              <span className="text-accent-text">{formatMalus(item.myMalus)}</span>{" "}
+              <span className="text-sm font-bold uppercase tracking-[0.06em] text-muted">de malus</span>
             </>
           )}
         </p>

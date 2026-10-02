@@ -1,21 +1,27 @@
 import { and, count, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "@/lib/db/client";
-import { prediction, predictionEvent, question, questionOption, user } from "@/lib/db/schema";
+import { prediction, predictionEvent, question, questionExtension, questionOption, user } from "@/lib/db/schema";
 import { JOKERS_PER_SEASON } from "@/lib/game/constants";
 import { parseNumberInput } from "@/lib/game/number-input";
-import { questionStatus } from "@/lib/game/question-status";
+import { questionStatusFor } from "@/lib/game/question-status";
 import { type Actor, authorize, ERROR_MESSAGES, fail, type Failure, isFailure, ok, type Result } from "./result";
+import { seasonsForQuestions } from "./seasons";
 
 // Predictions of the players (architecture §5.4, §7.3). A prediction is saved (still editable) or
 // validated (final); a saved prediction counts as validated at the closing, without any write.
 // Each action writes one event of the history, which is never changed.
 //
-// Locks, always in this order: the question (FOR SHARE: an admin cannot change it, nor a season
-// move it, while a prediction arrives), then the owner's user row (FOR NO KEY UPDATE: the writes
-// on one player's predictions run one at a time, so a double click cannot pose a third joker),
-// then the prediction (FOR UPDATE). NO KEY UPDATE rather than UPDATE: it does not block the
-// foreign key checks of the events written meanwhile for the same player.
+// "Open" means open for the owner of the prediction (v1.2, §5.2): a closed question stays open for a
+// player whose extension still runs (§5.14).
+//
+// Locks, always in this order (§5.4): for setJoker only, the seasons (FOR SHARE, to read whether
+// they allow jokers while no updateSeason takes them away); the question (FOR SHARE: an admin cannot
+// change it, nor a season move it, while a prediction arrives); the owner's extension on it, if any
+// (FOR SHARE); the owner's user row (FOR NO KEY UPDATE: the writes on one player's predictions run
+// one at a time, so a double click cannot pose a third joker); then the prediction (FOR UPDATE).
+// NO KEY UPDATE rather than UPDATE: it does not block the foreign key checks of the events written
+// meanwhile for the same player.
 
 type QuestionRow = Pick<
   typeof question.$inferSelect,
@@ -36,8 +42,11 @@ const answerInput = z.object({
 
 type Answer = { valueNumber: number | null; optionId: number | null };
 
-/** The question, locked FOR SHARE, if it is open at `now`; an unknown question is "not open" too. */
-async function openQuestion(tx: Database, questionId: number, now: Date): Promise<QuestionRow | Failure> {
+/**
+ * The question, locked FOR SHARE, then the owner's extension on it (FOR SHARE), if the question is
+ * open for the owner at `now`. An unknown question is "not open" too, without saying it does not exist.
+ */
+async function openQuestion(tx: Database, questionId: number, ownerId: string, now: Date): Promise<QuestionRow | Failure> {
   const [row] = await tx
     .select({
       id: question.id,
@@ -51,7 +60,13 @@ async function openQuestion(tx: Database, questionId: number, now: Date): Promis
     .from(question)
     .where(eq(question.id, questionId))
     .for("share");
-  if (!row || questionStatus(row, now) !== "open") return fail("QUESTION_NOT_OPEN");
+  if (!row) return fail("QUESTION_NOT_OPEN");
+  const [extension] = await tx
+    .select({ closesAt: questionExtension.closesAt })
+    .from(questionExtension)
+    .where(and(eq(questionExtension.questionId, questionId), eq(questionExtension.userId, ownerId)))
+    .for("share");
+  if (questionStatusFor(row, extension ?? null, now) !== "open") return fail("QUESTION_NOT_OPEN");
   return row;
 }
 
@@ -165,7 +180,7 @@ export async function savePrediction(
   const { questionId } = parsed.data;
 
   return db.transaction(async (tx) => {
-    const row = await openQuestion(tx, questionId, now);
+    const row = await openQuestion(tx, questionId, me.id, now);
     if (isFailure(row)) return row;
     await lockPlayer(tx, me.id);
     const current = await lockPrediction(tx, questionId, me.id);
@@ -195,7 +210,7 @@ export async function validatePrediction(
   const { questionId, rawValue, optionId } = parsed.data;
 
   return db.transaction(async (tx) => {
-    const row = await openQuestion(tx, questionId, now);
+    const row = await openQuestion(tx, questionId, me.id, now);
     if (isFailure(row)) return row;
     await lockPlayer(tx, me.id);
     let current = await lockPrediction(tx, questionId, me.id);
@@ -224,9 +239,10 @@ const jokerInput = z.object({ questionId: questionIdSchema, enabled: z.boolean()
 export type JokerState = { joker: boolean; jokersLeft: number };
 
 /**
- * Poses or removes the joker of a saved prediction, not validated yet. At most JOKERS_PER_SEASON
- * jokers per player in the season of the question, on questions that are not cancelled: a joker
- * posed on a question later cancelled is given back.
+ * Poses or removes the joker of a saved prediction, not validated yet, when the season of the
+ * question allows jokers (v1.2). At most JOKERS_PER_SEASON jokers per player in the season of the
+ * question, on questions that are not cancelled: a joker posed on a question later cancelled is
+ * given back.
  */
 export async function setJoker(
   db: Database,
@@ -241,8 +257,11 @@ export async function setJoker(
   const { questionId, enabled } = parsed.data;
 
   return db.transaction(async (tx) => {
-    const row = await openQuestion(tx, questionId, now);
+    const seasons = await seasonsForQuestions(tx);
+    const row = await openQuestion(tx, questionId, me.id, now);
     if (isFailure(row)) return row;
+    // An open question is published, hence in a season: the season decides, for posing and removing.
+    if (!seasons.find(({ id }) => id === row.seasonId)?.jokersEnabled) return fail("JOKERS_DISABLED");
     await lockPlayer(tx, me.id);
     const current = await lockPrediction(tx, questionId, me.id);
     if (!current) return fail("NO_PREDICTION");
@@ -266,8 +285,9 @@ export async function setJoker(
 const unlockInput = z.object({ predictionId: z.coerce.number().int().positive() });
 
 /**
- * The admin unlocks a validated prediction, at the player's request and before the closing: the
- * player can change it again. The event names the admin as the actor.
+ * The admin unlocks a validated prediction, at the player's request, while the question is open for
+ * the player (before the closing, or during their extension): the player can change it again. The
+ * event names the admin as the actor.
  */
 export async function unlockPrediction(db: Database, actor: Actor | null, input: unknown, now: Date): Promise<Result> {
   const me = authorize(actor, { admin: true });
@@ -283,7 +303,7 @@ export async function unlockPrediction(db: Database, actor: Actor | null, input:
       .from(prediction)
       .where(eq(prediction.id, parsed.data.predictionId));
     if (!target) return notFound();
-    const row = await openQuestion(tx, target.questionId, now);
+    const row = await openQuestion(tx, target.questionId, target.userId, now);
     if (isFailure(row)) return fail("QUESTION_NOT_OPEN", "La question n'est plus ouverte : ce prono ne peut plus être déverrouillé.");
     await lockPlayer(tx, target.userId);
     const current = await lockPrediction(tx, target.questionId, target.userId);

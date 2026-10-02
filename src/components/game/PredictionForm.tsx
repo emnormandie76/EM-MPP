@@ -2,12 +2,11 @@
 
 import { type FormEvent, useId, useOptimistic, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { Dialog } from "@/components/ui/Dialog";
 import { type FormFeedback, FormMessage } from "@/components/ui/FormMessage";
 import { type AnswerInput, savePredictionAction, setJokerAction, validatePredictionAction } from "@/lib/actions/predictions";
 import { formatCount, formatDateTime, formatNumber } from "@/lib/format";
-import { JOKER_MULTIPLIER } from "@/lib/game/constants";
+import { JOKER_DIVISOR } from "@/lib/game/constants";
 import { parseNumberInput } from "@/lib/game/number-input";
 import type { PredictionState } from "@/lib/game/prediction-state";
 import type { Result } from "@/lib/services/result";
@@ -16,21 +15,23 @@ import { StatusChip } from "./StatusChip";
 
 // Prediction form of an open question (architecture §5.4, §8.2). "Enregistrer" keeps it editable;
 // "Valider" asks for a confirmation showing the formatted value (a typing mistake would be final),
-// then sends the value shown. The joker is posed or removed at once, on a saved prediction.
+// then sends the value shown. The joker is posed or removed at once, on a saved prediction; it
+// divides the malus by 2, and is absent from a season that does not allow jokers (v1.2).
 
 export type PredictionFormProps = {
   questionId: number;
   type: "number" | "choice";
   kind: QuestionKind;
   unit: string | null;
-  priceIsRight: boolean;
+  /** Malus of a wrong answer, recalled for a choice (v1.2). */
+  wrongAnswerMalus: number | null;
   options: { id: number; label: string }[];
   state: PredictionState;
   mine: { optionId: number | null; joker: boolean; validatedAt: Date | null; savedAt: Date } | null;
   /** The saved value as the server formats it ("2 450"): the same text on both sides of the hydration. */
   initialValue: string;
-  /** Jokers left in the season of the question, this question's own included. */
-  jokersLeft: number;
+  /** Jokers left in the season of the question, this question's own included; null without jokers this season. */
+  jokersLeft: number | null;
 };
 
 const LABEL = "font-display text-[15px] font-bold uppercase tracking-[0.08em] text-muted";
@@ -40,7 +41,7 @@ const BIG_TILE =
   "flex min-h-16 cursor-pointer items-center justify-center gap-2.5 rounded-field border border-line-strong bg-surface px-3.5 font-display text-2xl font-extrabold uppercase tracking-[0.04em] has-checked:border-2 has-checked:border-accent has-checked:bg-accent-soft has-disabled:cursor-default";
 
 export function PredictionForm(props: PredictionFormProps) {
-  const { questionId, type, kind, unit, priceIsRight, options, state, mine, initialValue, jokersLeft } = props;
+  const { questionId, type, kind, unit, wrongAnswerMalus, options, state, mine, initialValue, jokersLeft } = props;
   const id = useId();
   const inputId = `${id}-valeur`;
   const labelId = `${id}-libelle`;
@@ -56,7 +57,7 @@ export function PredictionForm(props: PredictionFormProps) {
 
   const validated = state === "validated";
   // Jokers available for this question: those left, plus this question's own if it has one.
-  const available = jokersLeft + (mine?.joker ? 1 : 0);
+  const available = (jokersLeft ?? 0) + (mine?.joker ? 1 : 0);
   const shownLeft = Math.max(0, available - (joker ? 1 : 0));
 
   const answer = (): AnswerInput =>
@@ -178,13 +179,10 @@ export function PredictionForm(props: PredictionFormProps) {
         )}
         <StatusChip state={state} />
       </div>
-      {priceIsRight ? (
-        <p className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
-          <Chip tone="outline">Juste Prix</Chip>
-          Le plus proche sans dépasser
-        </p>
-      ) : null}
       {value}
+      {type === "choice" && wrongAnswerMalus !== null ? (
+        <p className="text-sm text-ink-2">Mauvaise réponse : {formatNumber(wrongAnswerMalus)} de malus</p>
+      ) : null}
       {fieldError ? (
         <p id={errorId} className="text-sm font-medium text-hot">
           {fieldError}
@@ -195,7 +193,7 @@ export function PredictionForm(props: PredictionFormProps) {
         <>
           {mine?.joker ? (
             <p className="font-display text-[17px] font-extrabold uppercase tracking-[0.06em] text-accent-text">
-              Joker ×{JOKER_MULTIPLIER} posé
+              Joker ÷{JOKER_DIVISOR} posé
             </p>
           ) : null}
           <p className="text-[13px] text-muted">
@@ -205,17 +203,20 @@ export function PredictionForm(props: PredictionFormProps) {
         </>
       ) : (
         <>
-          <label className="flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-field border border-dashed border-line-strong px-3 py-2.5 text-[15px] text-ink-2 has-disabled:cursor-not-allowed">
-            <input
-              type="checkbox"
-              checked={joker}
-              onChange={(event) => toggleJoker(event.target.checked)}
-              disabled={pending || !mine || (!joker && available === 0)}
-              className="size-4.5 accent-accent"
-            />
-            <span className="font-display text-[17px] font-extrabold tracking-[0.06em] text-accent-text">JOKER ×{JOKER_MULTIPLIER}</span>
-            {mine ? `${formatCount(shownLeft, "restant")} cette saison` : "Enregistre d'abord ton prono."}
-          </label>
+          {jokersLeft !== null ? (
+            <label className="flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-field border border-dashed border-line-strong px-3 py-2.5 text-[15px] text-ink-2 has-disabled:cursor-not-allowed">
+              <input
+                type="checkbox"
+                checked={joker}
+                onChange={(event) => toggleJoker(event.target.checked)}
+                disabled={pending || !mine || (!joker && available === 0)}
+                className="size-4.5 accent-accent"
+              />
+              <span className="font-display text-[17px] font-extrabold tracking-[0.06em] text-accent-text">JOKER ÷{JOKER_DIVISOR}</span>
+              Divise ton malus par deux ·{" "}
+              {mine ? `${formatCount(shownLeft, "restant")} cette saison` : "Enregistre d'abord ton prono."}
+            </label>
+          ) : null}
           <div className="flex gap-2.5">
             <Button type="submit" variant="secondary" size="lg" pending={pending} className="grow">
               Enregistrer

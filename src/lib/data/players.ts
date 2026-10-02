@@ -76,12 +76,16 @@ export type ProfileHistoryItem = {
   title: string;
   unit: string | null;
   resolvedAt: Date;
-  answer: AnswerView;
+  /** The player's answer; null without a prediction (v1.2: the malus of the absence applies). */
+  answer: AnswerView | null;
   real: AnswerView;
   joker: boolean;
-  /** Relative error of a number question; null for a choice (infinite if the real value is 0). */
+  /** Gap of a number prediction, in hundredths; null for a choice or an absence. */
+  gap: number | null;
+  /** Relative error of a number question; null for a choice or an absence (infinite if the real value is 0). */
   relativeError: number | null;
-  total: number;
+  /** Malus of the question, in hundredths. */
+  malus: number;
 };
 
 export type PlayerProfile = {
@@ -92,16 +96,19 @@ export type PlayerProfile = {
   season: SeasonRef | null;
   /** Resolved questions of the season shown: 0 means no standings yet. */
   resolvedCount: number;
-  /** The player's row in the standings of the season shown (rank, points, Dans le mille…). */
+  /** The player's row in the standings of the season shown (rank, malus, Dans le mille…). */
   standing: StandingView | null;
   /** The 6 badges, every season. */
   badges: BadgeView[];
-  /** The player's resolved predictions of the season shown, latest result first. */
+  /**
+   * The resolved questions of the season shown, latest result first: the player's predictions and,
+   * when they are in its standings, the questions they did not predict (v1.2).
+   */
   history: ProfileHistoryItem[];
 };
 
 /**
- * Public profile of a player (§8.3): rank and points in the season shown, mean error, Dans le mille,
+ * Public profile of a player (§8.3): rank and malus in the season shown, mean error, Dans le mille,
  * questions played, badges and history. Null when the account does not exist.
  */
 export async function getPlayerProfile(
@@ -125,7 +132,7 @@ export async function getPlayerProfile(
     .sort((a, b) => b.resolvedAt.getTime() - a.resolvedAt.getTime() || b.questionId - a.questionId);
 
   const labels = new Map<number, string>();
-  const optionIds = inSeason.flatMap(({ score, resultOptionId }) => [score.prediction.optionId, resultOptionId]).filter((id) => id !== null);
+  const optionIds = inSeason.flatMap(({ score, resultOptionId }) => [score?.prediction.optionId ?? null, resultOptionId]).filter((id) => id !== null);
   if (optionIds.length > 0) {
     const options = await db.select({ id: questionOption.id, label: questionOption.label }).from(questionOption).where(inArray(questionOption.id, optionIds));
     for (const { id, label } of options) labels.set(id, label);
@@ -148,16 +155,17 @@ export async function getPlayerProfile(
     resolvedCount: standings.resolvedCount,
     standing: standings.rows.find(({ userId: id }) => id === row.id) ?? null,
     badges: await getPlayerBadges(db, viewer, row.id, results),
-    history: inSeason.map(({ questionId, title, unit, resolvedAt, resultNumber, resultOptionId, score }) => ({
+    history: inSeason.map(({ questionId, title, type, unit, resolvedAt, resultNumber, resultOptionId, score, malus }) => ({
       questionId,
       title,
       unit,
       resolvedAt,
-      answer: answerOf(score.prediction.valueNumber, score.prediction.optionId),
+      answer: score ? answerOf(score.prediction.valueNumber, score.prediction.optionId) : null,
       real: answerOf(resultNumber, resultOptionId),
-      joker: score.prediction.joker,
-      relativeError: score.relativeError,
-      total: score.total,
+      joker: score?.prediction.joker ?? false,
+      gap: score && type === "number" ? score.baseMalus : null,
+      relativeError: score?.relativeError ?? null,
+      malus,
     })),
   };
 }

@@ -10,6 +10,7 @@ import {
   predictionEvent,
   prize,
   question,
+  questionExtension,
   questionOption,
   season,
   seasonStanding,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/db/schema";
 import { createAnnouncement, deleteAnnouncement, updateAnnouncement } from "@/lib/services/announcements";
 import { archiveCategory, createCategory, renameCategory, unarchiveCategory } from "@/lib/services/categories";
+import { cancelQuestionExtension, setQuestionExtension } from "@/lib/services/extensions";
 import { addAllowedEmails, anonymizeUser, disableUser, enableUser, removeAllowedEmail, setRole, setTemporaryPassword } from "@/lib/services/players";
 import { savePrediction, setJoker, unlockPrediction, validatePrediction } from "@/lib/services/predictions";
 import { recordVisit, updateAvatar, updateDisplayName } from "@/lib/services/profile";
@@ -108,7 +110,22 @@ const player = () => actors.player!;
 
 /** Every row of every table a service can write, to check that a refused call wrote nothing. */
 async function snapshot(): Promise<string> {
-  const tables = [user, session, account, allowedEmail, season, category, question, questionOption, prediction, predictionEvent, prize, announcement, seasonStanding];
+  const tables = [
+    user,
+    session,
+    account,
+    allowedEmail,
+    season,
+    category,
+    question,
+    questionOption,
+    questionExtension,
+    prediction,
+    predictionEvent,
+    prize,
+    announcement,
+    seasonStanding,
+  ];
   const dumps = await Promise.all(tables.map(async (table) => (await db.select().from(table)).map((row) => JSON.stringify(row)).sort()));
   return JSON.stringify(dumps);
 }
@@ -226,6 +243,26 @@ const CASES: { service: string; access: Access; prepare: () => Promise<Call> }[]
     prepare: async () => {
       const q = await insertQuestion(db, { categoryId, createdBy: admin().id, status: "published", opensAt: clock.at("-5d"), closesAt: clock.at("-1d") });
       return (actor) => resolveQuestion(db, actor, { questionId: q.id, rawValue: "150" }, now);
+    },
+  },
+  // Extensions (§5.14, v1.2)
+  {
+    service: "setQuestionExtension",
+    access: "admin",
+    prepare: async () => {
+      const q = await insertQuestion(db, { categoryId, createdBy: admin().id, status: "published", opensAt: clock.at("-5d"), closesAt: clock.at("-1d") });
+      const absent = await createUser(db, { name: "Absent" });
+      return (actor) => setQuestionExtension(db, actor, { questionId: q.id, userId: absent.id, closesAt: "2026-10-17T18:00" }, now);
+    },
+  },
+  {
+    service: "cancelQuestionExtension",
+    access: "admin",
+    prepare: async () => {
+      const q = await insertQuestion(db, { categoryId, createdBy: admin().id, status: "published", opensAt: clock.at("-5d"), closesAt: clock.at("-1d") });
+      const absent = await createUser(db, { name: "Absente" });
+      await db.insert(questionExtension).values({ questionId: q.id, userId: absent.id, closesAt: clock.at("+2d"), grantedBy: admin().id, grantedAt: now });
+      return (actor) => cancelQuestionExtension(db, actor, { questionId: q.id, userId: absent.id }, now);
     },
   },
   // Categories
@@ -403,8 +440,8 @@ const CASES: { service: string; access: Access; prepare: () => Promise<Call> }[]
 const PROFILES: Profile[] = ["anonymous", "player", "disabled player", "disabled admin", "admin"];
 
 describe("authorization matrix (§6.5, §9.3)", () => {
-  it("covers the 34 write services of §7.3", () => {
-    expect(new Set(CASES.map(({ service }) => service)).size).toBe(34);
+  it("covers the 36 write services of §7.3 (34 until step 8b, plus the 2 extension services of step 8c)", () => {
+    expect(new Set(CASES.map(({ service }) => service)).size).toBe(36);
   });
 
   for (const { service, access, prepare } of CASES) {

@@ -2,13 +2,14 @@ import { Clock } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Avatar } from "@/components/avatars/Avatar";
-import { buttonClasses } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { getAdminDashboard } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
 import { formatCount, formatDateTime } from "@/lib/format";
+import type { PredictionState } from "@/lib/game/prediction-state";
 
 export async function generateMetadata(): Promise<Metadata> {
   return adminMetadata("Back-office");
@@ -17,11 +18,20 @@ export async function generateMetadata(): Promise<Metadata> {
 const SECTION_TITLE = "font-display text-[26px] font-extrabold uppercase leading-none";
 const QUESTION_LINK = "text-[17px] font-semibold text-ink hover:text-accent-text hover:underline";
 
-/** Dashboard (architecture §8.3): open questions to follow, questions to resolve, next openings. */
+const STATES: Record<PredictionState, { text: string; className: string }> = {
+  todo: { text: "à faire", className: "text-hot" },
+  saved: { text: "enregistré", className: "text-warn" },
+  validated: { text: "validé", className: "text-accent-text" },
+};
+
+/**
+ * Dashboard (architecture §8.3): open questions to follow, questions to resolve (blocked while an
+ * extension runs), running extensions (v1.2), next openings.
+ */
 export default async function AdminPage() {
   const viewer = await requireAdmin();
   const now = new Date();
-  const { open, toResolve, upcoming } = await getAdminDashboard(getDb(), viewer, now);
+  const { open, toResolve, extensions, upcoming } = await getAdminDashboard(getDb(), viewer, now);
 
   return (
     <>
@@ -101,13 +111,49 @@ export default async function AdminPage() {
                       {q.expectedResultAt ? ` · résultat prévu ${formatDateTime(q.expectedResultAt, now)}` : ""}
                     </p>
                   </div>
-                  <Link
-                    href={`/admin/questions/${q.id}#resultat`}
-                    className={buttonClasses({ variant: "secondary" })}
-                    aria-label={`Saisir le résultat de « ${q.title} »`}
-                  >
-                    Saisir le résultat
+                  {q.blocker ? (
+                    <Button variant="secondary" disabled aria-label={`Saisir le résultat de « ${q.title} »`} aria-describedby={`blocage-${q.id}`}>
+                      Saisir le résultat
+                    </Button>
+                  ) : (
+                    <Link
+                      href={`/admin/questions/${q.id}#resultat`}
+                      className={buttonClasses({ variant: "secondary" })}
+                      aria-label={`Saisir le résultat de « ${q.title} »`}
+                    >
+                      Saisir le résultat
+                    </Link>
+                  )}
+                  {q.blocker ? (
+                    <p id={`blocage-${q.id}`} className="basis-full text-sm text-ink-2">
+                      {q.blocker}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card as="section" aria-labelledby="prolongations" className="flex flex-col gap-4">
+          <h2 id="prolongations" className={SECTION_TITLE}>
+            Prolongations en cours
+          </h2>
+          {extensions.length === 0 ? (
+            <p className="text-[15px] text-ink-2">Aucune prolongation en cours.</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {extensions.map((item) => (
+                <li key={`${item.questionId}-${item.player.id}`} className="flex flex-col gap-1 border-b border-line pb-3 last:border-b-0 last:pb-0">
+                  <Link href={`/admin/questions/${item.questionId}#suivi`} className={QUESTION_LINK}>
+                    {item.questionTitle}
                   </Link>
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                    <Avatar avatar={item.player.avatar} name={item.player.name} size={24} />
+                    <span className="font-semibold">{item.player.name}</span>
+                    <span className="text-muted">jusqu&apos;au {formatDateTime(item.closesAt, now)}</span>
+                    <span className={`font-semibold ${STATES[item.state].className}`}>{STATES[item.state].text}</span>
+                  </p>
                 </li>
               ))}
             </ul>

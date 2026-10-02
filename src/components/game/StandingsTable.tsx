@@ -2,10 +2,11 @@ import Link from "next/link";
 import { Avatar } from "@/components/avatars/Avatar";
 import { TableScroll } from "@/components/ui/TableScroll";
 import type { StandingView } from "@/lib/data/standings";
+import { formatMalus } from "@/lib/format";
 
 // Standings rows (§8.2). The compact version of the home page: rank, avatar, name, movement and
-// points; the viewer's row is outlined. The full version of /classement adds the Dans le mille and
-// the questions played, in a table.
+// malus (v1.2: the fewest malus first); the viewer's row is outlined. The full version of
+// /classement adds the Dans le mille and the questions played, in a table.
 
 /** On the viewer's row, a white background keeps the arrows readable (4.5:1) on the accent tint. */
 function Movement({ delta, onTint }: { delta: number | null; onTint: boolean }) {
@@ -67,8 +68,8 @@ function Row({ row, seasonId }: { row: StandingView; seasonId?: number }) {
       </span>
       <Movement delta={row.delta} onTint={me} />
       <span className={`min-w-12 text-right font-display text-[22px] font-bold tabular-nums ${me ? "text-accent-text" : ""}`}>
-        {row.points}
-        <span className="sr-only"> points</span>
+        {formatMalus(row.malus)}
+        <span className="sr-only"> de malus</span>
       </span>
     </li>
   );
@@ -90,7 +91,7 @@ function cell(me: boolean, position: "first" | "middle" | "last", extra = ""): s
 
 /**
  * Full standings of /classement (§8.2, §8.3): rank, player, movement, Dans le mille, questions played,
- * points. Each name leads to the player's profile, on the same season.
+ * malus. Each name leads to the player's profile, on the same season.
  */
 export function StandingsFullTable({ rows, caption, seasonId }: { rows: StandingView[]; caption: string; seasonId: number }) {
   return (
@@ -115,7 +116,7 @@ export function StandingsFullTable({ rows, caption, seasonId }: { rows: Standing
               Questions jouées
             </th>
             <th scope="col" className={`${TH} text-right`}>
-              Points
+              Malus
             </th>
           </tr>
         </thead>
@@ -151,7 +152,7 @@ export function StandingsFullTable({ rows, caption, seasonId }: { rows: Standing
                 <td className={cell(me, "middle", "text-right tabular-nums")}>{row.bullseyes}</td>
                 <td className={cell(me, "middle", "text-right tabular-nums")}>{row.questionsPlayed}</td>
                 <td className={cell(me, "last", `text-right font-display text-[22px] font-bold tabular-nums ${me ? "text-accent-text" : ""}`)}>
-                  {row.points}
+                  {formatMalus(row.malus)}
                 </td>
               </tr>
             );
@@ -164,7 +165,7 @@ export function StandingsFullTable({ rows, caption, seasonId }: { rows: Standing
 
 /**
  * The compact standings: the top rows, then the viewer's own row when it is further down. Also the
- * full standings of /classement on a phone, where the table would hide the points (decision of
+ * full standings of /classement on a phone, where the table would hide the malus (decision of
  * 01/10/2026).
  */
 export function StandingsTable({
