@@ -68,23 +68,26 @@ test("a message with an emoji of the grid reaches another player without reloadi
   for (const page of [sarah, hugo, lea]) await page.context().close();
 });
 
-test("a player deletes their own message, the admin anyone's without a trace; a deleted text never leaves the server", async ({ page, browser, extraHTTPHeaders }) => {
+test("a player deletes their own message, the admin anyone's, without a trace; a deleted text never leaves the server", async ({ page, browser, extraHTTPHeaders }) => {
   await signIn(page, ACCOUNTS.thomas);
   await openChat(page);
-  const marks = thread(page).getByText("Message supprimé.", { exact: true });
-  const marksBefore = await marks.count();
+  // Thomas's message deleted in the seed has left no trace either (v1.5).
+  await expect(thread(page)).not.toContainText("Message supprimé");
+  const items = thread(page).getByRole("listitem");
   await page.getByLabel("Ton message").fill("Message à supprimer très vite");
   await page.getByRole("button", { name: "Envoyer" }).click();
   const own = messageItem(page, "Message à supprimer très vite");
   await expect(own).toBeVisible();
+  const itemsBefore = await items.count();
   await own.getByRole("button", { name: "Supprimer le message" }).click();
   const dialog = page.getByRole("dialog", { name: "Supprimer ce message ?" });
-  await expect(dialog).toContainText("Il sera remplacé par « Message supprimé. » pour tout le monde.");
+  await expect(dialog).toContainText("Il disparaîtra du chat pour tout le monde, sans laisser de trace.");
   await dialog.getByRole("button", { name: "Supprimer" }).click();
   await expect(dialog).toBeHidden();
+  // Deleted by its author, it leaves the thread without a trace (v1.5).
   await expect(thread(page)).not.toContainText("Message à supprimer très vite");
-  // Deleted by its author: « Message supprimé. » takes its place.
-  await expect(marks).toHaveCount(marksBefore + 1);
+  await expect(items).toHaveCount(itemsBefore - 1);
+  await expect(thread(page)).not.toContainText("Message supprimé");
 
   // The polling sends no deleted text, even when asked for everything.
   const response = await page.request.get(`/api/chat?after=0&since=${encodeURIComponent(new Date(0).toISOString())}`);
@@ -93,13 +96,12 @@ test("a player deletes their own message, the admin anyone's without a trace; a 
   expect(body).not.toContain("Message à supprimer très vite");
   expect(JSON.parse(body).deletedIds.length).toBeGreaterThanOrEqual(2);
 
-  // The admin deletes a player's message: it leaves the thread without a trace (v1.5).
+  // The admin deletes a player's message: it leaves the thread without a trace too.
   const admin = await playerPage(browser, extraHTTPHeaders, ACCOUNTS.admin);
   await openChat(admin);
+  await expect(thread(admin)).not.toContainText("Message à supprimer très vite");
   const adminItems = thread(admin).getByRole("listitem");
-  const itemsBefore = await adminItems.count();
-  const adminMarks = thread(admin).getByText("Message supprimé.", { exact: true });
-  const adminMarksBefore = await adminMarks.count();
+  const adminItemsBefore = await adminItems.count();
   const hugos = messageItem(admin, "Bravo à ceux qui avaient trouvé Le Havre");
   await hugos.getByRole("button", { name: "Supprimer le message" }).click();
   const adminDialog = admin.getByRole("dialog", { name: "Supprimer ce message ?" });
@@ -107,20 +109,17 @@ test("a player deletes their own message, the admin anyone's without a trace; a 
   await adminDialog.getByRole("button", { name: "Supprimer" }).click();
   await expect(adminDialog).toBeHidden();
   await expect(thread(admin)).not.toContainText("Bravo à ceux qui avaient trouvé Le Havre");
-  await expect(adminItems).toHaveCount(itemsBefore - 1);
-  await expect(adminMarks).toHaveCount(adminMarksBefore);
-  const removed = await admin.request.get(`/api/chat?after=0&since=${encodeURIComponent(new Date(0).toISOString())}`);
-  const updates = (await removed.json()) as { removedIds: number[] };
-  expect(updates.removedIds.length).toBeGreaterThanOrEqual(1);
+  await expect(adminItems).toHaveCount(adminItemsBefore - 1);
+  await expect(thread(admin)).not.toContainText("Message supprimé");
   await admin.context().close();
 
-  // Thomas, whose chat stayed open, sees it go by the polling, without a mark; then after a reload.
+  // Thomas, whose chat stayed open, sees it go by the polling, without a trace; then after a reload.
   await expect(thread(page)).not.toContainText("Bravo à ceux qui avaient trouvé Le Havre", { timeout: 15_000 });
-  await expect(marks).toHaveCount(marksBefore + 1);
+  await expect(items).toHaveCount(itemsBefore - 2);
   await page.reload();
   await expect(thread(page)).not.toContainText("Bravo à ceux qui avaient trouvé Le Havre");
   await expect(thread(page)).not.toContainText("Message à supprimer très vite");
-  await expect(marks).toHaveCount(marksBefore + 1);
+  await expect(thread(page)).not.toContainText("Message supprimé");
 });
 
 test("the result of the Studyrama question is announced in the chat, corrected, with a link to the question", async ({ page }) => {
@@ -148,7 +147,7 @@ test("/api/chat answers 401 without a session, and checks its parameters", async
   }
   const fresh = await page.request.get(`/api/chat?after=0&since=${encodeURIComponent(new Date().toISOString())}`);
   expect(fresh.status()).toBe(200);
-  expect(Object.keys(await fresh.json()).sort()).toEqual(["deletedIds", "messages", "removedIds", "serverTime"]);
+  expect(Object.keys(await fresh.json()).sort()).toEqual(["deletedIds", "messages", "serverTime"]);
 });
 
 // Task 8 of step 8d: the page stops asking the server while the tab is hidden or the person idle,

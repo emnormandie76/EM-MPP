@@ -1,6 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gt, inArray, isNull, lt, ne, not, or, type SQL, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, ne, or, type SQL, sql } from "drizzle-orm";
 import type { Viewer } from "@/lib/auth/session";
 import { type AvatarKey, isAvatarKey } from "@/lib/avatars";
 import { CHAT_PAGE_SIZE, CHAT_UPDATES_LIMIT } from "@/lib/chat/constants";
@@ -12,8 +11,8 @@ import { scoreQuestion } from "@/lib/game/scoring";
 // Reads of the general chat (architecture §5.15, v1.2, step 8d), the same for every signed-in
 // account. A result message has no stored text: it is computed here from its question, whose values
 // are public once resolved (§6.6), so that a correction shows in it. It is no longer shown once its
-// question is cancelled. A message deleted by its author keeps its author and date, never its text;
-// one deleted by an admin is left out, without a trace (v1.5).
+// question is cancelled. A deleted message is left out, by its author or by an admin: it leaves the
+// thread for everyone, without a trace (v1.5).
 
 type ViewerRole = Pick<Viewer, "id" | "role">;
 
@@ -32,10 +31,9 @@ export type ChatMessageView = {
   createdAt: string;
   /** The author of a player's message; null for a result message. */
   author: ChatAuthorView | null;
-  /** Text of a player's message; null for a result message and once deleted. */
+  /** Text of a player's message; null for a result message. */
   body: string | null;
-  deleted: boolean;
-  /** A result message: its question and its text; null once deleted. */
+  /** A result message: its question and its text; null for a player's message. */
   result: { questionId: number; text: string } | null;
   /** The viewer may delete it: their own message, or any message for an admin. */
   canDelete: boolean;
@@ -53,10 +51,8 @@ export type ChatPage = {
 export type ChatUpdates = {
   /** New messages, oldest first. */
   messages: ChatMessageView[];
-  /** Messages deleted by their author since `since`: « Message supprimé. » in their place. */
+  /** Messages deleted since `since`, by their author or an admin: they leave the thread (v1.5). */
   deletedIds: number[];
-  /** Messages deleted by an admin since `since` (v1.5): they leave the thread, without a trace. */
-  removedIds: number[];
   /** ISO date of the read, to send back as `since` on the next poll. */
   serverTime: string;
 };
@@ -71,23 +67,11 @@ const UPDATES_OVERLAP_MS = 60_000;
 /** A player's message, or a result message whose question is not cancelled. */
 const SHOWN: SQL = or(eq(chatMessage.kind, "message"), ne(question.status, "cancelled"))!;
 
-/** The account that deleted a message. */
-const deleter = alias(user, "deleter");
-
-/**
- * Deleted by an admin (v1.5, §5.15): the message leaves the thread without a trace. Only an admin
- * may delete someone else's message (a result message has no author), so a deletion by another
- * account stays removed even if that admin loses the role later; an admin's own message counts too.
- * Never null: it is used under `not`.
- */
-const REMOVED: SQL = sql`(${chatMessage.deletedAt} is not null and (${chatMessage.deletedBy} is distinct from ${chatMessage.userId} or ${deleter.role} is not distinct from 'admin'))`;
-
 const COLUMNS = {
   id: chatMessage.id,
   kind: chatMessage.kind,
   createdAt: chatMessage.createdAt,
   body: chatMessage.body,
-  deletedAt: chatMessage.deletedAt,
   userId: chatMessage.userId,
   questionId: chatMessage.questionId,
   authorName: user.name,
@@ -100,7 +84,6 @@ type Row = {
   kind: "message" | "result";
   createdAt: Date;
   body: string | null;
-  deletedAt: Date | null;
   userId: string | null;
   questionId: number | null;
   authorName: string | null;
@@ -114,8 +97,8 @@ function selectMessages(db: Database, where: SQL | undefined) {
     .from(chatMessage)
     .leftJoin(user, eq(user.id, chatMessage.userId))
     .leftJoin(question, eq(question.id, chatMessage.questionId))
-    .leftJoin(deleter, eq(deleter.id, chatMessage.deletedBy))
-    .where(and(SHOWN, not(REMOVED), where));
+    // A deleted message leaves no trace (v1.5, §5.15).
+    .where(and(SHOWN, isNull(chatMessage.deletedAt), where));
 }
 
 /** Text of the result message of each of these resolved questions (§5.15). */
@@ -159,13 +142,15 @@ async function resultTexts(db: Database, questionIds: number[]): Promise<Map<num
   return texts;
 }
 
-/** Views of these rows, in the same order. */
+/**
+ * Views of these rows, in the same order. A result message always has its text (its question is
+ * resolved and not cancelled); one without would be left out rather than shown empty.
+ */
 async function toViews(db: Database, viewer: ViewerRole, rows: Row[]): Promise<ChatMessageView[]> {
-  const resolved = rows.filter(({ kind, deletedAt }) => kind === "result" && deletedAt === null).map(({ questionId }) => questionId!);
+  const resolved = rows.filter(({ kind }) => kind === "result").map(({ questionId }) => questionId!);
   const texts = await resultTexts(db, [...new Set(resolved)]);
-  return rows.map((row) => {
-    const deleted = row.deletedAt !== null;
-    const text = row.kind === "result" && !deleted ? texts.get(row.questionId!) : undefined;
+  const views: ChatMessageView[] = rows.map((row) => {
+    const text = row.kind === "result" ? texts.get(row.questionId!) : undefined;
     return {
       id: row.id,
       kind: row.kind,
@@ -179,12 +164,12 @@ async function toViews(db: Database, viewer: ViewerRole, rows: Row[]): Promise<C
               avatar: row.authorAvatar && isAvatarKey(row.authorAvatar) ? row.authorAvatar : "maillot-bleu-uni",
               inactive: row.authorBanned === true,
             },
-      body: deleted ? null : row.body,
-      deleted,
+      body: row.body,
       result: text === undefined ? null : { questionId: row.questionId!, text },
-      canDelete: !deleted && (viewer.role === "admin" || (row.kind === "message" && row.userId === viewer.id)),
+      canDelete: viewer.role === "admin" || (row.kind === "message" && row.userId === viewer.id),
     };
   });
+  return views.filter(({ kind, result }) => kind === "message" || result !== null);
 }
 
 /**
@@ -206,9 +191,8 @@ export async function getChatMessages(
 
 /**
  * What changed since the previous poll (§5.15): the messages after `afterId` (100 at most), the
- * messages deleted since `since` (by their author, or by an admin: v1.5), and the time of this
- * read. The lists also repeat the last minute (`UPDATES_OVERLAP_MS`), so that a message committed
- * late is not missed.
+ * messages deleted since `since`, and the time of this read. Both lists also repeat the last
+ * minute (`UPDATES_OVERLAP_MS`), so that a message committed late is not missed.
  */
 export async function getChatUpdates(
   db: Database,
@@ -221,17 +205,11 @@ export async function getChatUpdates(
     .orderBy(asc(chatMessage.id))
     .limit(CHAT_UPDATES_LIMIT);
   const deleted = await db
-    .select({ id: chatMessage.id, removed: sql<boolean>`${REMOVED}` })
+    .select({ id: chatMessage.id })
     .from(chatMessage)
-    .leftJoin(deleter, eq(deleter.id, chatMessage.deletedBy))
     .where(gt(chatMessage.deletedAt, recent))
     .orderBy(asc(chatMessage.id));
-  return {
-    messages: await toViews(db, viewer, rows),
-    deletedIds: deleted.filter(({ removed }) => !removed).map(({ id }) => id),
-    removedIds: deleted.filter(({ removed }) => removed).map(({ id }) => id),
-    serverTime: now.toISOString(),
-  };
+  return { messages: await toViews(db, viewer, rows), deletedIds: deleted.map(({ id }) => id), serverTime: now.toISOString() };
 }
 
 /**

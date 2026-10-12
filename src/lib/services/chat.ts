@@ -55,9 +55,9 @@ const messageInput = z.object({ messageId: z.coerce.number().int().positive() })
 
 /**
  * Deletes a message (§5.15): a player's message by its author or an admin, a result message by an
- * admin only. Its text is erased, not just hidden. Deleted by its author, « Message supprimé. »
- * shows in its place; deleted by an admin, it leaves the thread without a trace (v1.5, the reads of
- * data/chat.ts). The row stays, for the polls of the open chat pages and the limit per minute.
+ * admin only. Its text is erased, not just hidden, and the message leaves the thread for everyone,
+ * without a trace (v1.5, the reads of data/chat.ts). The row stays, for the polls of the open chat
+ * pages and the limit per minute.
  */
 export async function deleteChatMessage(db: Database, actor: Actor | null, input: unknown, now: Date): Promise<Result> {
   const me = authorize(actor);

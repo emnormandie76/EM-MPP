@@ -25,21 +25,12 @@ const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel", "touc
 
 type ScrollIntent = { kind: "bottom" } | { kind: "keep"; fromBottom: number } | null;
 
-type Deletions = { deletedIds?: number[]; removedIds?: number[] };
-
-/**
- * Merges fresh views into the thread, by id. A deletion by its author erases the text of a known
- * message; a deletion by an admin takes it out of the thread (v1.5).
- */
-function merge(current: ChatMessageView[], incoming: ChatMessageView[], { deletedIds = [], removedIds = [] }: Deletions, floor: number): ChatMessageView[] {
+/** Merges fresh views into the thread, by id. A deleted message leaves it, without a trace (v1.5). */
+function merge(current: ChatMessageView[], incoming: ChatMessageView[], deletedIds: number[], floor: number): ChatMessageView[] {
   const byId = new Map(current.map((message) => [message.id, message]));
   // A message older than the loaded ones would leave a gap: « Messages plus anciens » brings it.
   for (const message of incoming) if (message.id >= floor) byId.set(message.id, message);
-  for (const id of deletedIds) {
-    const message = byId.get(id);
-    if (message && !message.deleted) byId.set(id, { ...message, deleted: true, body: null, result: null, canDelete: false });
-  }
-  for (const id of removedIds) byId.delete(id);
+  for (const id of deletedIds) byId.delete(id);
   return [...byId.values()].sort((a, b) => a.id - b.id);
 }
 
@@ -61,10 +52,10 @@ function announce(messages: ChatMessageView[]): string {
   if (messages.length > 1) return `${messages.length} nouveaux messages.`;
   const [message] = messages;
   if (message.result) return `Nouveau message : ${message.result.text}`;
-  return `Nouveau message de ${message.author?.name ?? "quelqu'un"} : ${message.body ?? "message supprimé"}`;
+  return `Nouveau message de ${message.author?.name ?? "quelqu'un"} : ${message.body ?? ""}`;
 }
 
-export function ChatRoom({ initial, viewerId, viewerIsAdmin }: { initial: ChatPage; viewerId: string; viewerIsAdmin: boolean }) {
+export function ChatRoom({ initial, viewerId }: { initial: ChatPage; viewerId: string }) {
   const router = useRouter();
   const [messages, setMessages] = useState(initial.messages);
   const [hasMore, setHasMore] = useState(initial.hasMore);
@@ -137,7 +128,7 @@ export function ChatRoom({ initial, viewerId, viewerIsAdmin }: { initial: ChatPa
       const fresh = updates.messages.filter((message) => message.id > lastId);
       const fromOthers = fresh.filter((message) => message.author?.id !== viewerId);
       const floor = hasMoreRef.current ? (current[0]?.id ?? 0) : 0;
-      const next = merge(current, updates.messages, updates, floor);
+      const next = merge(current, updates.messages, updates.deletedIds, floor);
       messagesRef.current = next;
       if (followOwn || atBottom.current) scrollIntent.current = { kind: "bottom" };
       else if (fresh.length > 0) setNewBelow(true);
@@ -265,7 +256,7 @@ export function ChatRoom({ initial, viewerId, viewerIsAdmin }: { initial: ChatPa
       }
       const element = log.current;
       scrollIntent.current = { kind: "keep", fromBottom: element ? element.scrollHeight - element.scrollTop : 0 };
-      const next = merge(page.messages, messagesRef.current, {}, 0);
+      const next = merge(page.messages, messagesRef.current, [], 0);
       messagesRef.current = next;
       hasMoreRef.current = page.hasMore;
       setHasMore(page.hasMore);
@@ -289,8 +280,7 @@ export function ChatRoom({ initial, viewerId, viewerIsAdmin }: { initial: ChatPa
       setDeleteError(result.message);
       return;
     }
-    // An admin's deletion leaves no trace (v1.5), the author's leaves « Message supprimé. ».
-    const next = merge(messagesRef.current, [], viewerIsAdmin ? { removedIds: [toDelete.id] } : { deletedIds: [toDelete.id] }, 0);
+    const next = merge(messagesRef.current, [], [toDelete.id], 0);
     messagesRef.current = next;
     setMessages(next);
     setToDelete(null);
@@ -355,9 +345,7 @@ export function ChatRoom({ initial, viewerId, viewerIsAdmin }: { initial: ChatPa
       </div>
 
       <Dialog open={toDelete !== null} onClose={() => setToDelete(null)} title="Supprimer ce message ?">
-        <p className="text-[15px] text-ink-2">
-          {viewerIsAdmin ? "Il disparaîtra du chat pour tout le monde, sans laisser de trace." : "Il sera remplacé par « Message supprimé. » pour tout le monde."}
-        </p>
+        <p className="text-[15px] text-ink-2">Il disparaîtra du chat pour tout le monde, sans laisser de trace.</p>
         {deleteError ? <p className="text-sm font-medium text-hot">{deleteError}</p> : null}
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="secondary" onClick={() => setToDelete(null)}>

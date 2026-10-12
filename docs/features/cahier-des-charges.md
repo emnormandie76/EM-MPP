@@ -2,7 +2,7 @@
 
 > **Version 1.5 du 12/10/2026.** Toutes les décisions sont prises. La section 8 liste les précisions ajoutées en rédigeant ; elles restent contestables.
 >
-> **Changement de la v1.5** (demandé par l'utilisateur le 12/10/2026, **livré avant le lancement**, à l'étape É8f) : un message du chat supprimé par un admin **disparaît** du fil pour tout le monde, sans laisser de trace, au lieu d'afficher « Message supprimé. » sous le nom de son auteur. Un joueur qui supprime son propre message laisse toujours « Message supprimé. ». Sections concernées : 4.9, 4.11, 8, 11.
+> **Changement de la v1.5** (demandé par l'utilisateur le 12/10/2026, **livré avant le lancement**, à l'étape É8f) : un message supprimé du chat, par son auteur ou par un admin, **disparaît** du fil pour tout le monde, sans laisser de trace, au lieu d'afficher « Message supprimé. » sous le nom de son auteur. Sections concernées : 4.9, 4.11, 8, 11.
 >
 > **Changements de la v1.4** (demandés par l'utilisateur le 12/10/2026 après ses essais en production, **livrés avant le lancement**, à l'étape É8e, donc avant la v1.3) :
 > - l'admin peut **supprimer définitivement** une question, quel que soit son état (brouillon, programmée, ouverte, clôturée, résolue, annulée), sauf dans une saison proclamée. Tout ce qui s'y rattache disparaît avec elle : pronos, jokers, historique, prolongations, message de résultat du chat. L'annulation reste possible ;
@@ -171,7 +171,7 @@ Une prolongation rouvre une question pour un seul joueur, qu'elle soit encore ou
 - Des messages de texte avec des emojis, choisis dans une grille d'emojis ou tapés au clavier ; 500 caractères au plus.
 - Les messages sont conservés : on remonte tout l'historique avec « Messages plus anciens ».
 - Tant que la page du chat est ouverte, les nouveaux messages arrivent en quelques secondes (pas instantanément).
-- L'auteur peut supprimer ses messages : « Message supprimé. » s'affiche à leur place. L'admin peut supprimer n'importe quel message : il disparaît du fil pour tout le monde, sans laisser de trace (v1.5). Un message ne se modifie pas.
+- L'auteur peut supprimer ses messages ; l'admin peut supprimer n'importe quel message. Un message supprimé disparaît du fil pour tout le monde, sans laisser de trace (v1.5). Un message ne se modifie pas.
 - Une pastille sur l'onglet indique le nombre de messages non lus.
 - Quand l'admin saisit un résultat, un message automatique l'annonce dans le chat : la valeur réelle ou la bonne réponse, et le ou les pronos les plus proches.
 - Rien n'empêche techniquement de donner son prono dans le chat avant la clôture ; le règlement demande de ne pas le faire.
@@ -321,7 +321,7 @@ Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.
 - **Visibilité pour l'admin** : un admin qui n'a pas pronostiqué une question clôturée ne voit pas non plus les valeurs dans le back-office avant le résultat. Il peut ainsi recevoir une prolongation de l'autre admin.
 - **Chat** :
   - 10 messages par minute au plus ;
-  - un message supprimé par son auteur laisse « Message supprimé. » (supprimé par un admin, il disparaît sans trace depuis la v1.5) ;
+  - un message supprimé laisse « Message supprimé. » (depuis la v1.5, il disparaît sans trace) ;
   - les adresses web ne sont pas cliquables ;
   - les messages d'un compte anonymisé sont effacés ;
   - le message automatique n'est posté qu'à la première saisie du résultat ; une correction met son texte à jour.
@@ -345,11 +345,9 @@ Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.
 - **Aucune trace en base** de la suppression : une ligne est seulement écrite dans les journaux du serveur (identifiant, énoncé, nombre de pronos, admin), sans aucune valeur de prono.
 
 **v1.5** (la première est une décision de l'utilisateur du 12/10/2026)
-- **Suppression par un admin sans trace** : le message disparaît du fil pour tout le monde (ni « Message supprimé. », ni nom, ni heure). Cela vaut pour le message d'un joueur, un message de résultat, et le propre message d'un admin.
-- **Un joueur qui supprime son propre message** laisse toujours « Message supprimé. » : la demande ne portait que sur les suppressions par un admin.
-- **Anonymisation d'un compte** : ses messages, effacés par l'admin, disparaissent eux aussi ; ceux que le joueur avait supprimés lui-même gardent « Message supprimé. ».
-- **Une trace reste en base**, sans le texte : elle sert aux pages du chat déjà ouvertes, qui retirent le message à la prochaine interrogation, et à la limite de 10 messages par minute.
-- **Un « Message supprimé. » laissé par un joueur** ne peut pas être retiré ensuite par l'admin : le message est déjà supprimé.
+- **Suppression sans trace** : un message supprimé disparaît du fil pour tout le monde (ni « Message supprimé. », ni nom, ni heure), qu'il soit supprimé par son auteur ou par un admin. Cela vaut aussi pour un message de résultat, et pour les messages déjà supprimés avant la v1.5. L'utilisateur l'a d'abord demandé pour les suppressions par un admin, puis pour toutes.
+- **Anonymisation d'un compte** : ses messages, effacés par l'admin, disparaissent aussi.
+- **Une trace reste en base**, sans le texte. Elle sert aux pages du chat déjà ouvertes, qui retirent le message à la prochaine interrogation, et à la limite de 10 messages par minute : supprimer ses messages ne permet pas d'en écrire plus.
 
 ## 9. Contraintes non fonctionnelles
 
@@ -384,5 +382,5 @@ Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.
 
 1. **Design** : fait. Style B5 « Jour de match », maquette dans [docs/design/maquette-b5/](../design/maquette-b5/). La couleur principale a changé en v1.2 (#0036B3).
 2. **Architecture et plan de construction** : [docs/architecture/architecture.md](../architecture/architecture.md), suivi dans [avancement.md](../architecture/avancement.md).
-3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur), É8d (chat), É8e (suppression des questions, règlement réservé aux admins, v1.4) et É8f (suppression sans trace d'un message du chat par un admin, v1.5), puis recette avec deux ou trois collègues avant le 14 octobre. Après le lancement : É10 (règles réglables par saison, v1.3), avant le premier résultat.
+3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur), É8d (chat), É8e (suppression des questions, règlement réservé aux admins, v1.4) et É8f (suppression sans trace des messages du chat, v1.5), puis recette avec deux ou trois collègues avant le 14 octobre. Après le lancement : É10 (règles réglables par saison, v1.3), avant le premier résultat.
 4. **Contenu** : l'admin rédige les questions de la campagne d'octobre (énoncés, sources, liens BI, valeurs de l'an dernier, malus des questions à choix) avec le gabarit de l'architecture (annexe B), et les saisit avant le lancement.

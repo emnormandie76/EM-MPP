@@ -28,24 +28,19 @@ export function ChatMessage({ message, onDelete }: { message: ChatMessageView; o
     </button>
   ) : null;
 
-  // The automatic message of a result: its text starts with « Résultat : ».
-  if (message.kind === "result") {
+  // The automatic message of a result: its text starts with « Résultat : ». A deleted message is not
+  // shown at all (v1.5).
+  if (message.result) {
     return (
       <div className="flex items-start gap-3 rounded-card bg-accent-soft px-3.5 py-3">
         <MessageCircle aria-hidden size={20} strokeWidth={2.2} className="mt-0.5 shrink-0 text-accent-text" />
         <div className="flex min-w-0 grow flex-col gap-1">
-          {message.result ? (
-            <p className="text-[15px] font-medium break-words text-ink">{message.result.text}</p>
-          ) : (
-            <p className="text-[15px] text-muted italic">Message supprimé.</p>
-          )}
+          <p className="text-[15px] font-medium break-words text-ink">{message.result.text}</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Time iso={message.createdAt} />
-            {message.result ? (
-              <Link href={`/questions/${message.result.questionId}`} className="text-[15px] font-semibold text-accent-text underline-offset-2 hover:underline">
-                Voir la question
-              </Link>
-            ) : null}
+            <Link href={`/questions/${message.result.questionId}`} className="text-[15px] font-semibold text-accent-text underline-offset-2 hover:underline">
+              Voir la question
+            </Link>
             {deleteButton}
           </div>
         </div>
@@ -66,11 +61,7 @@ export function ChatMessage({ message, onDelete }: { message: ChatMessageView; o
           <Time iso={message.createdAt} />
           {deleteButton}
         </div>
-        {message.deleted ? (
-          <p className="text-[15px] text-muted italic">Message supprimé.</p>
-        ) : (
-          <p className="text-[15px] break-words whitespace-pre-wrap text-ink-2">{message.body}</p>
-        )}
+        <p className="text-[15px] break-words whitespace-pre-wrap text-ink-2">{message.body}</p>
       </div>
     </div>
   );
