@@ -1,6 +1,14 @@
 # Cahier des charges — Les petits pronos de la promo
 
-> **Version 1.2 du 02/10/2026.** Toutes les décisions sont prises. La section 8 liste les précisions ajoutées en rédigeant ; elles restent contestables.
+> **Version 1.4 du 12/10/2026.** Toutes les décisions sont prises. La section 8 liste les précisions ajoutées en rédigeant ; elles restent contestables.
+>
+> **Changements de la v1.4** (demandés par l'utilisateur le 12/10/2026 après ses essais en production, **livrés avant le lancement**, à l'étape É8e, donc avant la v1.3) :
+> - l'admin peut **supprimer définitivement** une question, quel que soit son état (brouillon, programmée, ouverte, clôturée, résolue, annulée), sauf dans une saison proclamée. Tout ce qui s'y rattache disparaît avec elle : pronos, jokers, historique, prolongations, message de résultat du chat. L'annulation reste possible ;
+> - la page règlement est **réservée aux admins jusqu'à l'É10** (v1.3) : un joueur ne la voit plus, ni dans le menu, ni dans le pied de page, ni sur la page des lots.
+>
+> Sections concernées : 4.7, 4.9, 5.7, 8, 11.
+>
+> **Changements de la v1.3** (demandés par l'utilisateur le 12/10/2026, **livrés après le lancement**, à l'étape É10) : l'admin règle les règles du jeu de chaque saison sans développeur : barème (écart brut ou écart en %), plafond par question, nombre et effet des jokers, malus d'un absent, seuil du « Dans le mille ». Les valeurs par défaut sont celles de la v1.2 : tant que l'É10 n'est pas livrée, et pour toute saison que l'admin ne règle pas, le jeu suit la v1.2. Les règles d'une saison se figent dès son premier résultat. Sections concernées : 1 à 3, 4.8, 4.9, 5.8 (nouvelle), 6 à 8, 11.
 >
 > **Changements de la v1.2** (demandés par l'utilisateur le 02/10/2026) :
 > - le barème devient un **malus** égal à l'écart brut entre le prono et la valeur réelle, sans plafond : le premier est celui qui a le moins de malus ;
@@ -26,7 +34,7 @@
 
 **Objectif secondaire.** Émulation et cohésion d'équipe.
 
-**Lancement : 14 octobre 2026**, avec la campagne principale : la majorité des questions de la saison ouvre ce jour-là, pour une semaine. Tout le périmètre décrit ici est livré pour cette date. Quelques questions pourront s'ajouter en cours d'année, à la marge. Premier résultat attendu en novembre.
+**Lancement : 14 octobre 2026**, avec la campagne principale : la majorité des questions de la saison ouvre ce jour-là, pour une semaine. Tout le périmètre décrit ici est livré pour cette date, sauf les règles réglables par saison (v1.3), livrées après le lancement et avant le premier résultat. Quelques questions pourront s'ajouter en cours d'année, à la marge. Premier résultat attendu en novembre.
 
 **Comment saura-t-on que ça marche ?**
 - Au moins 80 % des joueurs valident tous leurs pronos de la campagne d'octobre.
@@ -37,13 +45,14 @@
 | Rôle | Qui | Ce qu'il fait |
 |---|---|---|
 | Joueur | uniquement les membres de l'équipe (20 au plus) | pronostique, consulte les résultats, le classement et le palmarès, discute dans le chat |
-| Admin | toi (et éventuellement une deuxième personne) ; l'admin joue aussi | gère saisons, catégories, questions, résultats, prolongations, joueurs, lots et annonces ; modère le chat |
+| Admin | toi (et éventuellement une deuxième personne) ; l'admin joue aussi | gère saisons et leurs règles (v1.3), catégories, questions, résultats, prolongations, joueurs, lots et annonces ; modère le chat |
 
 Usage : une semaine intense à la mi-octobre, puis des visites ponctuelles pour suivre les résultats et le classement.
 
 ## 3. Concepts
 
-- **Saison** : une période créée par l'admin, avec un nom (par exemple « 2026-2027 ») et une date de début, choisie selon la rentrée. Une saison se termine quand la suivante commence : la bascule est automatique à la date de début de la nouvelle saison, que l'admin crée à l'avance. Tant que la saison suivante n'est pas créée, la saison en cours continue. La première saison est 2026-2027, créée avant le lancement du 14 octobre 2026. Chaque saison a son classement et ses lots. L'admin choisit aussi si les jokers sont autorisés pendant la saison (v1.2).
+- **Saison** : une période créée par l'admin, avec un nom (par exemple « 2026-2027 ») et une date de début, choisie selon la rentrée. Une saison se termine quand la suivante commence : la bascule est automatique à la date de début de la nouvelle saison, que l'admin crée à l'avance. Tant que la saison suivante n'est pas créée, la saison en cours continue. La première saison est 2026-2027, créée avant le lancement du 14 octobre 2026. Chaque saison a son classement et ses lots. L'admin choisit aussi si les jokers sont autorisés pendant la saison (v1.2), et, depuis la v1.3, les autres **règles de la saison** (5.8).
+- **Règles de la saison** (v1.3) : barème, plafond, nombre et effet des jokers, malus d'un absent, seuil du « Dans le mille ». Réglées par l'admin, figées dès le premier résultat de la saison. Par défaut, ce sont celles de la v1.2, décrites aux sections 5.1 à 5.7.
 - **Catégorie** : un thème créé par l'admin (JPO, Candidatures, Intégration…) pour ranger les questions. Il n'y a pas de classement par catégorie.
 - **Question** : ce qu'il faut pronostiquer. Deux types :
   - **Nombre** : le joueur saisit une valeur (« combien de participants à la JPO du 15 novembre ? »). Son malus est l'écart avec la valeur réelle.
@@ -125,22 +134,24 @@ Une prolongation rouvre une question pour un seul joueur, qu'elle soit encore ou
 ### 4.7 Lots et règlement
 - Une page liste les lots de la saison et leur règle d'attribution (par exemple 1er, 2e et 3e du classement final).
 - Une page règlement expose le calcul du malus, les jokers, les dates, les prolongations, les règles de validation et de départage. Dès qu'il y a des lots, elle évite les contestations.
+- **Jusqu'à l'É10** (v1.4, décision de l'utilisateur du 12/10/2026) : la page règlement n'est visible que par les admins, qui peuvent la relire ; un joueur reçoit la page introuvable, et aucun lien ne la lui montre. L'É10, qui rend les règles réglables par saison (5.8), la rouvre à tous.
 
 ### 4.8 Saisons et palmarès
 - Bascule automatique à la date de début de la saison suivante, fixée par l'admin : une nouvelle saison commence et le classement repart de zéro.
 - L'admin crée, renomme et supprime les saisons, et peut changer leur date de début. Il ne peut pas supprimer une saison qui contient déjà des questions, ni déplacer une date de début si cela ferait changer de saison une question qui a déjà des pronos (les jokers se comptent par saison).
 - **Jokers** (v1.2) : à la création et à la modification d'une saison, l'admin choisit si les jokers sont autorisés. Il peut les autoriser à tout moment, mais plus les retirer dès qu'un joueur en a posé un dans la saison.
+- **Règles de la saison** (v1.3) : l'admin règle le barème, le plafond, les jokers, le malus d'un absent et le seuil du « Dans le mille » de chaque saison (5.8). Une nouvelle saison reprend les règles de la saison précédente, qu'il peut ajuster. Les règles se figent au premier résultat de la saison ; chaque changement est gardé dans un historique.
 - Une question appartient à la saison de sa **date de clôture**. Le classement final d'une saison est proclamé par l'admin quand toutes ses questions sont résolues, même si certains résultats tombent après la bascule.
 - **Palmarès** : une page, visible par tous, affiche le classement final de chaque saison passée.
 - Les données des saisons passées sont conservées. La liste blanche, les comptes et les catégories passent d'une saison à l'autre.
 
 ### 4.9 Back-office admin
-- **Questions** : créer (nombre, choix, oui/non ; pour un choix, avec le malus d'une mauvaise réponse), publier, modifier, annuler ; créer en série pour la campagne d'octobre (mêmes dates pour un lot de questions) ; dupliquer une question d'une saison passée ; saisir puis corriger la valeur réelle, avec recalcul automatique.
+- **Questions** : créer (nombre, choix, oui/non ; pour un choix, avec le malus d'une mauvaise réponse), publier, modifier, annuler, supprimer définitivement, une par une ou plusieurs à la fois (v1.4, voir 5.7) ; créer en série pour la campagne d'octobre (mêmes dates pour un lot de questions) ; dupliquer une question d'une saison passée ; saisir puis corriger la valeur réelle, avec recalcul automatique.
 - **Suivi** : pour chaque question ouverte, l'état de chaque joueur (à faire, enregistré, validé), sans les valeurs. L'admin relance les retardataires par ses propres moyens (Teams, à l'oral). Depuis ce suivi, il prolonge une question pour un joueur absent (4.10).
 - **Pronos** : déverrouiller un prono validé avant la clôture.
 - **Joueurs** : gérer la liste blanche, désactiver un compte, attribuer un mot de passe provisoire, donner le rôle admin.
 - **Catégories** : créer, renommer, archiver.
-- **Saisons** : créer (nom, date de début, jokers autorisés ou non), renommer, changer la date de début, autoriser ou retirer les jokers, supprimer une saison sans question, saisir les lots, proclamer le classement final.
+- **Saisons** : créer (nom, date de début, jokers autorisés ou non), renommer, changer la date de début, autoriser ou retirer les jokers, supprimer une saison sans question, saisir les lots, proclamer le classement final. Depuis la v1.3 : régler les règles de la saison (5.8) et consulter l'historique de leurs changements.
 - **Annonces** : publier, modifier, supprimer un message affiché sur l'accueil.
 - **Chat** : supprimer n'importe quel message.
 
@@ -208,10 +219,46 @@ Sans cette règle, ne pas répondre serait la meilleure stratégie. La prolongat
 - Aucun prono : malus du pire prono (5.5).
 - Résultat corrigé après publication : recalcul automatique, et la correction est signalée sur la page de la question.
 - Question annulée : aucun malus pour personne, et le joker éventuellement posé est rendu au joueur.
+- Question supprimée (v1.4) : elle disparaît comme si elle n'avait jamais existé, avec ses pronos, ses jokers (rendus), son historique, ses prolongations et son message de résultat dans le chat. C'est définitif. La suppression sert aux questions de test et aux erreurs de saisie ; pour une vraie question dont on ne connaîtra pas la valeur, l'admin l'annule plutôt, et les joueurs la voient annulée. Une question d'une saison proclamée ne se supprime pas : le palmarès est figé, et les profils doivent rester d'accord avec lui.
 - Joueur arrivé en cours de saison : il joue les questions encore ouvertes. Sur les questions déjà résolues, il prend le malus d'absence, sinon il serait premier. Pour une question clôturée sans résultat, l'admin peut lui accorder une prolongation.
 - Joueur parti : compte désactivé, historique conservé. S'il n'a aucun prono dans une saison, il n'apparaît pas dans son classement.
 - Une fois des pronos reçus, l'admin peut modifier l'aide et repousser la clôture, mais pas changer l'énoncé, les réponses possibles ni le malus d'une mauvaise réponse, ni avancer la clôture. Pour cela, il annule la question et en crée une nouvelle.
 - Toutes les dates et heures sont celles de Paris.
+
+### 5.8 Règles de la saison (v1.3)
+
+Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.2. Depuis la v1.3, l'admin peut en régler une partie pour chaque saison, dans le back-office, sans développeur. Le classement d'une saison se calcule toujours avec les règles de cette saison, pour toutes ses questions.
+
+| Règle | Choix possibles | Par défaut (v1.2) |
+|---|---|---|
+| Barème | **écart brut** (5.2) ou **écart en %** : 1 point de malus par % d'écart à la valeur réelle | écart brut |
+| Plafond | aucun, ou un malus maximal par question, avant coefficient et joker ; **obligatoire** avec l'écart en % | aucun |
+| Jokers autorisés | oui ou non (v1.2) | oui |
+| Nombre de jokers | 1 à 5 par joueur et par saison | 2 |
+| Effet du joker | divise le malus de la question par 2, 3 ou 4 | par 2 |
+| Malus d'un absent | le **pire prono** de la question (5.5), ou la **valeur réelle**, comme un prono de 0 | pire prono |
+| Seuil du « Dans le mille » | de 0,5 à 10 % | 1 % |
+
+**Écart en %.** malus = |prono − valeur réelle| ÷ valeur réelle × 100, arrondi au centième, puis plafonné. Valeur réelle 1 000 : un prono de 950 donne 5 ; un prono de 3 000 donne 200, ramené à 100 avec un plafond de 100. Une valeur réelle de 0 donne le plafond à tout prono différent de 0. Toutes les questions pèsent alors à peu près autant, quelle que soit leur échelle.
+
+**Plafond.** Il borne le malus de base d'une question à nombre : avec l'écart brut et un plafond de 500, une faute de frappe à 25 000 pour une valeur réelle de 1 000 donne 500, et non plus 24 000. Le coefficient et le joker s'appliquent ensuite. Le plafond ne touche pas les questions à choix : leur malus d'une mauvaise réponse est déjà fixé par l'admin.
+
+**Malus d'un absent, « valeur réelle ».** L'absent prend le malus d'un prono de 0 : la valeur réelle avec l'écart brut, 100 avec l'écart en % (plafond appliqué dans les deux cas), multiplié par le coefficient. Sur une question à choix, l'absent prend toujours le malus d'une mauvaise réponse. Si la valeur réelle vaut 0, un prono de 0 serait parfait : l'absent prend alors le malus du pire prono. Si personne n'a pronostiqué une question, le malus d'absence reste 0 pour tout le monde.
+
+**Ce qui ne se règle pas** : le sens du classement (le moins de malus gagne), le départage (5.6), les coefficients (×1 à ×3, choisis sur chaque question), le malus d'une mauvaise réponse (fixé sur chaque question), les badges.
+
+**Quand les règles se figent.**
+- Toutes les règles se figent dès qu'un **premier résultat** est saisi dans la saison. L'admin joue aussi : changer les règles après avoir vu un résultat lui donnerait un avantage. Avant le premier résultat, changer le barème ne lèse personne : le meilleur prono reste celui qui est le plus proche de la valeur réelle.
+- Le nombre et l'effet des jokers se figent dès qu'un joueur a posé un joker dans la saison. Comme en v1.2, l'admin peut toujours autoriser les jokers, mais plus les retirer.
+- Une saison proclamée garde ses règles pour toujours.
+
+**Nouvelle saison.** Elle reprend les règles de la saison qui la précède (les valeurs par défaut pour la première), et l'admin peut les ajuster.
+
+**Historique.** Chaque changement de règles est gardé : date, admin, valeurs avant et après. L'historique est visible dans le back-office.
+
+**Règlement.** La page règlement affiche toujours les règles de la saison en cours, avec des exemples calculés selon ces règles. L'É10 la rend de nouveau visible par tous (réservée aux admins depuis la v1.4, 4.7).
+
+**Question supprimée** (v1.4). Une question supprimée ne fige plus rien : si c'était le seul résultat de la saison, ses règles redeviennent modifiables ; si elle portait les seuls jokers, leur nombre et leur effet aussi.
 
 ## 6. Décisions prises
 
@@ -243,12 +290,15 @@ Sans cette règle, ne pas répondre serait la meilleure stratégie. La prolongat
 | Création des comptes (P4) | Par le joueur lui-même, si son adresse est dans la liste blanche |
 | Saisons passées (P5) | Données conservées, palmarès des classements finaux visible par tous |
 | Aide (P6) | Bloc « Pour t'aider » rempli par l'admin |
-| Lancement | 14 octobre 2026, tout le périmètre livré |
+| Lancement | 14 octobre 2026, tout le périmètre livré (sauf la v1.3, après le lancement) |
 | Affichage | Pensé d'abord pour ordinateur |
+| Règles réglables (v1.3, 12/10/2026) | Par saison, dans le back-office : barème (écart brut ou en %), plafond, nombre et effet des jokers, malus d'un absent, seuil du « Dans le mille ». Valeurs par défaut = v1.2. Figées au premier résultat de la saison (jokers : au premier joker posé). Livrées après le lancement (É10), avant le premier résultat |
 
 ## 7. Idées
 
-**Retenues.** I02 coefficient · I03 jokers (autorisés par saison depuis la v1.2) · I05 questions à choix et oui/non · I07 bloc « Pour t'aider » · I10 sagesse de la foule · I11 graphique des pronos · I15 flèches d'évolution · I18 profil joueur · I19 badges · I20 palmarès · I22 avatar · I27 duplication de questions · I28 historique horodaté des pronos · I31 annonces · I34 liste blanche · I36 pastille « Nouveau » · I37 chat général (v1.2) · I38 message de résultat dans le chat (v1.2) · I39 prolongation pour un absent (v1.2).
+**Retenues.** I02 coefficient · I03 jokers (autorisés par saison depuis la v1.2) · I05 questions à choix et oui/non · I07 bloc « Pour t'aider » · I10 sagesse de la foule · I11 graphique des pronos · I15 flèches d'évolution · I18 profil joueur · I19 badges · I20 palmarès · I22 avatar · I27 duplication de questions · I28 historique horodaté des pronos · I31 annonces · I34 liste blanche · I36 pastille « Nouveau » · I37 chat général (v1.2) · I38 message de résultat dans le chat (v1.2) · I39 prolongation pour un absent (v1.2) · I40 règles réglables par saison (v1.3) · I41 historique des changements de règles (v1.3) · I42 règles reprises de la saison précédente (v1.3).
+
+**Écartées en v1.3** (12/10/2026). I43 préréglages de règles et aperçu en direct des exemples · I44 annonce automatique d'un changement de règles (chat, mention sur le règlement) · I45 encadré de texte libre en tête du règlement · I46 éditeur de formules écrit par l'admin (impossible à tester, une erreur fausserait tout le classement) · I47 validation d'un changement de règles par le second admin.
 
 **Écartées.** I01 barème par paliers et bonus podium (remplacés par le malus en v1.2) · I04 bonus lève-tôt · I06 Juste Prix (retiré en v1.2) · I08 justification · I09 débrief · I12 prix du raisonnement · I13 questions proposées par les joueurs · I14 classement par catégorie · I16 classement du mois · I17 courbe du rang · I21 réactions et commentaires · I23 récap mensuel · I24 Teams · I25 lots intermédiaires · I26 calendrier · I29 relance en un clic · I30 export CSV · I32 exclusion d'un joueur · I33 import depuis le BI · I35 connexion Microsoft.
 
@@ -273,6 +323,24 @@ Sans cette règle, ne pas répondre serait la meilleure stratégie. La prolongat
   - les adresses web ne sont pas cliquables ;
   - les messages d'un compte anonymisé sont effacés ;
   - le message automatique n'est posté qu'à la première saisie du résultat ; une correction met son texte à jour.
+
+**v1.3** (les trois premières ont été approuvées par l'utilisateur le 12/10/2026)
+- **Plafond obligatoire avec l'écart en %** : sans lui, une valeur réelle de 0 donnerait un malus infini. 100 est proposé dans le formulaire.
+- **Le « plus proche » reste calculé sur l'écart réel**, quel que soit le barème : message de résultat dans le chat, badges Tireur d'élite et Joker gagnant, départage. Le barème ne change pas qui est le plus proche ; avec un plafond, deux pronos plafonnés gardent leur ordre.
+- **Le plafond limite aussi les fautes de frappe**, y compris leur effet sur le malus d'absence du « pire prono ».
+- **Le plafond ne s'applique pas aux questions à choix** : leur malus d'une mauvaise réponse est déjà choisi par l'admin.
+- **Un résultat saisi fige les règles même si la question est annulée ensuite** : la valeur réelle a été vue.
+- **« Valeur réelle » pour un absent, valeur réelle 0** : l'absent prend le pire prono (sinon il aurait 0, comme un prono parfait).
+- **Valeurs renvoyées inchangées** : enregistrer le formulaire sans changer une règle figée est accepté, et n'écrit rien dans l'historique.
+
+**v1.4** (les trois premières sont des décisions de l'utilisateur du 12/10/2026)
+- **Pas de suppression dans une saison proclamée** : le palmarès est figé et les profils ne doivent pas le contredire.
+- **Confirmation renforcée** : la fenêtre dit ce qui sera effacé (pronos, jokers, prolongations, message de résultat) et rappelle que l'annulation existe. Si la question a au moins un prono, il faut taper « SUPPRIMER » pour activer le bouton.
+- **Règlement caché** : page introuvable pour un joueur, liens retirés ; l'admin la voit, avec la mention qu'elle est réservée aux admins. Objection présentée et écartée : au lancement, aucune page n'explique aux joueurs le malus, les jokers, les prolongations ni la consigne de ne pas donner son prono dans le chat ; l'annonce du lancement (H-15) peut en dire l'essentiel.
+- **Le message de résultat disparaît du chat** au prochain chargement de la page, comme pour une annulation ; un onglet déjà ouvert le garde jusque-là.
+- **Une copie d'une question supprimée** reste, mais oublie de quelle question elle venait.
+- **Suppression en série** (demandée par l'utilisateur pendant l'É8e) : depuis la liste des questions, l'admin en sélectionne plusieurs et les supprime d'un coup, avec le même bilan et la même confirmation. Comme pour les dates en série, chaque question est traitée à part : celles qui ne peuvent pas l'être restent, et le compte rendu dit pourquoi.
+- **Aucune trace en base** de la suppression : une ligne est seulement écrite dans les journaux du serveur (identifiant, énoncé, nombre de pronos, admin), sans aucune valeur de prono.
 
 ## 9. Contraintes non fonctionnelles
 
@@ -307,5 +375,5 @@ Sans cette règle, ne pas répondre serait la meilleure stratégie. La prolongat
 
 1. **Design** : fait. Style B5 « Jour de match », maquette dans [docs/design/maquette-b5/](../design/maquette-b5/). La couleur principale a changé en v1.2 (#0036B3).
 2. **Architecture et plan de construction** : [docs/architecture/architecture.md](../architecture/architecture.md), suivi dans [avancement.md](../architecture/avancement.md).
-3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur) et É8d (chat), puis recette avec deux ou trois collègues avant le 14 octobre.
+3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur), É8d (chat) et É8e (suppression des questions, règlement réservé aux admins, v1.4), puis recette avec deux ou trois collègues avant le 14 octobre. Après le lancement : É10 (règles réglables par saison, v1.3), avant le premier résultat.
 4. **Contenu** : l'admin rédige les questions de la campagne d'octobre (énoncés, sources, liens BI, valeurs de l'an dernier, malus des questions à choix) avec le gabarit de l'architecture (annexe B), et les saisit avant le lancement.

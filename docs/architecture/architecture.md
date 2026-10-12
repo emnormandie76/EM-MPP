@@ -1,7 +1,19 @@
 # Architecture et plan de construction — Les petits pronos de la promo
 
-> **Version 1.2 du 02/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
+> **Version 1.4 du 12/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
+> - **Changements de la v1.4** (demandés par l'utilisateur le 12/10/2026 après ses essais en production, cahier des charges v1.4, **étape É8e avant le lancement**, donc livrée avant la v1.3) :
+>   - suppression définitive d'une question dans tous ses états, sauf dans une saison proclamée, avec tout ce qui s'y rattache (§5.11), et une confirmation renforcée (§8.3) ;
+>   - page `/reglement` réservée aux admins jusqu'à l'É10 (§6.4, §8.3).
+>
+>   Sections touchées : §4.5, §5.11, §5.15, §5.16, §6.4, §6.5, §7.3, §7.4, §8.2, §8.3, §11 (É8e, É9, É10), §12 (H-13). Aucune migration.
+> - **Changements de la v1.3** (demandés par l'utilisateur le 12/10/2026, cahier des charges v1.3, **étape É10 après le lancement**) :
+>   - règles réglables par saison : barème (écart brut ou en %), plafond, nombre et effet des jokers, malus d'un absent, seuil du « Dans le mille » (§5.16) ;
+>   - valeurs par défaut = v1.2 ;
+>   - règles figées au premier résultat de la saison ;
+>   - historique des changements, règles reprises de la saison précédente.
+>
+>   Sections touchées : §4.3, §5.5, §5.13, §5.16 (nouvelle), §6.5, §7.3, §7.4, §8.3, §11 (É10), annexe A. Jusqu'à l'É10, le code suit la v1.2.
 > - **Changements de la v1.2** (demandés par l'utilisateur le 02/10/2026, cahier des charges v1.2), en deux étapes insérées avant l'É9 :
 >   - **É8c** :
 >     - barème en malus égal à l'écart brut, sans plafond ; le moins de malus gagne (§5.5, §5.6) ;
@@ -64,7 +76,7 @@
 
 ### 0.3 Protocole des interventions humaines
 
-Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tableaux de bord, secrets, contenu, validation). Elles sont numérotées H-01 à H-16 et détaillées en section 12. Quand une étape en atteint une :
+Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tableaux de bord, secrets, contenu, validation). Elles sont numérotées H-01 à H-17 et détaillées en section 12. Quand une étape en atteint une :
 
 1. S'arrêter et afficher : `⏸ Intervention humaine H-xx : <titre>`, avec la raison et une durée estimée.
 2. Donner les étapes numérotées de la section 12, une par ligne, avec les libellés exacts à cliquer. Si l'interface d'un service a changé par rapport à la description, le dire et adapter.
@@ -401,8 +413,29 @@ Seule clé utilisée : `environment`, qui vaut `production` sur la base de produ
 | `label` | text | nom affiché, 2 à 40 caractères (ex. `2026-2027`) ; unique sans tenir compte de la casse (index sur `lower(label)`) |
 | `starts_at` | timestamptz | début, un jour à 00:00 heure de Paris ; unique |
 | `jokers_enabled` | boolean | non nul, défaut `true` ; jokers autorisés pendant la saison (v1.2, §5.13) |
+| `scoring_mode` | enum `scoring_mode` (`raw`, `percent`) | non nul, défaut `raw` ; barème de la saison (v1.3, §5.16) |
+| `malus_cap` | numeric(14,2) | nullable ; plafond du malus de base d'une question à nombre. `CHECK (malus_cap IS NULL OR malus_cap > 0)` (`season_malus_cap_positive`) et `CHECK (scoring_mode <> 'percent' OR malus_cap IS NOT NULL)` (`season_percent_needs_cap`) |
+| `joker_count` | smallint | non nul, défaut 2, entre 1 et 5 (`season_joker_count`) |
+| `joker_divisor` | smallint | non nul, défaut 2, entre 2 et 4 (`season_joker_divisor`) |
+| `absent_rule` | enum `absent_rule` (`worst`, `real_value`) | non nul, défaut `worst` |
+| `bullseye_percent` | numeric(3,1) | non nul, défaut 1, entre 0,5 et 10 (`season_bullseye_percent`) |
 | `proclaimed_at` | timestamptz | nullable |
 | `created_at` | timestamptz | défaut `now()` |
+
+Les six colonnes de la v1.3 arrivent avec la migration `0005_season_rules` de l'É10. Elle ne fait qu'ajouter, et ses valeurs par défaut sont celles de la v1.2 : aucune saison existante ne change de règles.
+
+**`season_rules_event`** (v1.3, É10) : historique des changements de règles d'une saison (§5.16). Jamais lu pour calculer un malus.
+
+| Colonne | Type | Contraintes |
+|---|---|---|
+| `id` | integer identity | PK |
+| `season_id` | integer | → `season.id`, `ON DELETE CASCADE` (une saison ne se supprime que sans question) |
+| `actor_id` | text | → `user.id`, non nul |
+| `created_at` | timestamptz | non nul |
+| `before` | jsonb | nullable (nul à la création de la saison) ; les 7 règles (`GameRules`) avant le changement |
+| `after` | jsonb | non nul ; les 7 règles après |
+
+Index `(season_id, created_at)`.
 
 Une saison n'a pas de date de fin enregistrée : elle se termine au début de la saison suivante (§5.1). La colonne `ends_at` de la v1.0 est supprimée par la migration de l'É5b, avec la contrainte de format du libellé ; la colonne `label` garde son nom (un renommage serait une migration destructive, §0.4).
 
@@ -577,6 +610,7 @@ Clé primaire `(season_id, user_id)`.
 - `unit` n'a de sens que pour `type = number`, `wrong_answer_malus` que pour `type = choice`. `question_option` n'existe que pour `type = choice` (au moins 2 options).
 - Une prolongation ne concerne qu'un joueur sans prono au moment où elle est accordée, sur une question publiée, non annulée et sans résultat (§5.14). Aucun résultat n'est saisi tant qu'une prolongation court.
 - On ne supprime jamais un utilisateur ayant des pronos : on l'anonymise (§6.3). Ses messages du chat sont alors effacés (§5.15).
+- `prediction_event` n'est jamais modifié ni supprimé, **sauf** avec sa question : `deleteQuestion` (v1.4, §5.11) efface la question et tout ce qui s'y rattache, historique compris. C'est le seul service qui supprime un prono.
 
 ---
 
@@ -729,6 +763,8 @@ L'ouverture est **incluse** (`now = opens_at` → ouverte), la clôture **exclue
 ### 5.5 Malus (`scoring.ts`, `constants.ts`)
 
 > **v1.2 (É8c)** : remplace le barème de la v1.0, qui disparaît (paliers `SCORE_TIERS`, bonus podium, 50 points pour une bonne réponse, joker ×2, variante Juste Prix). Décision de l'utilisateur du 02/10/2026, cahier des charges §5. Le classement va désormais du plus petit malus au plus grand. L'écart brut est voulu par l'utilisateur, en connaissance de cause : une question sur un grand nombre pèse bien plus qu'une question sur un petit nombre. Ne pas le « corriger » en écart relatif ni ajouter de plafond (l'agent l'avait proposé, l'utilisateur l'a refusé).
+>
+> **v1.3 (É10)** : ce qui suit décrit les **règles par défaut** (`DEFAULT_RULES`). Depuis l'É10, l'admin peut, pour chaque saison, choisir l'écart en %, un plafond, le nombre et l'effet des jokers, la règle d'absence et le seuil du « Dans le mille » (§5.16). C'est à l'admin d'en décider, saison par saison : le code ne change pas de lui-même les valeurs par défaut.
 
 **Constantes**
 
@@ -931,7 +967,52 @@ Une question publiée avec `opens_at` dans le futur est « programmée » : l'ad
 
 Pour changer un champ verrouillé, l'admin annule la question et en crée une nouvelle (le message d'erreur le dit).
 
-**Suppression** : uniquement un brouillon sans prono. Sinon, annulation.
+**Suppression** (v1.4, É8e ; décisions de l'utilisateur du 12/10/2026, à ne pas rediscuter). Jusqu'à l'É8e : uniquement un brouillon sans prono (`deleteDraftQuestion`). Depuis : `deleteQuestion(db, admin, { questionId, confirmation? }, now)`, qui remplace `deleteDraftQuestion`. La suppression sert aux questions de test et aux erreurs de saisie : la question disparaît comme si elle n'avait jamais existé. Pour une vraie question dont la valeur ne sera pas connue, l'admin l'annule plutôt (ci-dessous).
+
+Conditions, avec leur code de refus :
+- l'acteur est admin ;
+- la question existe (`NOT_FOUND`) ;
+- une question **publiée ou annulée** d'une saison proclamée ne se supprime pas (`QUESTION_IN_PROCLAIMED_SEASON` : « Cette question appartient à une saison proclamée : son palmarès est figé, elle ne peut plus être supprimée. »). Un brouillon se supprime toujours, même s'il clôture dans une saison proclamée : il n'a jamais compté ;
+- si la question a au moins un prono, `confirmation`, après retrait des espaces et sans tenir compte de la casse, vaut `SUPPRIMER` (`CONFIRMATION_REQUIRED` : « Cette question a des pronos : tape SUPPRIMER pour confirmer. »). Le contrôle est fait par le service, et non seulement par la fenêtre : un prono arrivé entre l'affichage de la page (aucun prono, pas de saisie demandée) et le clic n'est jamais effacé sans que l'admin le sache. Sans prono, `confirmation` est ignorée.
+
+Effet, dans une transaction, dans cet ordre (imposé par les clés étrangères, qui sont toutes en `NO ACTION` sauf `question_option`) :
+1. le message de résultat du chat de la question (`chat_message`, `kind = 'result'`), supprimé pour de bon : la contrainte `chat_message_question` interdit de le garder sans question. `chat_read.last_read_id` n'a pas de clé étrangère et n'est pas touché ;
+2. les événements des pronos (`prediction_event`) de la question ;
+3. les pronos (`prediction`) ;
+4. les prolongations (`question_extension`) ;
+5. `duplicated_from_id = NULL` sur les copies de la question ;
+6. la question ; ses réponses (`question_option`) suivent par `ON DELETE CASCADE`, et `result_option_id` part avec la ligne qui le porte.
+
+Le service renvoie le bilan (`{ predictions, extensions, resultMessage }`, des nombres et un booléen) ; l'action écrit une ligne dans les journaux du serveur (`console.info`) avec l'identifiant de la question, son énoncé, ce bilan et l'identifiant de l'admin, **jamais une valeur de prono**. Aucune migration : le schéma ne change pas.
+
+**Verrous** : comme les autres services de questions qui touchent à une saison (§5.13), lire les saisons en `FOR SHARE` (`seasonsForQuestions`) **avant** de verrouiller la question (`FOR UPDATE`), puis lire `proclaimed_at` de sa saison. Le `FOR UPDATE` attend les services de pronos en cours (`FOR SHARE` sur la question) ; ceux qui arrivent ensuite ne trouvent plus la question (`NOT_FOUND`). `proclaimSeason`, qui verrouille la table `season` en `EXCLUSIVE`, ne peut pas se croiser avec une suppression.
+
+**Effets ailleurs**, sans rien à écrire, car tout se recalcule à la lecture :
+- classement, résultats, badges, profils, accueil, dernier résultat : la question n'existe plus, ses malus disparaissent, malus d'absence compris ;
+- jokers : ceux posés sur la question sont rendus, comme pour une annulation (§5.13 ; le retrait des jokers d'une saison redevient possible si c'étaient les seuls) ;
+- saison : si c'était sa dernière question, elle peut être supprimée (§5.13) ;
+- règles de la saison (É10, §5.16) : une question supprimée ne fige plus rien ;
+- joueur qui regarde la question : page 404 au prochain chargement ;
+- chat : le message de résultat disparaît au prochain chargement de `/chat`, comme pour une annulation (§5.15), et ne compte plus dans les non lus.
+
+| # | Cas | Attendu |
+|---|---|---|
+| QD1 | brouillon sans prono | supprimé, réponses comprises (comportement de `deleteDraftQuestion`, conservé) |
+| QD2 | question ouverte, 2 pronos dont un avec joker, avec leurs événements : sans `confirmation` ; avec « SUPPRIME » ; avec «  supprimer  » | `CONFIRMATION_REQUIRED`, rien ne change ; idem ; supprimée : plus aucune ligne de la question dans `prediction`, `prediction_event`, `question_option` ; le joueur au joker peut de nouveau en poser 2 dans la saison |
+| QD3 | question clôturée, une prolongation en cours | supprimée, prolongation comprise |
+| QD4 | question résolue, avec son message de résultat, saison non proclamée | supprimée ; message de résultat supprimé ; classement de la saison recalculé sans elle, absents compris ; non lus recalculés |
+| QD5 | question annulée avec des pronos (avec « SUPPRIMER ») | supprimée |
+| QD6 | saison proclamée : question résolue ; question annulée ; brouillon qui y clôture | `QUESTION_IN_PROCLAIMED_SEASON`, aucune table ne change ; idem ; supprimé |
+| QD7 | question qui a une copie | supprimée ; la copie reste, `duplicated_from_id` nul |
+| QD8 | joueur, joueur désactivé, anonyme | refusé, aucune table ne change (matrice d'autorisation, §9.3) |
+| QD9 | question inconnue | `NOT_FOUND` |
+| QD10 | saison dont la seule question est supprimée | `deleteSeason` l'accepte ensuite |
+| QD11 | question programmée sans prono, sans `confirmation` | supprimée |
+
+**Suppression en série** (v1.4, demandée par l'utilisateur le 12/10/2026 pendant l'É8e) : depuis `/admin/questions`, l'admin sélectionne plusieurs questions et les supprime d'un coup (§8.3).
+- Pas de nouveau service : l'action `deleteQuestionsAction(questionIds, confirmation)` appelle `deleteQuestion` pour chaque question, chacune dans sa propre transaction, avec le même mot `confirmation` pour toutes. Toutes les règles restent donc dans le service, et la matrice d'autorisation ne change pas.
+- Comme les dates en série et la publication groupée, chaque question est traitée à part. Celles qui sont refusées restent ; le compte rendu donne leur énoncé et la raison (saison proclamée, ou prono arrivé depuis l'affichage sans « SUPPRIMER » tapé). Les autres sont supprimées.
+- L'action écrit une ligne de journal par question supprimée, comme `deleteQuestionAction`, et revalide les pages une seule fois. Elle renvoie les identifiants supprimés et, pour chaque refus, l'identifiant et le message ; la page retrouve les énoncés dans sa liste.
 
 **Annulation** : possible à tout moment, avec confirmation ; `cancelled_at = now`. La question sort du calcul des malus (personne, absents compris, n'en prend sur elle), et les jokers posés dessus sont rendus.
 
@@ -965,6 +1046,7 @@ Les rentrées ne tombent pas toujours le même jour : l'admin crée chaque saiso
   - Les retirer est refusé dès qu'un prono avec joker existe sur une question non annulée de la saison : `JOKERS_IN_USE`, « Des jokers sont déjà posés dans cette saison : impossible de les retirer. ». Un joker posé sur une question annulée a été rendu : il ne bloque rien.
   - Saison proclamée : réglage figé, comme la date de début.
   - La migration de l'É8c autorise les jokers sur les saisons existantes, dont 2026-2027 en production.
+  - Depuis l'É10 (v1.3), ce réglage passe par `updateSeasonRules`, avec les autres règles de la saison (§5.16) ; les règles ci-dessus ne changent pas.
 - **Créer** (`createSeason` : nom, date de début, jokers autorisés) : la nouvelle saison prend sa place dans la suite et reprend, dans la saison qui la précède, les questions dont la clôture tombe à partir de son début. Refusé :
   - si l'une de ces questions a des pronos : « Des questions avec des pronos clôturent après cette date : elles changeraient de saison. » ;
   - si une question publiée ou annulée sortirait d'une saison proclamée (règle des saisons proclamées, ci-dessous).
@@ -1075,7 +1157,7 @@ Un fil unique pour toute l'équipe (cahier des charges §4.11). Les messages son
 - sans aucun prono, la seconde phrase est omise ;
 - « (corrigé) » est ajouté si le résultat a été corrigé, après « Résultat » : « Résultat (corrigé) : … » ;
 - le message porte un lien vers la question ;
-- si la question est annulée ensuite, il n'est plus affiché (ni compté dans les non lus) ;
+- si la question est annulée ensuite, il n'est plus affiché (ni compté dans les non lus) ; si elle est supprimée (v1.4, §5.11), il est supprimé avec elle ;
 - une correction ou une annulation se voit au prochain chargement de `/chat` : l'interrogation ne renvoie pas les messages de résultat déjà affichés (précision de l'É8d). Un message de résultat supprimé par l'admin affiche « Message supprimé. ».
 
 **Anonymisation** (`anonymizeUser`, §6.3) : tous les messages du compte sont effacés comme une suppression (`deleted_by` = l'admin).
@@ -1112,6 +1194,157 @@ Un fil unique pour toute l'équipe (cahier des charges §4.11). Les messages son
 | CH9 | première saisie d'un résultat ; correction ; annulation de la question | un message de résultat ; pas de second message, texte corrigé ; message masqué |
 | CH10 | anonymisation d'un compte | tous ses messages effacés |
 | CH11 | `shouldPoll` : onglet caché ; visible et inactif depuis 6 min ; visible et actif il y a 1 min | non ; non ; oui |
+
+### 5.16 Règles de la saison (v1.3, É10)
+
+> Décisions de l'utilisateur du 12/10/2026 (cahier des charges §5.8) : niveau « paramètres et barème » (option B ; un éditeur de formules est écarté), règles **par saison**, figées au **premier résultat** de la saison, historique des changements, règles reprises de la saison précédente à la création. Écartés : préréglages et aperçu en direct, annonce automatique d'un changement, encadré libre au règlement. Livré **après le lancement** : jusqu'à l'É10, le code suit les constantes du §5.5, qui deviennent les valeurs par défaut.
+
+**Type et valeurs par défaut** (`src/lib/game/rules.ts`, fonctions pures)
+
+```ts
+export type ScoringMode = "raw" | "percent";        // écart brut | écart en %
+export type AbsentRule = "worst" | "real_value";    // pire prono | valeur réelle (prono de 0)
+
+export type GameRules = {
+  scoringMode: ScoringMode;
+  malusCap: number | null;   // malus de base maximal d'une question à nombre, 2 décimales ; obligatoire en "percent"
+  jokersEnabled: boolean;    // v1.2
+  jokerCount: number;        // 1 à 5
+  jokerDivisor: 2 | 3 | 4;
+  absentRule: AbsentRule;
+  bullseyePercent: number;   // 0,5 à 10, une décimale
+};
+
+export const DEFAULT_RULES: GameRules = {
+  scoringMode: "raw", malusCap: null, jokersEnabled: true,
+  jokerCount: 2, jokerDivisor: 2, absentRule: "worst", bullseyePercent: 1,
+};
+```
+
+`JOKER_DIVISOR`, `JOKERS_PER_SEASON` et `BULLSEYE_PERCENT` disparaissent de `constants.ts` : chaque usage doit lire les règles de la saison concernée, et le compilateur les retrouve tous. `COEFFICIENTS` et `PODIUM_SIZE` restent. `rules.ts` contient aussi :
+- `rulesSchema` (Zod) : bornes ci-dessus, plafond > 0 avec 2 décimales au plus, plafond obligatoire en `percent` (`CAP_REQUIRED`) ;
+- `rulesSummary(rules)` : une ligne pour le back-office, par exemple « Écart brut, sans plafond · 2 jokers ÷ 2 · absent : pire prono · Dans le mille ≤ 1 % » ;
+- `rulesChanges(before, after)` : les lignes de l'historique, par exemple « Barème : écart brut → écart en % », « Plafond : aucun → 100 ».
+
+**Calcul** (`scoreQuestion(question, predictions, rules)`, en centièmes entiers comme au §5.5). Le paramètre `rules` est **obligatoire**, sans valeur par défaut : un appel qui l'oublierait ne compilerait pas. Notations du §5.5 (`P`, `R`, `D = |P − R|`, `W`), plus `C = round(malusCap × 100)` et `t = round(bullseyePercent × 10)` (seuil en dixièmes de pour cent).
+
+1. **Malus de base d'une question à nombre** :
+   - `raw` : `B = D` ;
+   - `percent` : si `R ≠ 0`, `B = floor((2 × D × 10 000 + |R|) / (2 × |R|))`, soit `D / |R| × 100` points arrondis au centième, la moitié vers le haut ; si `R = 0`, `B = 0` pour `D = 0`, sinon `B = C` ;
+   - plafond : si `C` existe, `B = min(B, C)`.
+
+   Les entiers restent sûrs : avec un prono et un réel bornés à 999 999 999,99, `2 × D × 10 000` reste sous 2⁵³ (vecteur E10).
+2. **Question à choix** : `B = 0` ou `W`, comme au §5.5. Le plafond ne s'y applique pas.
+3. **« Dans le mille »** : `D × 1 000 ≤ t × |R|`. Avec le seuil par défaut (`t = 10`), c'est la règle du §5.5. `relativeError` et `podiumRank` ne changent pas : ils se calculent toujours sur `D`, quel que soit le barème (précision approuvée par l'utilisateur). Les badges, le message de résultat du chat et le départage restent donc indépendants du barème.
+4. **Malus d'une question** = `B × coefficient`, puis, avec un joker, division par `d = jokerDivisor` arrondie au centième, la moitié vers le haut : `floor((2x + d) / (2d))`. Pour `d = 2`, c'est le `floor((x + 1) / 2)` du §5.5.
+5. **Malus d'absence** :
+   - question sans aucun prono : 0, quelle que soit la règle ;
+   - question à choix : `W × coefficient`, quelle que soit la règle ;
+   - question à nombre, `worst` : le plus grand `B` (plafond compris) parmi les pronos, × coefficient ;
+   - question à nombre, `real_value` : le `B` d'un prono de 0 (`|R|` en `raw`, 10 000 centièmes en `percent`, plafond compris), × coefficient. Si `R = 0`, on applique `worst` (un prono de 0 serait parfait).
+
+**Vecteurs, écart en % (plafond 100 ; valeur réelle 1 000, coefficient 1, sans joker, sauf mention)**
+
+| # | Cas | Malus |
+|---|---|---|
+| E1 | prono 1 000 | 0 |
+| E2 | prono 950 | 5 |
+| E3 | prono 1 015 | 1,5 |
+| E4 | prono 989,99 | 1 (1,001 % arrondi au centième) |
+| E5 | prono 3 000 | 100 (200 plafonné) |
+| E6 | prono 25 000 | 100 |
+| E7 | réel 12,5, prono 12,6 | 0,8 |
+| E8 | réel 3 : pronos 2 et 1 | 33,33 et 66,67 |
+| E9 | réel 0 : pronos 0 et 5 | 0 (« Dans le mille ») et 100 (le plafond) |
+| E10 | réel 0,01, prono 999 999 999,99 | 100, sans perte de précision |
+
+**Vecteurs, plafond avec l'écart brut (plafond 500, valeur réelle 1 000)**
+
+| # | Cas | Malus |
+|---|---|---|
+| CP1 | prono 1 500 | 500 |
+| CP2 | prono 2 000 ; prono 25 000 | 500 ; 500 |
+| CP3 | prono 900, coefficient 3, joker ÷ 2 | 100 × 3 ÷ 2 = 150 |
+| CP4 | pronos 900 et 25 000, un absent (`worst`) | absent : 500 (le pire, plafonné) |
+| CP5 | question à choix, malus d'une mauvaise réponse 800 | 800 (pas de plafond sur un choix) |
+| CP6 | pronos 1 000 et 25 000 | rangs de proximité 1 et 2 ; « Dans le mille » pour 1 000 seulement |
+
+**Vecteurs, effet du joker (écart brut, valeur réelle 1 000)**
+
+| # | Cas | Malus |
+|---|---|---|
+| J1 | ÷ 3 : prono 1 100, joker | 100 ÷ 3 = 33,33 |
+| J2 | ÷ 3 : prono 1 001, joker | 1 ÷ 3 = 0,33 |
+| J3 | ÷ 4 : prono 1 250, coefficient 2, joker | 500 ÷ 4 = 125 |
+| J4 | ÷ 4 : prono 1 000,02, joker | 0,02 ÷ 4 = 0,005, arrondi à 0,01 |
+
+**Vecteurs, malus d'absence `real_value`**
+
+| # | Cas | Attendu |
+|---|---|---|
+| AB1 | écart brut, réel 1 000, coefficient 2 : A 900, B 1 300 avec joker, C sans prono | C : 2 000 (1 000 × 2 ; avec `worst`, 600 comme A1) |
+| AB2 | écart brut, plafond 500, réel 1 000 : un prono 900, C sans prono | C : 500 |
+| AB3 | écart en %, plafond 100 ; puis plafond 50 | C : 100 ; 50 |
+| AB4 | écart brut, réel 0 : pronos 0 et 5, C sans prono | C : 5 (repli sur `worst`) |
+| AB5 | question sans aucun prono | 0 |
+| AB6 | question à choix, malus d'une mauvaise réponse 200 | C : 200 |
+
+**Vecteurs, seuil du « Dans le mille » (valeur réelle 1 000)**
+
+| # | Cas | Attendu |
+|---|---|---|
+| DM1 | seuil 5 % : pronos 1 050 et 1 050,01 | oui ; non |
+| DM2 | seuil 0,5 % : pronos 1 005 et 1 006 | oui ; non |
+
+**Non-régression** : avec `DEFAULT_RULES`, tous les vecteurs du §5.5 (M1 à M7, K1 à K5, Q1 à Q3, P1, P2, A1 à A4, X6), du §5.6 (C1 à C9) et du §5.8 donnent exactement les résultats actuels. Les tests existants passent `DEFAULT_RULES` à `scoreQuestion` et `computeStandings`. C'est un changement de signature, pas un affaiblissement.
+
+**Où les règles sont lues.** Toujours celles de la saison de la question (`question.season_id`) :
+- `computeStandings({ questions, predictions, players, rules })` : une saison, donc un seul jeu de règles ;
+- `getQuestionResults`, `getPlayerResults` et les badges (un profil couvre plusieurs saisons : une règle par saison), le message de résultat du chat, `proclaimSeason` ;
+- jokers restants (`getJokersLeft`, `PlayerQuestion.jokersLeft`, tuile de l'accueil) et `setJoker` (limite `jokerCount`, message « Tu as déjà utilisé tes n jokers cette saison. ») ;
+- affichage « ÷ n » du joker : `jokerDivisor` de la saison de la question ;
+- `/reglement` : les règles de la saison courante (`getCurrentSeason`), ou `DEFAULT_RULES` s'il n'y en a pas.
+
+**Services** (`src/lib/services/seasons.ts`)
+
+`updateSeasonRules(db, admin, { seasonId, ...règles }, now)` : un champ absent garde sa valeur. Le réglage des jokers (`jokersEnabled`) quitte `updateSeason` pour ce service, avec ses règles du §5.13 ; SA9 à SA13 le visent désormais. Conditions, avec leur code de refus :
+- l'acteur est admin ;
+- la saison existe et n'est pas proclamée (`SEASON_PROCLAIMED` : « Cette saison est proclamée : ses règles sont figées. ») ;
+- les valeurs respectent `rulesSchema` (`INVALID_INPUT`, avec les messages par champ ; `CAP_REQUIRED` : « Avec l'écart en %, indique un plafond (100 par exemple). ») ;
+- aucune règle ne change si un **résultat** a été saisi sur une question de la saison (`resolved_at` non nul, même annulée ensuite) : `RULES_LOCKED`, « Un résultat a déjà été saisi dans cette saison : ses règles sont figées. ». Exception : autoriser les jokers reste possible, comme en v1.2. Le verrou se lit sur les questions qui existent : une question supprimée (v1.4, §5.11) ne fige plus rien (SR14) ;
+- `jokerCount`, `jokerDivisor` et le retrait des jokers sont refusés dès qu'un prono avec joker existe sur une question non annulée de la saison : `JOKERS_IN_USE`, « Des jokers sont déjà posés dans cette saison : impossible de les retirer, ni d'en changer le nombre ou l'effet. » ;
+- une règle figée renvoyée **inchangée** est acceptée. Tout ou rien : un refus n'écrit rien.
+
+Effet : met à jour la saison et, si au moins une règle change, ajoute une ligne `season_rules_event` (acteur, `now`, règles avant et après). Rien n'est écrit si rien ne change.
+
+`createSeason` accepte les mêmes règles, toutes facultatives. Une règle absente reprend celle de **la saison qui précède** la nouvelle dans l'ordre des dates, ou `DEFAULT_RULES` pour la première saison. Une ligne d'historique est écrite (`before` nul).
+
+**Verrous.** `updateSeasonRules` verrouille la table `season` comme les autres services de saisons (`EXCLUSIVE`, §5.13), puis lit les résultats et les jokers. `setJoker` lit déjà les saisons en `FOR SHARE` avant la question (§5.13). **`resolveQuestion` doit faire de même** (`seasonsForQuestions` avant `lockQuestion`) : sans cela, un premier résultat et un changement de règles saisis au même instant par les deux admins pourraient se croiser.
+
+**Lectures.**
+- `getSeasonsAdmin` donne pour chaque saison :
+  - `rules` et `rulesSummary` ;
+  - `rulesLock`, avec la raison de chaque verrou : `all` (résultat saisi ou saison proclamée) et `jokers` (joker posé) ;
+  - `rulesHistory` : date, nom de l'admin, lignes de `rulesChanges`, du plus récent au plus ancien.
+- `getCurrentSeason` et les résumés de saison portent `rules`.
+- Le formulaire de création reçoit les règles proposées (`suggestedSeasonRules`), calculées comme dans `createSeason`.
+
+| # | Cas | Attendu |
+|---|---|---|
+| SR1 | saison sans résultat ni joker : passer en écart en %, plafond 100 | accepté ; une ligne d'historique (avant : écart brut sans plafond ; après : écart en %, 100) |
+| SR2 | passer en écart en % sans plafond | `CAP_REQUIRED`, rien ne change |
+| SR3 | saison avec un résultat saisi : changer le barème, le plafond, la règle d'absence ou le seuil | `RULES_LOCKED` ; autoriser les jokers (retirés jusque-là) : accepté |
+| SR4 | le seul résultat de la saison est sur une question annulée ensuite | `RULES_LOCKED` |
+| SR5 | un joker posé (question non annulée) : changer le nombre ou l'effet | `JOKERS_IN_USE` ; si le seul joker est sur une question annulée : accepté |
+| SR6 | saison proclamée | `SEASON_PROCLAIMED` |
+| SR7 | saison figée : renvoyer toutes les règles inchangées | accepté, aucune ligne d'historique |
+| SR8 | créer une saison sans règles, après une saison en écart en % ; créer la première saison ; créer avec des règles | règles reprises ; `DEFAULT_RULES` ; celles données ; une ligne d'historique dans chaque cas |
+| SR9 | `jokerCount` 3 avant tout joker | `setJoker` accepte un 3e joker, refuse un 4e (`NO_JOKER_LEFT`, « … tes 3 jokers … ») |
+| SR10 | `jokerDivisor` 3 | malus divisé par 3 dans le classement, les résultats, le profil et le palmarès proclamé |
+| SR11 | bornes : 0 ou 6 jokers, diviseur 5, seuil 0,4 ou 10,1, plafond 0 ou négatif, plafond à 3 décimales | `INVALID_INPUT` |
+| SR12 | changement de règles et premier résultat lancés en même temps | jamais des règles changées après un résultat (l'un attend l'autre) |
+| SR13 | migration `0005` sur une base avec des données | toutes les saisons prennent `DEFAULT_RULES` ; le classement de chaque saison est identique avant et après |
+| SR14 | le seul résultat de la saison est sur une question supprimée ensuite (v1.4) ; le seul joker de la saison est sur une question supprimée | les règles se changent de nouveau ; le nombre et l'effet des jokers aussi |
 
 ---
 
@@ -1187,6 +1420,7 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
 3. **Layout `admin`** : `requireAdmin()`. Un joueur non admin reçoit la page 404 (on ne révèle pas l'existence du back-office). Next résout les métadonnées d'une page même quand son layout répond 404 : les pages d'admin donnent leur titre par `generateMetadata`, qui passe par `adminMetadata(titre)` (`requireAdmin()` d'abord). Sinon, l'onglet d'un joueur affichait « Back-office · Le Bon Chiffre » (recette du 01/10/2026, R-02).
 4. **Chaque Server Action** appelle `requireUser()` ou `requireAdmin()` et renvoie une erreur `NOT_AUTHENTICATED` ou `FORBIDDEN`, jamais une exception non gérée.
 5. **Chaque service** revérifie le rôle de l'acteur qu'il reçoit (défense en profondeur).
+6. **`/reglement`, jusqu'à l'É10** (v1.4, É8e, décision de l'utilisateur du 12/10/2026) : réservée aux admins. La règle tient dans `src/lib/app.ts` : la constante `RULES_PAGE_FOR_PLAYERS = false` et la fonction pure `canSeeRulesPage(isAdmin: boolean)` (vrai pour un admin, ou pour tous quand la constante est vraie). La page appelle `requireUser()`, puis `notFound()` si `canSeeRulesPage` est faux, comme le back-office (on ne révèle pas la page). Son titre passe par `generateMetadata`, avec le même contrôle, et non par un `metadata` statique (même raison qu'au point 3). Le menu (`MainNav`, avec son menu sur téléphone), le pied de page (`Footer`) et `/lots` n'affichent le lien que si `canSeeRulesPage` est vrai. L'É10 passe la constante à `true` (une ligne), ce qui rouvre la page et ses liens à tous.
 
 `getViewer()` lit la session (`auth.api.getSession({ headers })`) et renvoie `{ id, name, role, banned, avatar, lastSeenAt, previousVisitAt } | null`.
 
@@ -1196,10 +1430,13 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
 |---|---|---|---|---|
 | Voir les pages du jeu | → /connexion | oui | → /connexion | oui |
 | Voir le back-office | → /connexion | 404 | → /connexion | oui |
+| Voir le règlement (v1.4, jusqu'à l'É10) | → /connexion | 404, aucun lien | → /connexion | oui |
 | Enregistrer, valider un prono, poser un joker | refusé | oui (les siens) | refusé | oui (les siens) |
 | Déverrouiller un prono | refusé | refusé | refusé | oui |
 | Prolonger une question pour un joueur, annuler une prolongation (É8c) | refusé | refusé | refusé | oui, jamais pour soi-même |
 | Gérer questions, catégories, saisons, lots, annonces | refusé | refusé | refusé | oui |
+| Supprimer une question (v1.4, É8e) | refusé | refusé | refusé | oui, sauf une question publiée ou annulée d'une saison proclamée (§5.11) |
+| Régler les règles d'une saison (É10) | refusé | refusé | refusé | oui, jusqu'au premier résultat de la saison (§5.16) |
 | Gérer liste blanche et comptes | refusé | refusé | refusé | oui |
 | Modifier son nom, son avatar, son mot de passe | refusé | oui | refusé | oui |
 | Lire et écrire dans le chat, marquer comme lu (É8d) | refusé (`401` pour `/api/chat`) | oui | refusé | oui |
@@ -1272,16 +1509,16 @@ type Result<T = void> =
 | Fichier | Fonctions |
 |---|---|
 | `predictions.ts` | `savePrediction`, `validatePrediction`, `setJoker`, `unlockPrediction` |
-| `questions.ts` | `createQuestion`, `updateQuestion`, `deleteDraftQuestion`, `publishQuestions`, `setQuestionDates`, `duplicateQuestion`, `cancelQuestion`, `resolveQuestion` |
+| `questions.ts` | `createQuestion`, `updateQuestion`, `deleteQuestion` (`deleteDraftQuestion` jusqu'à l'É8e, §5.11), `publishQuestions`, `setQuestionDates`, `duplicateQuestion`, `cancelQuestion`, `resolveQuestion` |
 | `extensions.ts` (É8c) | `setQuestionExtension`, `cancelQuestionExtension` (§5.14) |
 | `categories.ts` | `createCategory`, `renameCategory`, `archiveCategory`, `unarchiveCategory` |
-| `seasons.ts` | `createSeason`, `updateSeason`, `deleteSeason`, `upsertPrizes`, `proclaimSeason` (v1.1 : `ensureSeason` disparaît, §5.13) |
+| `seasons.ts` | `createSeason`, `updateSeason`, `deleteSeason`, `upsertPrizes`, `proclaimSeason` (v1.1 : `ensureSeason` disparaît, §5.13), `updateSeasonRules` (É10, §5.16) |
 | `announcements.ts` | `createAnnouncement`, `updateAnnouncement`, `deleteAnnouncement` |
 | `players.ts` | `addAllowedEmails`, `removeAllowedEmail`, `setRole`, `disableUser`, `enableUser`, `setTemporaryPassword`, `anonymizeUser` |
 | `profile.ts` | `updateDisplayName`, `updateAvatar`, `recordVisit` (le changement de mot de passe passe par Better Auth) |
 | `chat.ts` (É8d) | `postChatMessage`, `deleteChatMessage`, `markChatRead` (§5.15) |
 
-La matrice d'autorisation (`tests/integration/authorization-matrix.test.ts`, §9.3) compte ces services : 34 jusqu'à l'É8b, 36 après l'É8c, 39 après l'É8d.
+La matrice d'autorisation (`tests/integration/authorization-matrix.test.ts`, §9.3) compte ces services : 34 jusqu'à l'É8b, 36 après l'É8c, 39 après l'É8d (et après l'É8e, où `deleteQuestion` remplace `deleteDraftQuestion`), 40 après l'É10.
 
 ### 7.4 Liste des lectures
 
@@ -1293,8 +1530,10 @@ La matrice d'autorisation (`tests/integration/authorization-matrix.test.ts`, §9
 | `badges.ts` (É7) | `getPlayerResults` (questions résolues de la saison pour un joueur, avec son prono et son malus, ou « pas de prono » et le malus d'absence), `getPlayerBadges`, `getBadgesOnQuestion` |
 | `standings.ts` | `getStandings({ seasonId? })`, `getAvailableSeasons` |
 | `players.ts` | `getPlayerProfile({ userId, seasonId? })`, `getAllowedEmails`, `getAccounts` |
-| `admin.ts` | `getAdminDashboard` (avec les prolongations en cours), `getAdminQuestion` (avec la prolongation de chaque joueur et ce que l'admin peut en faire), `getAdminQuestionsList(filters)`, `getSeasonsAdmin` (avec la raison de ne pas proclamer et le réglage des jokers), `hasSeasons` (formulaire de question, §5.13) |
-| `content.ts` | `getAnnouncements`, `getPrizes(seasonId)`, `getPalmares`, `getCurrentSeason` (pied de page, `/lots`, tuile Jokers ; avec `jokersEnabled`) |
+| `admin.ts` | `getAdminDashboard` (avec les prolongations en cours), `getAdminQuestion` (avec la prolongation de chaque joueur et ce que l'admin peut en faire ; depuis l'É8e, `deletion` : `{ allowed, reason, predictions, extensions, resultMessage }`, le bilan affiché par la fenêtre de suppression, sans compter les jokers, que l'admin ne doit pas voir avant la clôture, §6.6), `getAdminQuestionsList(filters)` (depuis l'É8e, chaque ligne a aussi son `deletion`, calculé comme pour `getAdminQuestion`, pour la suppression en série), `getSeasonsAdmin` (avec la raison de ne pas proclamer et le réglage des jokers ; depuis l'É10, les règles, leurs verrous et leur historique, §5.16), `suggestedSeasonRules` (É10, formulaire de création), `hasSeasons` (formulaire de question, §5.13) |
+| `content.ts` | `getAnnouncements`, `getPrizes(seasonId)`, `getPalmares`, `getCurrentSeason` (pied de page, `/lots`, tuile Jokers ; avec `jokersEnabled`, et depuis l'É10 toutes les `rules` de la saison, lues aussi par `/reglement`) |
+
+Depuis l'É10, toute lecture qui calcule un malus charge les règles de la saison de la question et les passe à `scoreQuestion` ou `computeStandings` (§5.16).
 | `chat.ts` (É8d) | `getChatMessages`, `getChatUpdates`, `getUnreadChatCount` (§5.15) |
 
 ---
@@ -1439,7 +1678,21 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 - **Field** : libellé au-dessus, champ de 44 px, bordure `line-strong` passant à `accent` au focus, message d'erreur en `hot` sous le champ (`aria-describedby`).
 - **Tabs** : liens avec le compteur (« À FAIRE (3) »).
 - **EmptyState** : icône, phrase, action éventuelle.
-- **Footer** : « Les petits pronos de la promo · Saison 2026-2027 » (nom de la saison courante, rien s'il n'y en a pas) et liens Règlement, Lots, Palmarès.
+- **Footer** : « Les petits pronos de la promo · Saison 2026-2027 » (nom de la saison courante, rien s'il n'y en a pas) et liens Règlement, Lots, Palmarès. Jusqu'à l'É10 (v1.4), le lien Règlement n'apparaît que pour un admin, comme l'onglet « Règlement » de `MainNav` (§6.4, point 6).
+- **QuestionDeleteDialog** (É8e, back-office, §5.11) : `<dialog>` « Supprimer définitivement la question ? », ouvert par le bouton « Supprimer » (variante `danger`, icône `Trash`) des actions de la question.
+  - Texte : « Ce n'est pas réversible : la question disparaît pour tout le monde, comme si elle n'avait jamais existé. »
+  - Bilan, seulement les lignes non nulles : « Seront effacés : 3 pronos, 1 prolongation, le message de résultat du chat. » ; s'il y a des pronos, « Les jokers posés dessus sont rendus à leurs joueurs. » (sans nombre, §6.6) ; sans rien : « Aucun prono n'a été fait sur cette question. »
+  - Pour une question publiée, la seule qui s'annule encore (pas pour un brouillon ni une question déjà annulée, précision de l'É8e) : « Pour une vraie question dont la valeur ne sera pas connue, préfère « Annuler la question » : les joueurs la verront annulée. »
+  - S'il y a au moins un prono : champ « Tape SUPPRIMER pour confirmer » (`Field`, `autocomplete="off"`), qui active le bouton « Supprimer définitivement » ; sinon le bouton est actif tout de suite.
+  - Refus du serveur (`CONFIRMATION_REQUIRED` après un prono arrivé entre-temps, `QUESTION_IN_PROCLAIMED_SEASON`) : message dans la fenêtre, qui reste ouverte ; pour `CONFIRMATION_REQUIRED`, le champ apparaît.
+  - Après la suppression : retour à `/admin/questions` avec « Question supprimée. » (message passé dans l'adresse, retiré par `DropSearchParams`).
+- **QuestionsDeleteDialog** (É8e, suppression en série depuis `/admin/questions`, §5.11) : `<dialog>` « Supprimer définitivement 3 questions ? ». Mêmes règles que `QuestionDeleteDialog`, au pluriel, sur l'ensemble de la sélection.
+  - Texte : « Ce n'est pas réversible : ces questions disparaissent pour tout le monde, comme si elles n'avaient jamais existé. »
+  - Bilan des questions supprimables : « Seront effacés : 5 pronos, 1 prolongation, 2 messages de résultat du chat. » ; s'il y a des pronos, la phrase des jokers rendus ; sans rien : « Aucun prono n'a été fait sur ces questions. »
+  - Questions qui resteront : « 1 question ne sera pas supprimée : elle appartient à une saison proclamée. » (« 2 questions ne seront pas supprimées : elles appartiennent… »). Si aucune question de la sélection n'est supprimable, le bouton de confirmation est désactivé.
+  - Si au moins une question supprimable est publiée, le conseil d'annuler plutôt, depuis la page de la question.
+  - S'il y a au moins un prono : le champ « Tape SUPPRIMER pour confirmer », comme pour une seule question.
+  - Après : la fenêtre se ferme ; compte rendu au-dessus du tableau, comme les autres actions groupées (« 3 questions supprimées. », puis une ligne par refus : « « énoncé » : raison ») ; les questions supprimées quittent la sélection et la liste.
 - **ExtensionDialog** (É8c, back-office) : `<dialog>` « Prolonger pour <nom> », champ date-heure (heure de Paris), prérempli 48 h plus tard à l'heure pile, et rappel « Le joueur ne verra pas les pronos des autres avant d'avoir répondu. Préviens-le toi-même. » ; boutons « Annuler » et « Prolonger ». Précisé à l'É8c : les 48 h partent de la clôture de la question si elle est encore à venir (absence prévue, PR10), l'heure est arrondie à l'heure suivante ; « Changer la date » ouvre le même dialogue, prérempli avec la date limite en cours.
 - **Chat** (É8d) :
   - `ChatRoom` (client) : liste et interrogation périodique (§5.15) ;
@@ -1513,9 +1766,9 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 - Changement de mot de passe : actuel, nouveau, confirmation.
 - Bouton « Se déconnecter ».
 
-**`/lots`** : lots de la saison courante (rang et description). EmptyState « Les lots seront annoncés bientôt. » Lien vers le règlement.
+**`/lots`** : lots de la saison courante (rang et description). EmptyState « Les lots seront annoncés bientôt. » Lien vers le règlement (jusqu'à l'É10, pour un admin seulement : la phrase qui le porte est réécrite sans lien pour un joueur, sans laisser de ponctuation orpheline).
 
-**`/reglement`** : page générée à partir des constantes (§5.5), dont les exemples sont calculés par `scoreQuestion`. Sections (v1.2) :
+**`/reglement`** : page générée à partir des constantes (§5.5), dont les exemples sont calculés par `scoreQuestion`. **Depuis l'É8e et jusqu'à l'É10** (v1.4), réservée aux admins (§6.4, point 6) : 404 pour un joueur ; pour l'admin, un encadré en tête : « Page réservée aux admins pour l'instant : les joueurs ne la voient pas. Elle leur sera ouverte avec les règles réglables par saison. » Le contenu ne change pas. Sections (v1.2) :
 - principe : le moins de malus gagne ;
 - types de questions : nombre, choix, oui/non ;
 - enregistrement, validation et clôture ;
@@ -1533,6 +1786,16 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 - lots.
 
 Les sections « barème (tableau des paliers) », « bonus podium » et « Juste Prix » disparaissent.
+
+**Depuis l'É10 (v1.3)**, la page est générée à partir des **règles de la saison courante** (`getCurrentSeason().rules`, ou `DEFAULT_RULES` sans saison), et non plus des constantes. Elle l'annonce en tête (« Règles de la saison 2026-2027 »).
+- Les sections du malus, du « Dans le mille », des jokers et de l'absence suivent ces règles :
+  - écart brut ou écart en %, avec le plafond s'il y en a un ;
+  - seuil du « Dans le mille » ;
+  - nombre de jokers et « ÷ n » ;
+  - pire prono ou valeur réelle.
+- Les exemples restent calculés par `scoreQuestion` avec ces règles.
+- Les textes qui dépendent des règles viennent de fonctions pures de `rules.ts`, testées pour chaque combinaison de barème et de règle d'absence.
+- Aucune mention de date de changement (idée écartée par l'utilisateur).
 
 **`/palmares`** : pour chaque saison proclamée, du plus récent au plus ancien, le podium (3 premiers, avec leurs avatars, et leur malus), puis le classement complet dans une section dépliable et les lots attribués. EmptyState tant qu'aucune saison n'est proclamée.
 
@@ -1557,7 +1820,7 @@ Les sections « barème (tableau des paliers) », « bonus podium » et « Juste
 
 **`/admin/questions`**
 - Filtres : statut (brouillon, programmée, ouverte, clôturée, résolue, annulée), saison, catégorie.
-- Tableau avec cases à cocher et actions groupées « Définir les dates » (fenêtre avec trois champs date-heure, heure de Paris) et « Publier ».
+- Tableau avec cases à cocher et actions groupées « Définir les dates » (fenêtre avec trois champs date-heure, heure de Paris) et « Publier » ; depuis l'É8e, « Supprimer » (`QuestionsDeleteDialog`, §8.2).
 - Boutons « Nouvelle question » et « Dupliquer ».
 
 **`/admin/questions/nouvelle` et `/admin/questions/[id]`**, formulaire en sections :
@@ -1565,7 +1828,7 @@ Les sections « barème (tableau des paliers) », « bonus podium » et « Juste
 2. Source de la valeur réelle.
 3. Pour t'aider : lien BI, valeur de l'an dernier, indice.
 4. Dates : ouverture, clôture, résultat prévu, avec la mention « heure de Paris ».
-5. Actions : Enregistrer, Publier, Annuler la question (confirmation), Supprimer (brouillon sans prono).
+5. Actions : Enregistrer, Publier, Annuler la question (confirmation), Supprimer (brouillon sans prono jusqu'à l'É8e ; depuis, toute question, avec `QuestionDeleteDialog`, §8.2 ; pour une question publiée ou annulée d'une saison proclamée, bouton désactivé avec la raison).
 
 Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Dans la page d'une question existante :
 - **Suivi** :
@@ -1589,6 +1852,20 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Da
 - Rappel de créer la saison suivante (§5.13) ; invitation à créer la première saison s'il n'y en a aucune.
 - Éditeur de lots (rang et description, ordre).
 - Bouton « Proclamer le classement final », actif seulement si les conditions sont remplies (sinon, la raison est affichée), avec une confirmation qui rappelle que l'action est irréversible.
+- **Règles de la saison** (É10, §5.16) :
+  - pour chaque saison, une ligne de résumé (`rulesSummary`) et un bouton « Modifier les règles » qui ouvre le formulaire `SeasonRulesForm` (`useFormAction`) ;
+  - champs du formulaire :
+    - barème : boutons radio « Écart brut » et « Écart en % » ;
+    - plafond : nombre facultatif, obligatoire et prérempli à 100 quand on choisit l'écart en %. L'aide indique l'unité : « dans l'unité de chaque question » ou « en points de % » ;
+    - « Jokers autorisés » ;
+    - nombre de jokers (1 à 5) et effet (÷ 2, ÷ 3, ÷ 4) ;
+    - malus d'un absent : « Le pire prono de la question » ou « La valeur réelle, comme un prono de 0 » ;
+    - seuil du « Dans le mille » (0,5 à 10 %, pas de 0,1) ;
+  - un champ figé est désactivé, avec sa raison (« Un résultat a déjà été saisi… », « Des jokers sont déjà posés… ») ;
+  - sous le formulaire, « Historique des règles » (`<details>`) : date et heure, admin, changements, du plus récent au plus ancien ;
+  - le formulaire « Nouvelle saison » montre les règles proposées (`suggestedSeasonRules`), avec « Règles reprises de <saison> » et la possibilité de les changer. La case « Jokers autorisés » y entre ;
+  - testé à 390 et 1 280 px, avec axe, comme les autres pages d'admin.
+- L'aide du malus d'une mauvaise réponse, dans le formulaire de question, rappelle le barème et le plafond de la saison de la question quand elle est connue (É10).
 
 **`/admin/annonces`** : liste, création, modification, suppression (500 caractères au plus, compteur affiché).
 
@@ -1752,7 +2029,9 @@ Les étapes É1 à É8b sont faites. Elles décrivent ce qui a été construit a
 | É8b | Changement du nom du site (v1.1) | 12/10, dès que le nouveau nom est choisi, et avant H-10 |
 | É8c | Malus, jokers par saison, prolongations, couleur (v1.2) | 05/10 |
 | É8d | Chat général (v1.2) | 07/10 |
+| É8e | Suppression des questions, règlement réservé aux admins (v1.4) | 13/10, avant le lancement |
 | É9 | Recette et lancement | 13/10, lancement le 14/10 |
+| É10 | Règles réglables par saison (v1.3) | après le lancement, avant le premier résultat de 2026-2027 (novembre) |
 
 ### É1 — Socle du projet
 
@@ -2254,11 +2533,72 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
 
 **Interventions humaines** : H-08 (l'utilisateur discute avec un collègue ou avec un second compte du seed sur l'aperçu).
 
+### É8e — Suppression des questions, règlement réservé aux admins (v1.4)
+
+**Objectif** : après ses essais en production, l'utilisateur veut pouvoir effacer ses questions de test, quel que soit leur état, et cacher le règlement aux joueurs jusqu'à l'É10 (cahier des charges v1.4 ; §5.11, §6.4 point 6, §8.2, §8.3 ici). Décisions de l'utilisateur du 12/10/2026, à ne pas rediscuter : pas de suppression d'une question publiée ou annulée d'une saison proclamée ; confirmation avec bilan et saisie de « SUPPRIMER » dès qu'il y a un prono ; règlement en 404 pour un joueur, liens retirés.
+
+**Prérequis** : É8d validée et fusionnée dans `main` (fait le 02/10). La recette ciblée de l'É8c n'est pas un prérequis.
+
+**Branche** : `etape-08e-suppression-reglement`, créée depuis `main`.
+
+**Aucune migration** : le schéma ne change pas. La production a des données : ne rien écrire dans sa base ; les questions de test y sont supprimées par l'utilisateur lui-même, depuis le back-office, après la fusion (H-17).
+
+**Deux parties indépendantes**, qui peuvent être confiées à deux agents en parallèle (elles ne touchent pas les mêmes fichiers). Les tests de bout en bout utilisent le port 3100 et une base PGlite propre à chaque lancement : deux lancements simultanés se gênent, un seul agent à la fois les lance.
+
+**Partie A : suppression d'une question** (§5.11)
+1. **Tests d'abord** : `tests/integration/` (fichier des services de questions, ou `question-delete.test.ts`) avec QD1 à QD11 ; remplacer les tests de `deleteDraftQuestion` par ceux de `deleteQuestion` (QD1 reprend leur attendu, ce n'est pas un affaiblissement).
+2. **Service** `deleteQuestion` dans `src/lib/services/questions.ts` : il remplace `deleteDraftQuestion`, avec les conditions, l'ordre des suppressions, les verrous et le bilan du §5.11. Codes de refus `QUESTION_IN_PROCLAIMED_SEASON` et `CONFIRMATION_REQUIRED` ajoutés aux codes et messages d'erreur ; `NOT_DELETABLE` disparaît s'il ne sert plus ailleurs.
+3. **Matrice d'autorisation** : `deleteQuestion` à la place de `deleteDraftQuestion` (toujours 39 services) ; l'instantané des tables comparé avant et après un refus couvre `prediction`, `prediction_event`, `question_extension`, `question_option` et `chat_message`.
+4. **Lecture** : `getAdminQuestion` renvoie `deletion` (§7.4), avec la raison du refus pour une question publiée ou annulée d'une saison proclamée.
+5. **Action** `deleteQuestionAction(questionId, confirmation)` : appelle le service, journalise le bilan (§5.11, jamais une valeur de prono), revalide les pages du jeu et du back-office comme les autres actions de questions, puis renvoie vers `/admin/questions` avec le message « Question supprimée. ».
+6. **Interface** : `QuestionDeleteDialog` (§8.2) ; bouton « Supprimer » sur toute question dans `QuestionActions` (désactivé avec la raison si `deletion.allowed` est faux) ; message « Question supprimée. » sur `/admin/questions`.
+7. **Suppression en série** (ajoutée pendant l'étape, à la demande de l'utilisateur) : `deletion` sur chaque ligne de `getAdminQuestionsList`, action `deleteQuestionsAction`, action groupée « Supprimer » et `QuestionsDeleteDialog` sur `/admin/questions` (§5.11, §8.2).
+
+**Partie B : règlement réservé aux admins** (§6.4 point 6)
+1. `src/lib/app.ts` : `RULES_PAGE_FOR_PLAYERS = false` (commentaire : rouverte par l'É10) et `canSeeRulesPage(isAdmin)`, avec un test unitaire (admin, joueur, et les deux valeurs de la constante si la fonction la reçoit en paramètre facultatif pour le test).
+2. `/reglement` : `notFound()` pour un joueur ; titre par `generateMetadata` ; encadré pour l'admin (§8.3).
+3. Liens : onglet « Règlement » de `MainNav` (en-tête et menu sur téléphone), `Footer` (qui reçoit de quoi savoir si la personne est admin), lien de `/lots`.
+4. En-tête à 1 024 px : vérifier qu'il tient toujours, pour l'admin (inchangé) comme pour un joueur (un onglet de moins).
+
+**Tests à écrire**
+- Partie A :
+  - intégration : QD1 à QD11, matrice d'autorisation ;
+  - `e2e/admin-delete-question.spec.ts`. Il ne supprime **aucune question du seed** : les autres fichiers en dépendent (points ouverts d'`avancement.md`). Le test crée et publie sa propre question ouverte, un joueur y enregistre un prono, puis l'admin la supprime :
+    - bilan affiché ;
+    - bouton inactif tant que « SUPPRIMER » n'est pas tapé ;
+    - retour à la liste avec « Question supprimée. » ;
+    - le joueur reçoit la page 404 sur l'adresse de la question.
+    
+    Il vérifie aussi, sans rien changer, le bouton désactivé et sa raison sur une question résolue de 2025-2026 (saison proclamée du seed). Au plus 5 connexions par test (§6.1) ;
+
+    Suppression en série : l'admin crée deux brouillons, puis les sélectionne dans la liste avec une question résolue de la saison proclamée du seed. Le test vérifie le bilan et l'annonce de la question qui restera, puis le compte rendu : 2 supprimées, une ligne de refus. Il passe axe sur la fenêtre ouverte ;
+  - axe sur la fenêtre de suppression ouverte, à 390 et 1 280 px.
+- Partie B :
+  - unitaire : `canSeeRulesPage` ;
+  - `e2e/rules-page.spec.ts` :
+    - un joueur reçoit la page 404 sur `/reglement`, sans le titre « Règlement » dans l'onglet ;
+    - aucun lien « Règlement » pour lui dans l'en-tête, le menu sur téléphone, le pied de page ni `/lots` ;
+    - l'admin voit la page, l'encadré et les liens.
+  - Mettre à jour les fichiers qui ouvrent `/reglement` avec un joueur (`a11y.spec.ts`, `responsive.spec.ts`, `results.spec.ts`) : ils l'ouvrent avec l'admin. Dans `responsive.spec.ts`, la liste des onglets d'un joueur perd « Règlement ». C'est un changement de règle décidé par l'utilisateur, pas un affaiblissement.
+
+**Critères de passage** : porte commune (`verify` et `test:e2e` sur la branche qui réunit les deux parties) ; aucune migration générée (`npm run db:generate` ne produit rien) ; `.pglite-buildcheck` non créé par `next build` (point 9 d'`avancement.md`).
+
+**Interventions humaines** :
+- H-08, sur l'aperçu (base `dev`) :
+  - supprimer une question avec des pronos du seed, puis vérifier le classement ;
+  - constater le refus sur une question de 2025-2026 ;
+  - vérifier le règlement avec un compte joueur du seed, puis avec l'admin.
+
+  Relancer ensuite le seed sur `dev` si la question supprimée manque à la recette.
+- H-17, après la fusion dans `main` : l'utilisateur supprime lui-même, dans le back-office de production, ses questions de test. Au 12/10, ce sont les n° 1 (annulée), 2 (résolue puis annulée) et 4 (ouverte, 1 prono). L'agent vérifie ensuite en lecture seule (outil Neon) : questions, pronos, prolongations et messages de résultat restants. Supprimer la n° 2 retire le seul résultat de 2026-2027 : ses règles ne seront plus figées à l'É10 (§5.16).
+
 ### É9 — Recette et lancement
 
 **Objectif** : des collègues testent, on corrige, la production est remplie et vérifiée, on lance le 14 octobre.
 
-**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change, l'É8c, et l'É8d (sauf si l'utilisateur décide de la reporter après le lancement : le chat ne bloque rien d'autre).
+**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change, l'É8c, l'É8d (sauf si l'utilisateur décide de la reporter après le lancement : le chat ne bloque rien d'autre) et l'É8e (v1.4), avec H-17 faite.
+
+**Depuis la v1.4**, le règlement est caché aux joueurs jusqu'à l'É10 : les collègues de H-12 ne le voient pas, et H-13 ne porte plus que sur les autres textes (sa relecture passe à l'É10). L'annonce du lancement (H-15) peut résumer l'essentiel des règles : le moins de malus gagne, le malus est l'écart au résultat, jokers selon la saison, pas de prono dans le chat.
 
 **Branche** : `etape-09-recette` pour les corrections.
 
@@ -2275,6 +2615,92 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
 **Critères de passage** : porte commune sur `main`, fumée en production au vert, checklist de la section 13 cochée par l'utilisateur.
 
 **Interventions humaines** : H-07, H-12, H-13, H-14, H-15.
+
+### É10 — Règles réglables par saison (v1.3)
+
+**Objectif** : l'admin règle, pour chaque saison et sans développeur, le barème (écart brut ou écart en %), le plafond, le nombre et l'effet des jokers, le malus d'un absent et le seuil du « Dans le mille ». Les règles se figent au premier résultat de la saison. Les valeurs par défaut sont celles de la v1.2 : rien ne change tant que l'admin ne touche à rien (cahier des charges §5.8, §5.16 ici).
+
+**Prérequis** : É9 validée (site lancé). **Ne pas commencer avant le lancement du 14/10** (décision de l'utilisateur du 12/10/2026).
+
+**Branche** : `etape-10-regles`.
+
+**Le site est en production avec de vraies données** : la migration ne fait qu'ajouter (§0.4), et le classement de chaque saison doit être identique avant et après (SR13).
+
+**Tâches**
+1. **Lecture seule, avant toute chose** (outil Neon), sur `dev` et en production :
+   - saisons, et résultats déjà saisis par saison ;
+   - pronos avec joker ;
+   - le consigner.
+
+   Si un résultat est déjà saisi dans 2026-2027 en production, ses règles seront figées aux valeurs par défaut dès la migration. Le dire à l'utilisateur avant de coder : la fonctionnalité ne servira alors qu'à partir de 2027-2028.
+2. **Règles pures, tests d'abord** :
+   - `src/lib/game/rules.ts` (`GameRules`, `DEFAULT_RULES`, `rulesSchema`, `rulesSummary`, `rulesChanges`, textes du règlement) ;
+   - `scoreQuestion(…, rules)` et `computeStandings({ …, rules })` (§5.16) ;
+   - retrait de `JOKER_DIVISOR`, `JOKERS_PER_SEASON` et `BULLSEYE_PERCENT` de `constants.ts` ;
+   - tous les vecteurs du §5.16, et la non-régression avec `DEFAULT_RULES`.
+3. **Schéma et migration `0005_season_rules`** (ajouts seulement) :
+   - enums `scoring_mode` et `absent_rule` ;
+   - six colonnes de `season`, avec leurs contraintes ;
+   - table `season_rules_event` (§4.3).
+
+   Relire le SQL, puis l'appliquer sur `dev` (hôte vérifié avec `npm run db:check`).
+4. **Services** :
+   - `updateSeasonRules` ;
+   - `createSeason` avec ses règles reprises ;
+   - `updateSeason` sans `jokersEnabled` ;
+   - `setJoker` avec `jokerCount` ;
+   - `resolveQuestion` qui lit les saisons en `FOR SHARE` avant de verrouiller la question ;
+   - `proclaimSeason` avec les règles de la saison ;
+   - messages d'erreur (§5.16).
+
+   Matrice d'autorisation : 40 services, et `season_rules_event` dans l'instantané des tables.
+5. **Lectures** : charger les règles de la saison partout où un malus se calcule ou un joker s'affiche (§5.16, §7.4) ; `getSeasonsAdmin` (règles, verrous, historique), `suggestedSeasonRules`.
+6. **Interface** :
+   - `/admin/saisons` (§8.3 : résumé, `SeasonRulesForm`, historique, formulaire de création) ;
+   - « ÷ n » du joker partout où il est affiché (`PredictionForm`, `ResultPanel`, `PredictionsTable`, `/questions/[id]`, `/joueurs/[id]`) ;
+   - tuile Jokers de l'accueil (« /n ») ;
+   - `ResultPanel` : en écart en %, « écart de 50, soit 5 % de la valeur réelle » ; avec un plafond atteint, « plafonné à 100 » ;
+   - `/reglement` généré à partir des règles de la saison ;
+   - **rouvrir `/reglement` à tous** (v1.4) : `RULES_PAGE_FOR_PLAYERS = true` dans `src/lib/app.ts`, retrait de l'encadré réservé aux admins ; `e2e/rules-page.spec.ts` vérifie alors qu'un joueur voit la page et ses liens (changement de règle prévu, pas un affaiblissement) ; vérifier l'en-tête à 1 024 px pour un joueur, qui retrouve l'onglet ;
+   - aide du malus d'une mauvaise réponse.
+7. **Seed** : règles par défaut pour toutes les saisons (aucun attendu ne change), pas de ligne d'historique.
+8. **Après la fusion dans `main`** :
+   - lire la production (migration `0005` appliquée, saisons aux règles par défaut, aucune ligne d'historique) ;
+   - test rapide de la production (`e2e/prod-smoke.spec.ts`).
+
+**Tests à écrire**
+- `tests/unit/game/scoring.test.ts` :
+  - vecteurs E1 à E10, CP1 à CP6, J1 à J4, AB1 à AB6, DM1, DM2 ;
+  - les vecteurs du §5.5 avec `DEFAULT_RULES`, inchangés.
+- `tests/unit/game/rules.test.ts` : `rulesSchema` (bornes, `CAP_REQUIRED`), `rulesSummary`, `rulesChanges`, textes du règlement pour chaque barème et chaque règle d'absence.
+- `tests/unit/game/standings.test.ts` :
+  - C1 à C9 avec `DEFAULT_RULES`, inchangés ;
+  - un classement en écart en % avec un plafond, des jokers ÷ 3 et des absents en `real_value`, calculé à la main.
+- `tests/integration/season-rules.test.ts` : SR1 à SR12, et SR14 (question supprimée, v1.4).
+- `tests/integration/seasons.test.ts` : SA9 à SA13, qui passent par `updateSeasonRules`.
+- `tests/integration/migrate.test.ts` : SR13, avec la migration `0005` sur une base remplie par le seed.
+- `tests/integration/schema.test.ts` : les cinq contraintes de `season`.
+- `standings`, `results-data`, `badges-data`, `proclaim` : une saison en écart en % avec un plafond, attendus calculés à la main.
+- `tests/integration/authorization-matrix.test.ts` : 40 services.
+- Tests transverses (§9.3) : pureté et vocabulaire étendus à `rules.ts`.
+- `e2e/admin-season-rules.spec.ts` (ne jamais toucher aux règles des saisons du seed, dont dépendent les attendus des autres fichiers) :
+  - créer une saison de test dans 330 jours ;
+  - choisir l'écart en % et vider le plafond : message ; avec 100 : enregistré, résumé et historique à jour ;
+  - sur 2024-2025, qui a un résultat : champs désactivés, avec la raison ;
+  - supprimer la saison de test ;
+  - axe sur `/admin/saisons` formulaire ouvert, à 390 et 1 280 px.
+
+**Critères de passage** :
+- porte commune ;
+- non-régression : tous les vecteurs de la v1.2 passent tels quels avec `DEFAULT_RULES` ;
+- SR13 vérifiée sur `dev` (classements avant et après la migration, consignés) ;
+- production lue après la fusion.
+
+**Interventions humaines** : H-08. Sur l'aperçu, l'utilisateur :
+- change les règles d'une saison du seed sans résultat (ou d'une saison de test) ;
+- vérifie le règlement et l'historique ;
+- constate qu'une saison avec un résultat est figée ;
+- relit le règlement, rouvert aux joueurs (relecture reportée de H-13 depuis la v1.4), avec un compte joueur du seed.
 
 ---
 
@@ -2371,6 +2797,7 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
 
 ### H-13 — Relecture du règlement et des textes (É9)
 - Lire `/reglement` (en particulier le malus, le pire prono pour les absents et les prolongations, v1.2), l'accueil, `/pronos` et la fenêtre de confirmation. Signaler toute formulation à changer.
+- **Depuis la v1.4** : le règlement est caché aux joueurs jusqu'à l'É10 ; sa relecture passe au H-08 de l'É10. H-13 ne porte plus que sur l'accueil, `/pronos`, la fenêtre de confirmation et le texte de l'annonce (H-15).
 
 ### H-14 — Checklist de lancement (13/10)
 - Cocher la section 13 avec l'agent.
@@ -2387,6 +2814,14 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
   3. Sur l'ancienne adresse `le-bon-chiffre.vercel.app` : choisir une redirection vers la nouvelle, pour que les anciens liens continuent de marcher.
   4. Prévenir l'agent, qui met à jour `BETTER_AUTH_URL` en production (sans l'afficher) et relance un déploiement de production.
 - **Vérification** : la nouvelle adresse affiche `/connexion`, la connexion admin fonctionne, l'ancienne adresse redirige vers la nouvelle.
+
+### H-17 — Suppression des questions de test en production (É8e, après la fusion)
+- **Pourquoi** : la production garde les questions des essais du 30/09 au 02/10. Elles fausseraient le classement de 2026-2027 et figeraient ses règles à l'É10 (§5.16). L'agent n'écrit jamais dans la base de production : l'utilisateur les supprime avec la fonction livrée.
+- **Étapes** :
+  1. Se connecter en admin sur la production et ouvrir « Questions » dans le back-office, sans filtre de statut (les questions annulées doivent apparaître).
+  2. Pour chaque question de test (au 12/10 : n° 1, 2 et 4), ouvrir la question, cliquer « Supprimer », lire le bilan, taper `SUPPRIMER`, puis « Supprimer définitivement ».
+  3. Prévenir l'agent.
+- **Vérification** : l'agent lit la production (outil Neon, lecture seule). Il ne doit plus rester aucune des questions de test, ni leurs pronos, événements, prolongations ou messages de résultat ; les autres données (comptes, saison, lots) sont intactes.
 
 ---
 
@@ -2458,6 +2893,12 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | Prolongation | `extension` (`questionExtension`) |
 | Rang de proximité | `podiumRank` |
 | Juste Prix (supprimé en v1.2) | `priceIsRight` (colonne conservée, toujours `false`) |
+| Règles de la saison (v1.3) | `GameRules`, `DEFAULT_RULES` ; historique `seasonRulesEvent` |
+| Barème : écart brut, écart en % | `scoringMode` : `raw`, `percent` |
+| Plafond | `malusCap` |
+| Nombre de jokers, effet du joker | `jokerCount`, `jokerDivisor` |
+| Malus d'un absent : pire prono, valeur réelle | `absentRule` : `worst`, `real_value` |
+| Seuil du « Dans le mille » | `bullseyePercent` |
 | Dans le mille | `bullseye` |
 | Bonus podium (supprimé en v1.2) | `podiumBonus` |
 | Écart relatif | `relativeError` |
