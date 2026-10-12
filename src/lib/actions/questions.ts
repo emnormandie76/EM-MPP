@@ -9,7 +9,8 @@ import {
   type BatchReport,
   cancelQuestion,
   createQuestion,
-  deleteDraftQuestion,
+  type DeletionReport,
+  deleteQuestion,
   duplicateQuestion,
   publishQuestions,
   resolveQuestion,
@@ -131,12 +132,50 @@ export async function cancelQuestionAction(questionId: number): Promise<Result> 
   return result;
 }
 
-/** Deletes a draft and goes back to the list. */
-export async function deleteQuestionAction(questionId: number): Promise<Result<never>> {
-  const result = await deleteDraftQuestion(getDb(), await getActor(), { questionId });
+/**
+ * Deletes a question for good (v1.4, §5.11), then goes back to the list with « Question supprimée. »
+ * (`?supprimee=1`, dropped once shown). No trace is kept in the database: one line in the server
+ * logs, with the counts of the report, never a prediction value.
+ */
+export async function deleteQuestionAction(questionId: number, confirmation: string): Promise<Result<never>> {
+  const actor = await getActor();
+  const result = await deleteQuestion(getDb(), actor, { questionId, confirmation }, new Date());
   if (!result.ok) return result;
+  logDeletion(questionId, result.data, actor?.id);
   refresh();
-  redirect("/admin/questions");
+  redirect("/admin/questions?supprimee=1");
+}
+
+/** One line per deleted question in the server logs (§5.11): the counts of the report, never a prediction value. */
+function logDeletion(questionId: number, report: DeletionReport & { title: string }, adminId: string | undefined) {
+  const { title, predictions, extensions, resultMessage } = report;
+  console.info("QUESTION_DELETED", JSON.stringify({ questionId, title, predictions, extensions, resultMessage, adminId }));
+}
+
+/**
+ * Series deletion from the list (v1.4, step 8e, §5.11): each question goes through `deleteQuestion`,
+ * in its own transaction, with the same typed word. As for the dates in series, the refused ones stay;
+ * the page finds their titles in its list.
+ */
+export async function deleteQuestionsAction(
+  questionIds: number[],
+  confirmation: string,
+): Promise<Result<{ deleted: number[]; failed: { id: number; message: string }[] }>> {
+  const db = getDb();
+  const actor = await getActor();
+  const deleted: number[] = [];
+  const failed: { id: number; message: string }[] = [];
+  for (const questionId of questionIds) {
+    const result = await deleteQuestion(db, actor, { questionId, confirmation }, new Date());
+    if (!result.ok) {
+      failed.push({ id: questionId, message: result.message });
+      continue;
+    }
+    logDeletion(questionId, result.data, actor?.id);
+    deleted.push(questionId);
+  }
+  if (deleted.length > 0) refresh();
+  return { ok: true, data: { deleted, failed } };
 }
 
 export async function resolveQuestionAction(_: FormState, formData: FormData): Promise<FormState> {

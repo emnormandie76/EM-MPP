@@ -6,7 +6,9 @@ import { QUESTION_STATUS_LABELS } from "@/components/admin/QuestionStatusChip";
 import { type QuestionListItem, QuestionsTable } from "@/components/admin/QuestionsTable";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { DropSearchParams } from "@/components/ui/DropSearchParams";
 import { SelectField } from "@/components/ui/Field";
+import { FormMessage } from "@/components/ui/FormMessage";
 import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { type AdminQuestionFilters, getAdminQuestionsList, QUESTION_STATUSES } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
@@ -47,6 +49,9 @@ function filtersOf(params: Record<string, string | string[] | undefined>): Admin
 
 const optionalDate = (date: Date | null, now: Date) => (date ? formatDateTime(date, now) : null);
 
+/** One-time notice of the address, after the deletion of a question (v1.4, §8.2). */
+const DELETED_NOTICE = "supprimee";
+
 /** Questions list: filters, selection and group actions (architecture §8.3). */
 export default async function QuestionsAdminPage({ searchParams }: PageProps<"/admin/questions">) {
   const viewer = await requireAdmin();
@@ -55,6 +60,7 @@ export default async function QuestionsAdminPage({ searchParams }: PageProps<"/a
   const now = new Date();
   const { rows, seasons, categories } = await getAdminQuestionsList(getDb(), viewer, filters, now);
   const filtered = Boolean(filters.status || filters.season || filters.categoryId);
+  const deleted = params[DELETED_NOTICE] !== undefined;
   const items: QuestionListItem[] = rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -67,6 +73,7 @@ export default async function QuestionsAdminPage({ searchParams }: PageProps<"/a
     closesLabel: optionalDate(row.closesAt, now),
     expectedLabel: optionalDate(row.expectedResultAt, now),
     predictionCount: row.predictionCount,
+    deletion: row.deletion,
   }));
 
   return (
@@ -78,6 +85,13 @@ export default async function QuestionsAdminPage({ searchParams }: PageProps<"/a
           Nouvelle question
         </Link>
       </div>
+
+      {deleted ? (
+        <>
+          <FormMessage feedback={{ tone: "success", text: "Question supprimée." }} />
+          <DropSearchParams names={[DELETED_NOTICE]} />
+        </>
+      ) : null}
 
       <Card as="section" className="flex flex-col gap-5">
         <h2 className="sr-only">Filtres</h2>

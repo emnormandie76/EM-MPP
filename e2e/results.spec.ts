@@ -120,7 +120,8 @@ test("/classement shows the standings in the expected order, with the arrows, se
 });
 
 test("/reglement explains the malus, without any scale nor podium bonus (v1.2)", async ({ page }) => {
-  await signIn(page, ACCOUNTS.lea);
+  // Until step 10, the rules page is for admins only (v1.4, step 8e, §6.4, point 6).
+  await signIn(page, ACCOUNTS.admin);
   await page.goto("/reglement");
   await expect(page.getByRole("region", { name: "Principe" })).toContainText("le moins de malus gagne");
   const number = page.getByRole("region", { name: "Malus d'une question à nombre" });

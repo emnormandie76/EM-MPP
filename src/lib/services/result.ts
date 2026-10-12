@@ -27,7 +27,6 @@ export const ERROR_MESSAGES = {
   QUESTION_LOCKED: "Des pronos existent : ce champ ne peut plus changer. Pour le modifier, annule la question et crée une nouvelle question.",
   QUESTION_CLOSED: "La question est clôturée : seuls la catégorie, l'aide et la date de résultat prévue peuvent encore changer.",
   QUESTION_CANCELLED: "Cette question est annulée : elle ne peut plus être modifiée.",
-  NOT_DELETABLE: "Seul un brouillon sans prono peut être supprimé. Annule plutôt la question.",
   NOT_CANCELLABLE: "Un brouillon ne s'annule pas : supprime-le.",
   ALREADY_CANCELLED: "Cette question est déjà annulée.",
   NOT_PUBLISHABLE: "La question ne peut pas être publiée.",
@@ -67,6 +66,10 @@ export const ERROR_MESSAGES = {
   MESSAGE_TOO_LONG: `${CHAT_MAX_LENGTH} caractères au maximum.`,
   CHAT_RATE_LIMITED: `Doucement : ${CHAT_MAX_PER_MINUTE} messages par minute au maximum.`,
   MESSAGE_NOT_FOUND: "Ce message n'existe plus.",
+  // Deletion of a question (v1.4, §5.11, step 8e).
+  QUESTION_IN_PROCLAIMED_SEASON:
+    "Cette question appartient à une saison proclamée : son palmarès est figé, elle ne peut plus être supprimée.",
+  CONFIRMATION_REQUIRED: "Cette question a des pronos : tape SUPPRIMER pour confirmer.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

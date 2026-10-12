@@ -37,6 +37,14 @@ export const YES_NO_OPTIONS = ["Oui", "Non"] as const;
 export const NO_SEASON_YET =
   "Aucune saison n'existe encore : la question peut être enregistrée en brouillon, mais elle ne pourra être publiée qu'une fois la première saison créée.";
 
+/** The word the admin types to delete a question that has predictions (v1.4, §5.11). */
+export const DELETION_CONFIRMATION = "SUPPRIMER";
+
+/** Whether the typed text confirms a deletion: SUPPRIMER, spaces around and case aside. */
+export function isDeletionConfirmed(typed: string | null | undefined): boolean {
+  return (typed ?? "").trim().toUpperCase() === DELETION_CONFIRMATION;
+}
+
 const L = QUESTION_LIMITS;
 
 export const QUESTION_MESSAGES = {

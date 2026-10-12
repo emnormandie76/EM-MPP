@@ -43,11 +43,19 @@ for (const url of ["/connexion", "/inscription"]) {
 
 test("the player pages do not scroll sideways at 390 px", async ({ page }) => {
   await signIn(page, ACCOUNTS.julien);
-  for (const url of ["/", "/pronos", "/questions", "/classement", "/chat", "/palmares", "/reglement", "/lots", "/profil"]) {
+  for (const url of ["/", "/pronos", "/questions", "/classement", "/chat", "/palmares", "/lots", "/profil"]) {
     await page.goto(url);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expectNoSidewaysScroll(page);
   }
+});
+
+// v1.4 (step 8e): until step 10, the rules page is for admins only (§6.4, point 6), with its notice.
+test("/reglement (admin) does not scroll sideways at 390 px", async ({ page }) => {
+  await signIn(page, ACCOUNTS.admin);
+  await page.goto("/reglement");
+  await expect(page.getByRole("heading", { level: 1, name: "Règlement" })).toBeVisible();
+  await expectNoSidewaysScroll(page);
 });
 
 // Open (two numbers), closed and resolved (number with a joker, choice) questions.
@@ -210,14 +218,15 @@ test("/chat fits the screen at 390 px, emoji grid open, with a very long word", 
 });
 
 // Step 8d (§8.2, decision of the user of 02/10/2026): with the Chat tab, the header is compacted
-// between 1 024 and 1 279 px; at 1 024 px, it no longer widens the page, for an admin (one more
-// link) as for a player, and every link of the navigation stays visible.
+// between 1 024 and 1 279 px; at 1 024 px, it no longer widens the page, for an admin (the admin
+// link, and the rules tab) as for a player, and every link of the navigation stays visible. Until
+// step 10, a player has no « Règlement » tab (v1.4, step 8e, §6.4, point 6).
 test.describe("at 1 024 px", () => {
   test.use({ viewport: { width: 1024, height: 768 } });
 
-  for (const [who, email] of [
-    ["an admin", ACCOUNTS.admin],
-    ["a player", ACCOUNTS.julien],
+  for (const [who, email, tabs] of [
+    ["an admin", ACCOUNTS.admin, ["Accueil", "Mes pronos", "Classement", "Chat", "Palmarès", "Règlement"]],
+    ["a player", ACCOUNTS.julien, ["Accueil", "Mes pronos", "Classement", "Chat", "Palmarès"]],
   ] as const) {
     test(`the header fits the screen for ${who}`, async ({ page }) => {
       await signIn(page, email);
@@ -229,7 +238,7 @@ test.describe("at 1 024 px", () => {
         expect(header, url).toBeLessThanOrEqual(0);
       }
       const navigation = page.getByRole("navigation", { name: "Navigation principale" });
-      for (const label of ["Accueil", "Mes pronos", "Classement", "Chat", "Palmarès", "Règlement"]) {
+      for (const label of tabs) {
         await expect(navigation.getByRole("link", { name: new RegExp(`^${label}`) })).toBeInViewport();
       }
       await expect(page.getByRole("banner").locator("summary[aria-label^='Mon compte']")).toBeInViewport();

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Copy, Send } from "lucide-react";
+import { CalendarClock, Copy, Send, Trash } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
@@ -9,14 +9,16 @@ import { Field } from "@/components/ui/Field";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { TableScroll } from "@/components/ui/TableScroll";
 import { duplicateQuestionsAction, publishQuestionsAction, setQuestionDatesAction } from "@/lib/actions/questions";
+import type { AdminDeletion } from "@/lib/data/admin";
 import { formatCount, lowerFirst } from "@/lib/format";
 import type { QuestionStatus } from "@/lib/game/question-status";
 import type { BatchReport } from "@/lib/services/questions";
+import { type DeletionOutcome, QuestionsDeleteDialog } from "./QuestionsDeleteDialog";
 import { QuestionStatusChip } from "./QuestionStatusChip";
 
 // Questions of the back office, with a selection and its group actions (architecture §5.11,
-// §8.3): dates in series (Paris time), publication, duplication. Each action reports, question
-// by question, what failed and why.
+// §8.3): dates in series (Paris time), publication, duplication and, since step 8e, deletion for good
+// (§5.11). Each action reports, question by question, what failed and why.
 
 export type QuestionListItem = {
   id: number;
@@ -30,6 +32,8 @@ export type QuestionListItem = {
   closesLabel: string | null;
   expectedLabel: string | null;
   predictionCount: number;
+  /** For the series deletion (v1.4, step 8e). */
+  deletion: AdminDeletion;
 };
 
 type Report = { tone: "success" | "error"; lines: string[] } | null;
@@ -50,6 +54,7 @@ export function QuestionsTable({ rows }: { rows: QuestionListItem[] }) {
   const [pending, startTransition] = useTransition();
   const [report, setReport] = useState<Report>(null);
   const [datesOpen, setDatesOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [dateErrors, setDateErrors] = useState<Record<string, string>>({});
 
   const visibleIds = rows.map(({ id }) => id);
@@ -82,6 +87,21 @@ export function QuestionsTable({ rows }: { rows: QuestionListItem[] }) {
           ? { tone: "success", lines: [`${formatCount(result.data.ids.length, "copie créée", "copies créées")}, en brouillon.`] }
           : { tone: "error", lines: [result.message] },
       );
+    });
+  }
+
+  function deleted({ deleted: ids, failed }: DeletionOutcome) {
+    setDeleteOpen(false);
+    const next = new Set(selected);
+    for (const id of ids) next.delete(id);
+    setSelected(next);
+    const titleOf = new Map(rows.map(({ id, title }) => [id, title]));
+    setReport({
+      tone: failed.length > 0 ? "error" : "success",
+      lines: [
+        `${formatCount(ids.length, "question supprimée", "questions supprimées")}.`,
+        ...failed.map(({ id, message }) => `« ${titleOf.get(id) ?? id} » : ${lowerFirst(message)}`),
+      ],
     });
   }
 
@@ -128,6 +148,10 @@ export function QuestionsTable({ rows }: { rows: QuestionListItem[] }) {
         <Button variant="secondary" disabled={selection.length === 0} pending={pending} onClick={duplicate}>
           <Copy {...ICON} />
           Dupliquer
+        </Button>
+        <Button variant="danger" disabled={selection.length === 0} pending={pending} onClick={() => setDeleteOpen(true)}>
+          <Trash {...ICON} />
+          Supprimer
         </Button>
       </div>
 
@@ -201,6 +225,13 @@ export function QuestionsTable({ rows }: { rows: QuestionListItem[] }) {
           </tbody>
         </table>
       </TableScroll>
+
+      <QuestionsDeleteDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        questions={rows.filter(({ id }) => selected.has(id))}
+        onDone={deleted}
+      />
 
       <Dialog open={datesOpen} onClose={() => setDatesOpen(false)} title="Définir les dates">
         <form

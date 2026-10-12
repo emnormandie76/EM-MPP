@@ -342,11 +342,7 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
 
       <FormMessage feedback={notice ? { tone: "success", text: NOTICES[notice] } : null} />
       {notice ? <DropSearchParams names={Object.keys(NOTICES)} /> : null}
-      <QuestionActions
-        questionId={q.id}
-        canCancel={q.status === "published"}
-        canDelete={q.status === "draft" && predictionCount === 0}
-      />
+      <QuestionActions questionId={q.id} canCancel={q.status === "published"} deletion={detail.deletion} />
 
       {hasResultForm ? (
         <Card as="section" className="flex flex-col gap-4">

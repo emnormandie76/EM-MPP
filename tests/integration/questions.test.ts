@@ -7,7 +7,7 @@ import { parseNumberInput } from "@/lib/game/number-input";
 import {
   cancelQuestion,
   createQuestion,
-  deleteDraftQuestion,
+  deleteQuestion,
   duplicateQuestion,
   publicationProblems,
   publishQuestions,
@@ -115,9 +115,9 @@ describe("authorization (§6.5): admin only", () => {
       const q = await insertQuestion(db, { categoryId, status: "published", opensAt: clock.at("-1d"), closesAt: clock.at("+1d") });
       return cancelQuestion(db, actor, { questionId: q.id }, now);
     },
-    deleteDraftQuestion: async (actor: Actor | null) => {
+    deleteQuestion: async (actor: Actor | null) => {
       const q = await insertQuestion(db, { categoryId });
-      return deleteDraftQuestion(db, actor, { questionId: q.id });
+      return deleteQuestion(db, actor, { questionId: q.id }, now);
     },
     resolveQuestion: async (actor: Actor | null) => {
       const q = await insertQuestion(db, { categoryId, status: "published", opensAt: clock.at("-3d"), closesAt: clock.at("-1d") });
@@ -670,20 +670,8 @@ describe("duplication (§5.11)", () => {
   });
 });
 
-describe("deletion and cancellation (§5.11)", () => {
-  it("deletes a draft only; its copies forget where they came from", async () => {
-    const draft = await insertQuestion(db, { categoryId, type: "choice", unit: null, options: ["A", "B"] });
-    const copy = await duplicateQuestion(db, admin, { questionId: draft.id }, now);
-    const published = await insertQuestion(db, { categoryId, status: "published", opensAt: clock.at("+1d"), closesAt: clock.at("+2d") });
-
-    expect(await deleteDraftQuestion(db, admin, { questionId: published.id })).toMatchObject({ ok: false, code: "NOT_DELETABLE" });
-    expect(await deleteDraftQuestion(db, admin, { questionId: draft.id })).toEqual({ ok: true, data: undefined });
-    expect(await db.select().from(question).where(eq(question.id, draft.id))).toEqual([]);
-    expect(await db.select().from(questionOption).where(eq(questionOption.questionId, draft.id))).toEqual([]);
-    expect((await load(copy.ok ? copy.data.id : 0)).duplicatedFromId).toBeNull();
-    expect(await deleteDraftQuestion(db, admin, { questionId: draft.id })).toMatchObject({ code: "NOT_FOUND" });
-  });
-
+// The deletion of a question (v1.4, vectors QD1 to QD11) is tested in question-delete.test.ts.
+describe("cancellation (§5.11)", () => {
   it("cancels a published question at any time, not a draft nor twice", async () => {
     const open = await openQuestionWithPrediction();
     expect(await cancelQuestion(db, admin, { questionId: open.id }, now)).toEqual({ ok: true, data: undefined });

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Avatar } from "@/components/avatars/Avatar";
 import { useUnreadChat } from "@/components/chat/UnreadChat";
 import { signOutAction } from "@/lib/actions/auth";
+import { canSeeRulesPage } from "@/lib/app";
 import type { AvatarKey } from "@/lib/avatars";
 import { useDetailsMenu } from "./useDetailsMenu";
 
@@ -41,9 +42,11 @@ function UnreadBadge({ count }: { count: number }) {
   );
 }
 
-function NavLinks({ pathname }: { pathname: string }) {
+function NavLinks({ pathname, isAdmin }: { pathname: string; isAdmin: boolean }) {
   const { count: unread } = useUnreadChat();
-  return LINKS.map(({ href, label }) => {
+  // Until step 10, the rules tab shows to the admins only (§6.4, point 6, v1.4).
+  const links = LINKS.filter(({ href }) => href !== "/reglement" || canSeeRulesPage(isAdmin));
+  return links.map(({ href, label }) => {
     const active = isActive(pathname, href);
     // Not on the chat itself, where the messages are being read.
     const badge = href === "/chat" && unread > 0 && !active;
@@ -124,7 +127,7 @@ export function MainNav({ viewer }: { viewer: HeaderViewer }) {
   return (
     <>
       <nav aria-label="Navigation principale" className="hidden grow items-center gap-0.5 lg:flex xl:gap-1.5">
-        <NavLinks pathname={pathname} />
+        <NavLinks pathname={pathname} isAdmin={viewer.isAdmin} />
       </nav>
       <div className="hidden items-center gap-3 lg:flex xl:gap-5">
         {viewer.isAdmin ? (
@@ -143,7 +146,7 @@ export function MainNav({ viewer }: { viewer: HeaderViewer }) {
         </summary>
         <div className="absolute right-0 top-full z-10 mt-2 flex w-60 flex-col gap-1 rounded-card border border-line bg-surface p-2 shadow-lg">
           <nav aria-label="Navigation principale" className="flex flex-col gap-1">
-            <NavLinks pathname={pathname} />
+            <NavLinks pathname={pathname} isAdmin={viewer.isAdmin} />
             {viewer.isAdmin ? <AdminLink pathname={pathname} className={LINK_CLASSES} /> : null}
           </nav>
           <div className="mt-1 flex flex-col gap-1 border-t border-line pt-2">

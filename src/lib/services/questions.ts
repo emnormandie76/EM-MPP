@@ -1,7 +1,7 @@
 import { and, asc, count, eq, gt, inArray, max } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "@/lib/db/client";
-import { category, chatMessage, prediction, question, questionExtension, questionOption } from "@/lib/db/schema";
+import { category, chatMessage, prediction, predictionEvent, question, questionExtension, questionOption } from "@/lib/db/schema";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { COEFFICIENTS } from "@/lib/game/constants";
 import { parseNumberInput } from "@/lib/game/number-input";
@@ -10,6 +10,7 @@ import { seasonAt } from "@/lib/game/time";
 import {
   createQuestionSchema,
   dateErrors,
+  isDeletionConfirmed,
   kindOf,
   localDateTimeSchema,
   QUESTION_MESSAGES,
@@ -556,22 +557,71 @@ export async function cancelQuestion(db: Database, actor: Actor | null, input: u
   });
 }
 
-/** Deletes a draft without predictions; any other question is cancelled instead. */
-export async function deleteDraftQuestion(db: Database, actor: Actor | null, input: unknown): Promise<Result> {
+/**
+ * Why a question cannot be deleted, or null (v1.4, §5.11): a published or cancelled question of a
+ * proclaimed season, whose palmarès is frozen. A draft never counted: it may always go.
+ */
+export function deletionBlocker(status: QuestionRow["status"], seasonProclaimed: boolean): ErrorCode | null {
+  return status !== "draft" && seasonProclaimed ? "QUESTION_IN_PROCLAIMED_SEASON" : null;
+}
+
+/** What a deletion removed with the question: shown before (§7.4), logged after (§5.11). */
+export type DeletionReport = { predictions: number; extensions: number; resultMessage: boolean };
+
+const deleteInput = idInput.extend({ confirmation: z.string().optional() });
+
+/**
+ * Deletes a question for good, whatever its status (v1.4, §5.11): test questions and typing
+ * errors disappear as if they had never existed, with their result message, the events of their
+ * predictions, their predictions (their jokers are given back), their extensions and their answers.
+ * Never in a proclaimed season, but for a draft. With at least one prediction, `confirmation` must be
+ * SUPPRIMER: a prediction that arrived after the page was shown is never erased unknowingly.
+ *
+ * Locks: the seasons (FOR SHARE) before the question (FOR UPDATE), as the other question services;
+ * the question waits for the prediction services under way, which hold it FOR SHARE, and those that
+ * come next no longer find it. The deletions follow the foreign keys, all NO ACTION but the answers'.
+ * Returns the title with the report, for the server log of the action.
+ */
+export async function deleteQuestion(
+  db: Database,
+  actor: Actor | null,
+  input: unknown,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the signature of every service (§7.1); no rule of the deletion depends on the date.
+  now: Date,
+): Promise<Result<DeletionReport & { title: string }>> {
   const me = authorize(actor, { admin: true });
   if (isFailure(me)) return me;
-  const parsed = idInput.safeParse(input);
+  const parsed = deleteInput.safeParse(input);
   if (!parsed.success) return fail("INVALID_INPUT");
+  const { questionId, confirmation } = parsed.data;
 
   return db.transaction(async (tx) => {
-    const row = await lockQuestion(tx, parsed.data.questionId);
+    const seasons = await seasonsForQuestions(tx);
+    const row = await lockQuestion(tx, questionId);
     if (!row) return notFound();
+    const seasonProclaimed = row.seasonId !== null && proclaimedIds(seasons).has(row.seasonId);
+    const blocker = deletionBlocker(row.status, seasonProclaimed);
+    if (blocker) return fail(blocker);
     const predictions = (await predictionCounts(tx, [row.id])).get(row.id) ?? 0;
-    if (row.status !== "draft" || predictions > 0) return fail("NOT_DELETABLE");
-    // Copies made from this draft forget where they came from.
+    if (predictions > 0 && !isDeletionConfirmed(confirmation)) return fail("CONFIRMATION_REQUIRED");
+
+    // The result message cannot stay without its question (`chat_message_question`); the read marks
+    // of the chat have no foreign key and are left as they are.
+    const results = await tx
+      .delete(chatMessage)
+      .where(and(eq(chatMessage.questionId, row.id), eq(chatMessage.kind, "result")))
+      .returning({ id: chatMessage.id });
+    await tx.delete(predictionEvent).where(eq(predictionEvent.questionId, row.id));
+    await tx.delete(prediction).where(eq(prediction.questionId, row.id));
+    const extensions = await tx
+      .delete(questionExtension)
+      .where(eq(questionExtension.questionId, row.id))
+      .returning({ userId: questionExtension.userId });
+    // Copies made from this question forget where they came from.
     await tx.update(question).set({ duplicatedFromId: null }).where(eq(question.duplicatedFromId, row.id));
+    // The answers follow (ON DELETE CASCADE), and the right answer goes with the row that holds it.
     await tx.delete(question).where(eq(question.id, row.id));
-    return ok();
+    return ok({ title: row.title, predictions, extensions: extensions.length, resultMessage: results.length > 0 });
   });
 }
 

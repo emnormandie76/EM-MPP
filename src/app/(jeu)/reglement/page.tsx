@@ -1,15 +1,35 @@
+import { EyeOff } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
-import { requireUser } from "@/lib/auth/session";
+import { canSeeRulesPage, RULES_PAGE_FOR_PLAYERS } from "@/lib/app";
+import { requireUser, type Viewer } from "@/lib/auth/session";
 import { getCurrentSeason } from "@/lib/data/content";
 import { getDb } from "@/lib/db/client";
 import { formatMalus } from "@/lib/format";
 import { BULLSEYE_PERCENT, COEFFICIENTS, JOKER_DIVISOR, JOKERS_PER_SEASON } from "@/lib/game/constants";
 import { scoreQuestion } from "@/lib/game/scoring";
 
-export const metadata: Metadata = { title: "Règlement" };
+/**
+ * Until step 10, the rules page is for admins only (architecture §6.4, point 6, v1.4): a player gets
+ * the 404 page, as on the back office, so the page is not revealed.
+ */
+async function requireRulesReader(): Promise<Viewer> {
+  const viewer = await requireUser();
+  if (!canSeeRulesPage(viewer.role === "admin")) notFound();
+  return viewer;
+}
+
+/**
+ * The same check as the page: Next resolves a page's metadata even when it answers 404, and a static
+ * title would reach a player's tab (§6.4, point 3).
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  await requireRulesReader();
+  return { title: "Règlement" };
+}
 
 // The rules page (architecture §5.5, §8.3, v1.2) is generated from the scoring constants, and its
 // examples are computed by the scoring itself: the published rules and the computation cannot
@@ -60,13 +80,21 @@ function examples() {
 
 /** Rules (architecture §8.3, v1.2), in the order of the specification. */
 export default async function RulesPage() {
-  const viewer = await requireUser();
+  const viewer = await requireRulesReader();
   const season = await getCurrentSeason(getDb(), viewer, new Date());
   const e = examples();
 
   return (
     <>
       <h1 className="font-display text-[44px] leading-none font-extrabold uppercase">Règlement</h1>
+      {/* Only an admin gets here while the page is closed to the players (v1.4, §8.3). */}
+      {RULES_PAGE_FOR_PLAYERS ? null : (
+        <p className="flex items-start gap-2.5 rounded-field border border-accent bg-surface px-4 py-3 text-[15px] font-semibold text-accent-text">
+          <EyeOff aria-hidden size={18} strokeWidth={2.2} className="mt-0.5 shrink-0" />
+          Page réservée aux admins pour l&apos;instant : les joueurs ne la voient pas. Elle leur sera ouverte avec les règles
+          réglables par saison.
+        </p>
+      )}
 
       <Section id="principe" title="Principe">
         <p>

@@ -26,7 +26,6 @@ for (const url of [
   "/profil",
   "/classement",
   "/palmares",
-  "/reglement",
   "/lots",
   "/cette-page-n-existe-pas",
 ]) {
@@ -36,6 +35,14 @@ for (const url of [
     expect(await blockingViolations(page)).toEqual([]);
   });
 }
+
+// v1.4 (step 8e): until step 10, the rules page is for admins only (§6.4, point 6), with its notice.
+test("/reglement (admin) has no serious or critical accessibility violation", async ({ page }) => {
+  await signIn(page, ACCOUNTS.admin);
+  await page.goto("/reglement");
+  await expect(page.getByRole("heading", { level: 1, name: "Règlement" })).toBeVisible();
+  expect(await blockingViolations(page)).toEqual([]);
+});
 
 // §9.4: the page of an open question, with its form and its help.
 test("/questions/<id> (open, player) has no serious or critical accessibility violation", async ({ page }) => {

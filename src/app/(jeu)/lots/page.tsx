@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { canSeeRulesPage } from "@/lib/app";
 import { requireUser } from "@/lib/auth/session";
 import { getCurrentSeason, getPrizes } from "@/lib/data/content";
 import { getDb } from "@/lib/db/client";
@@ -40,12 +41,20 @@ export default async function PrizesPage() {
           </ol>
         </Card>
       )}
+      {/* Until step 10, the rules page is for admins only (§6.4, point 6, v1.4): a player gets the
+          sentence without the link. */}
       <p className="text-[15px] text-ink-2">
-        Barème, jokers et départage :{" "}
-        <Link href="/reglement" className="font-semibold text-accent-text hover:underline">
-          lire le règlement
-        </Link>
-        .
+        {canSeeRulesPage(viewer.role === "admin") ? (
+          <>
+            Barème, jokers et départage :{" "}
+            <Link href="/reglement" className="font-semibold text-accent-text hover:underline">
+              lire le règlement
+            </Link>
+            .
+          </>
+        ) : (
+          "Barème, jokers et départage : demande à l'admin."
+        )}
       </p>
     </>
   );

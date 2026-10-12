@@ -4,12 +4,13 @@ import { alias } from "drizzle-orm/pg-core";
 import type { Viewer } from "@/lib/auth/session";
 import { type AvatarKey, isAvatarKey } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
-import { category, prediction, predictionEvent, question, questionOption, season, user } from "@/lib/db/schema";
+import { category, chatMessage, prediction, predictionEvent, question, questionExtension, questionOption, season, user } from "@/lib/db/schema";
 import { formatDateTime } from "@/lib/format";
 import { type PredictionState, predictionState } from "@/lib/game/prediction-state";
 import { type QuestionStatus, questionStatus, questionStatusFor } from "@/lib/game/question-status";
 import { seasonAt, seasonEnd, seasonStartFromLocalDate, suggestedSeasonLabel, utcToParisLocalDate } from "@/lib/game/time";
-import { type EditRules, editRules } from "@/lib/services/questions";
+import { type DeletionReport, deletionBlocker, type EditRules, editRules } from "@/lib/services/questions";
+import { ERROR_MESSAGES } from "@/lib/services/result";
 import { proclamationBlocker } from "@/lib/services/seasons";
 import { type QuestionKind, kindOf } from "@/lib/validation/question";
 import { getPrizes, type PrizeView } from "./content";
@@ -211,6 +212,8 @@ export type AdminQuestionRow = {
   expectedResultAt: Date | null;
   seasonLabel: string | null;
   predictionCount: number;
+  /** For the series deletion (v1.4, step 8e, §5.11). */
+  deletion: AdminDeletion;
 };
 
 export type CategoryChoice = { id: number; name: string; archived: boolean };
@@ -238,13 +241,24 @@ export async function getAdminQuestionsList(
 ): Promise<AdminQuestionsList> {
   assertAdmin(viewer);
   const rows = await db
-    .select({ question, categoryName: category.name, seasonLabel: season.label, seasonStartsAt: season.startsAt })
+    .select({
+      question,
+      categoryName: category.name,
+      seasonLabel: season.label,
+      seasonStartsAt: season.startsAt,
+      seasonProclaimedAt: season.proclaimedAt,
+    })
     .from(question)
     .innerJoin(category, eq(category.id, question.categoryId))
     .leftJoin(season, eq(season.id, question.seasonId));
   const ids = rows.map(({ question: q }) => q.id);
   const options = await optionsByQuestion(db, ids);
   const counts = await predictionCounts(db, ids);
+  const deletions = await deletionsOf(
+    db,
+    rows.map(({ question: q, seasonProclaimedAt }) => ({ id: q.id, status: q.status, seasonProclaimed: seasonProclaimedAt !== null })),
+    counts,
+  );
 
   const all: AdminQuestionRow[] = rows.map(({ question: q, categoryName, seasonLabel }) => ({
     id: q.id,
@@ -258,6 +272,7 @@ export async function getAdminQuestionsList(
     expectedResultAt: q.expectedResultAt,
     seasonLabel,
     predictionCount: counts.get(q.id) ?? 0,
+    deletion: deletions.get(q.id)!,
   }));
   const categoryIdOf = new Map(rows.map(({ question: q }) => [q.id, q.categoryId]));
   const filtered = all
@@ -320,7 +335,61 @@ export type AdminQuestion = {
   tracking: TrackingRow[] | null;
   /** Why the result cannot be entered while an extension runs ("Prolongation de Léa jusqu'au …"), or null. */
   extensionBlocker: string | null;
+  /**
+   * The deletion (v1.4, §5.11): refused, with its reason, for a published or cancelled question of a
+   * proclaimed season; otherwise what it would remove. No count of jokers: the admin must not learn
+   * them before the closing (§6.6).
+   */
+  deletion: AdminDeletion;
 };
+
+/** A deletion as the back office shows it (v1.4, §5.11): allowed or not, with its reason, and what it would remove. */
+export type AdminDeletion = DeletionReport & { allowed: boolean; reason: string | null };
+
+/**
+ * What deleting each question would remove (§5.11): every extension, running or over, and the result
+ * message; refused, with its reason, for a published or cancelled question of a proclaimed season.
+ * Counted for a whole list at once (series deletion, step 8e).
+ */
+async function deletionsOf(
+  db: Database,
+  questions: { id: number; status: QuestionRow["status"]; seasonProclaimed: boolean }[],
+  predictions: Map<number, number>,
+): Promise<Map<number, AdminDeletion>> {
+  const ids = questions.map(({ id }) => id);
+  const extensions =
+    ids.length === 0
+      ? []
+      : await db
+          .select({ questionId: questionExtension.questionId, n: count() })
+          .from(questionExtension)
+          .where(inArray(questionExtension.questionId, ids))
+          .groupBy(questionExtension.questionId);
+  const results =
+    ids.length === 0
+      ? []
+      : await db
+          .select({ questionId: chatMessage.questionId })
+          .from(chatMessage)
+          .where(and(inArray(chatMessage.questionId, ids), eq(chatMessage.kind, "result")));
+  const extensionCounts = new Map(extensions.map(({ questionId, n }) => [questionId, n]));
+  const withResult = new Set(results.map(({ questionId }) => questionId));
+  return new Map(
+    questions.map(({ id, status, seasonProclaimed }) => {
+      const refused = deletionBlocker(status, seasonProclaimed);
+      return [
+        id,
+        {
+          allowed: refused === null,
+          reason: refused ? ERROR_MESSAGES[refused] : null,
+          predictions: predictions.get(id) ?? 0,
+          extensions: extensionCounts.get(id) ?? 0,
+          resultMessage: withResult.has(id),
+        },
+      ];
+    }),
+  );
+}
 
 export async function getAdminQuestion(db: Database, viewer: ViewerRole, questionId: number, now: Date): Promise<AdminQuestion | null> {
   assertAdmin(viewer);
@@ -389,6 +458,11 @@ export async function getAdminQuestion(db: Database, viewer: ViewerRole, questio
 
   const categories = (await categoryChoices(db)).filter((choice) => !choice.archived || choice.id === q.categoryId);
   const seasonsExist = await anySeason(db);
+  const deletions = await deletionsOf(
+    db,
+    [{ id: q.id, status: q.status, seasonProclaimed: row.seasonProclaimedAt !== null }],
+    new Map([[q.id, predictionCount]]),
+  );
   return {
     question: {
       ...q,
@@ -406,6 +480,7 @@ export async function getAdminQuestion(db: Database, viewer: ViewerRole, questio
     seasonsExist,
     tracking,
     extensionBlocker: blocker,
+    deletion: deletions.get(q.id)!,
   };
 }
 

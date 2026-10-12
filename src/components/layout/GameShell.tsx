@@ -22,7 +22,7 @@ export async function GameShell({ viewer, children }: { viewer: Viewer; children
     <UnreadChatProvider initial={unreadChat}>
       <AppHeader viewer={viewer} />
       <main className="mx-auto flex w-full max-w-page grow flex-col gap-6 px-4 pt-7 lg:px-12">{children}</main>
-      <Footer seasonLabel={season?.label ?? null} />
+      <Footer seasonLabel={season?.label ?? null} isAdmin={viewer.role === "admin"} />
       <VisitTracker />
     </UnreadChatProvider>
   );

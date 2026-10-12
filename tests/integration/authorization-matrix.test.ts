@@ -29,7 +29,7 @@ import { recordVisit, updateAvatar, updateDisplayName } from "@/lib/services/pro
 import {
   cancelQuestion,
   createQuestion,
-  deleteDraftQuestion,
+  deleteQuestion,
   duplicateQuestion,
   publishQuestions,
   resolveQuestion,
@@ -203,11 +203,29 @@ const CASES: { service: string; access: Access; prepare: () => Promise<Call> }[]
     },
   },
   {
-    service: "deleteDraftQuestion",
+    // v1.4 (step 8e): any question but those of a proclaimed season. This one carries everything a
+    // deletion removes: answers, a prediction and its event, an extension, the result message.
+    service: "deleteQuestion",
     access: "admin",
     prepare: async () => {
-      const q = await draftQuestion();
-      return (actor) => deleteDraftQuestion(db, actor, { questionId: q.id });
+      const q = await insertQuestion(db, {
+        categoryId,
+        createdBy: admin().id,
+        type: "choice",
+        unit: null,
+        options: ["Caen", "Le Havre"],
+        status: "published",
+        opensAt: clock.at("-5d"),
+        closesAt: clock.at("-2d"),
+        resolvedAt: clock.at("-1h"),
+      });
+      await db.update(question).set({ resultOptionId: q.options[1].id }).where(eq(question.id, q.id));
+      const p = await createPrediction(db, { questionId: q.id, userId: player().id, optionId: q.options[0].id, joker: true });
+      await db.insert(predictionEvent).values({ predictionId: p.id, questionId: q.id, ownerId: player().id, actorId: player().id, type: "saved", optionId: q.options[0].id, joker: true, createdAt: clock.at("-3d") });
+      const extended = await createUser(db, { name: "Prolongé" });
+      await db.insert(questionExtension).values({ questionId: q.id, userId: extended.id, closesAt: clock.at("-1d"), grantedBy: admin().id, grantedAt: clock.at("-2d") });
+      await db.insert(chatMessage).values({ kind: "result", questionId: q.id, createdAt: clock.at("-1h") });
+      return (actor) => deleteQuestion(db, actor, { questionId: q.id, confirmation: "SUPPRIMER" }, now);
     },
   },
   {
@@ -471,7 +489,7 @@ const CASES: { service: string; access: Access; prepare: () => Promise<Call> }[]
 const PROFILES: Profile[] = ["anonymous", "player", "disabled player", "disabled admin", "admin"];
 
 describe("authorization matrix (§6.5, §9.3)", () => {
-  it("covers the 39 write services of §7.3 (34 until step 8b, 2 extension services of step 8c, 3 chat services of step 8d)", () => {
+  it("covers the 39 write services of §7.3 (34 until step 8b, 2 extension services of step 8c, 3 chat services of step 8d; deleteQuestion replaces deleteDraftQuestion at step 8e)", () => {
     expect(new Set(CASES.map(({ service }) => service)).size).toBe(39);
   });
 

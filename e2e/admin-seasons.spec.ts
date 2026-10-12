@@ -68,11 +68,14 @@ test("the admin creates a future season, renames it, moves its start, then delet
   // The seed's season cannot be deleted: questions are attached to it.
   await expect(page.getByRole("button", { name: `Supprimer la saison ${currentSeason}` })).toBeDisabled();
 
-  // Clean up the draft.
+  // Clean up the draft: without prediction, no word to type (v1.4, §8.2).
   await page.goto(questionUrl);
-  await page.getByRole("button", { name: "Supprimer" }).click();
-  await page.getByRole("dialog", { name: "Supprimer le brouillon ?" }).getByRole("button", { name: "Supprimer" }).click();
-  await expect(page).toHaveURL(/\/admin\/questions/);
+  await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+  const deletion = page.getByRole("dialog", { name: "Supprimer définitivement la question ?" });
+  await expect(deletion.getByText("Aucun prono n'a été fait sur cette question.", { exact: true })).toBeVisible();
+  await deletion.getByRole("button", { name: "Supprimer définitivement" }).click();
+  await expect(page).toHaveURL(/\/admin\/questions$/);
+  await expect(page.getByText("Question supprimée.", { exact: true })).toBeVisible();
 });
 
 // Test report of 01/10/2026: after a deletion, « Saison créée. » stayed under the form (R-04), and the
