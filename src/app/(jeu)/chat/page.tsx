@@ -16,7 +16,7 @@ export default async function ChatPage() {
         <h1 className="font-display text-[44px] leading-none font-extrabold uppercase">Chat</h1>
         <p className="text-[15px] text-ink-2">Le chat de toute l&apos;équipe. Les nouveaux messages arrivent toutes les 10 secondes environ.</p>
       </div>
-      <ChatRoom initial={page} viewerId={viewer.id} />
+      <ChatRoom initial={page} viewerId={viewer.id} viewerIsAdmin={viewer.role === "admin"} />
     </>
   );
 }

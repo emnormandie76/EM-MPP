@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getChatMessages, getChatUpdates, getUnreadChatCount } from "@/lib/data/chat";
 import type { Database } from "@/lib/db/client";
-import { chatMessage, chatRead } from "@/lib/db/schema";
+import { chatMessage, chatRead, user } from "@/lib/db/schema";
 import { deleteChatMessage, markChatRead, postChatMessage } from "@/lib/services/chat";
 import { anonymizeUser } from "@/lib/services/players";
 import { cancelQuestion, resolveQuestion } from "@/lib/services/questions";
@@ -147,16 +147,47 @@ describe("deleteChatMessage (§5.15)", () => {
     expect(await rowOf(result.id)).toMatchObject({ deletedAt: null });
   });
 
-  it("CH6: an admin deletes a player's message and a result message", async () => {
+  it("CH6: an admin deletes a player's message and a result message, which leave no trace (v1.5)", async () => {
     const message = await post(hugo, "Message à modérer");
     const q = await closedNumberQuestion();
     await resolveQuestion(db, admin, { questionId: q.id, rawValue: "250" }, now);
     const [result] = await db.select().from(chatMessage).where(eq(chatMessage.kind, "result"));
+    const kept = await post(lea, "Message de Léa");
 
     expect(await deleteChatMessage(db, admin, { messageId: message }, now)).toMatchObject({ ok: true });
     expect(await rowOf(message)).toMatchObject({ body: null, deletedBy: admin.id });
     expect(await deleteChatMessage(db, admin, { messageId: result.id }, now)).toMatchObject({ ok: true });
     expect(await rowOf(result.id)).toMatchObject({ deletedAt: now, deletedBy: admin.id });
+
+    // Gone from the thread for everyone, the admin included: no « Message supprimé. » in their place.
+    for (const viewer of [lea, hugo, admin]) {
+      expect((await getChatMessages(db, viewer, {}, now)).messages.map(({ id }) => id)).toEqual([kept]);
+    }
+    // Nor counted in the unread messages: Hugo has only Léa's message to read.
+    expect(await getUnreadChatCount(db, hugo)).toBe(1);
+  });
+
+  it("CH12: an admin's own message deleted by the admin leaves no trace; a player's own one leaves « Message supprimé. »", async () => {
+    const adminsOwn = await post(admin, "Message de l'admin");
+    const playersOwn = await post(lea, "Message de Léa");
+    await deleteChatMessage(db, admin, { messageId: adminsOwn }, now);
+    await deleteChatMessage(db, lea, { messageId: playersOwn }, now);
+
+    const page = await getChatMessages(db, hugo, {}, now);
+    expect(page.messages.map(({ id, deleted, body }) => ({ id, deleted, body }))).toEqual([{ id: playersOwn, deleted: true, body: null }]);
+  });
+
+  it("CH13: a message removed by an admin stays removed once that admin is no longer one", async () => {
+    const message = await post(hugo, "Message à modérer");
+    const adminsOwn = await post(admin, "Message de l'admin");
+    await deleteChatMessage(db, admin, { messageId: message }, now);
+    await deleteChatMessage(db, admin, { messageId: adminsOwn }, now);
+    await db.update(user).set({ role: "player" }).where(eq(user.id, admin.id));
+
+    // The moderation of someone else's message stays invisible; the former admin's own message is
+    // then shown as deleted by its author.
+    const page = await getChatMessages(db, lea, {}, now);
+    expect(page.messages.map(({ id, deleted }) => ({ id, deleted }))).toEqual([{ id: adminsOwn, deleted: true }]);
   });
 
   it("refuses an unknown or already deleted message", async () => {
@@ -286,7 +317,7 @@ describe("result message (§5.15)", () => {
 });
 
 describe("anonymization (§5.15, §6.3)", () => {
-  it("CH10: erases every message of the account, as a deletion by the admin", async () => {
+  it("CH10: erases every message of the account, as a deletion by the admin, which leaves no trace (v1.5)", async () => {
     const first = await post(hugo, "Mon premier message");
     const second = await post(hugo, "Mon second message");
     const other = await post(lea, "Le message de Léa");
@@ -297,9 +328,9 @@ describe("anonymization (§5.15, §6.3)", () => {
     expect(await rowOf(second)).toMatchObject({ body: null, deletedAt: now, deletedBy: admin.id });
     expect(await rowOf(other)).toMatchObject({ body: "Le message de Léa", deletedAt: null });
 
+    // The message Hugo deleted himself keeps its mark; the ones erased by the anonymization go.
     const page = await getChatMessages(db, lea, {}, now);
     expect(page.messages.map(({ author, body, deleted }) => ({ name: author?.name, inactive: author?.inactive, body, deleted }))).toEqual([
-      { name: "Ancien joueur 1", inactive: true, body: null, deleted: true },
       { name: "Ancien joueur 1", inactive: true, body: null, deleted: true },
       { name: "Léa", inactive: false, body: "Le message de Léa", deleted: false },
     ]);
@@ -376,8 +407,24 @@ describe("getChatUpdates (§5.15)", () => {
     const updates = await getChatUpdates(db, lea, { afterId: toDelete, since: now }, later);
     expect(updates.messages.map(({ id, body }) => ({ id, body }))).toEqual([{ id: fresh, body: "Nouveau" }]);
     expect(updates.deletedIds).toEqual([toDelete]);
+    expect(updates.removedIds).toEqual([]);
     expect(updates.serverTime).toBe(later.toISOString());
     expect(updates.messages.map(({ id }) => id)).not.toContain(old);
+  });
+
+  it("gives apart the messages removed by an admin (v1.5), and never sends them again", async () => {
+    const byAuthor = await post(lea, "Supprimé par Léa", clock.at("+1min"));
+    const byAdmin = await post(hugo, "Supprimé par l'admin", clock.at("+1min"));
+    const adminsOwn = await post(admin, "Supprimé par l'admin lui-même", clock.at("+1min"));
+    await deleteChatMessage(db, lea, { messageId: byAuthor }, clock.at("+2min"));
+    await deleteChatMessage(db, admin, { messageId: byAdmin }, clock.at("+2min"));
+    await deleteChatMessage(db, admin, { messageId: adminsOwn }, clock.at("+2min"));
+
+    const updates = await getChatUpdates(db, lea, { afterId: 0, since: now }, clock.at("+3min"));
+    expect(updates.deletedIds).toEqual([byAuthor]);
+    expect(updates.removedIds).toEqual([byAdmin, adminsOwn]);
+    expect(updates.messages.map(({ id }) => id)).toEqual([byAuthor]);
+    expect(JSON.stringify(updates)).not.toContain("Supprimé par l'admin");
   });
 
   it("never sends the text of a deleted message (§9.3)", async () => {

@@ -1,7 +1,8 @@
 # Architecture et plan de construction — Les petits pronos de la promo
 
-> **Version 1.4 du 12/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
+> **Version 1.5 du 12/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
+> - **Changement de la v1.5** (demandé par l'utilisateur le 12/10/2026, cahier des charges v1.5, **étape É8f avant le lancement**) : un message du chat supprimé par un admin disparaît du fil pour tout le monde, sans laisser « Message supprimé. » ; supprimé par son auteur joueur, il laisse toujours la mention (§5.15). Sections touchées : §5.15, §8.2, §8.3, §11 (É8f). Aucune migration.
 > - **Changements de la v1.4** (demandés par l'utilisateur le 12/10/2026 après ses essais en production, cahier des charges v1.4, **étape É8e avant le lancement**, donc livrée avant la v1.3) :
 >   - suppression définitive d'une question dans tous ses états, sauf dans une saison proclamée, avec tout ce qui s'y rattache (§5.11), et une confirmation renforcée (§8.3) ;
 >   - page `/reglement` réservée aux admins jusqu'à l'É10 (§6.4, §8.3).
@@ -1147,7 +1148,12 @@ Un fil unique pour toute l'équipe (cahier des charges §4.11). Les messages son
 
 **Supprimer** `deleteChatMessage(db, actor, { messageId }, now)`
 - Un `message` non supprimé : par son auteur ou par un admin. Un message de résultat : par un admin seulement. Sinon `FORBIDDEN` ; message inconnu ou déjà supprimé : `MESSAGE_NOT_FOUND`, « Ce message n'existe plus. ».
-- Effet : `body = NULL` (le contenu est effacé, pas seulement masqué), `deleted_at = now`, `deleted_by = acteur`. L'affichage montre « Message supprimé. ». Pas de modification de message.
+- Effet : `body = NULL` (le contenu est effacé, pas seulement masqué), `deleted_at = now`, `deleted_by = acteur`. Pas de modification de message.
+- Affichage (v1.5, É8f, décision de l'utilisateur du 12/10/2026) :
+  - supprimé par son auteur, un joueur : « Message supprimé. » à sa place, sous le nom de l'auteur, comme en v1.2 ;
+  - supprimé par un admin : il **disparaît du fil** pour tout le monde, sans laisser de trace (ni mention, ni nom, ni heure ; un séparateur de jour sans autre message disparaît aussi). Cela couvre le message d'un joueur, un message de résultat et le propre message d'un admin.
+- La règle se lit à l'affichage, sans migration. Un message est **retiré** (`REMOVED` dans `src/lib/data/chat.ts`) s'il est supprimé et que `deleted_by` diffère de `user_id` (seul un admin supprime le message d'un autre, et un message de résultat n'a pas d'auteur), ou que le compte `deleted_by` est admin. Si un admin perd ce rôle, ses suppressions des messages des autres restent invisibles, mais ses propres messages supprimés reparaissent en « Message supprimé. » (précision de l'É8f).
+- La ligne reste en base, sans texte : les pages du chat ouvertes l'apprennent par l'interrogation (`removedIds`), et elle compte toujours dans la limite de 10 messages par minute.
 
 **Marquer comme lu** `markChatRead(db, actor, { lastMessageId }, now)` : `chat_read.last_read_id = max(valeur actuelle, lastMessageId)`, en refusant (`INVALID_INPUT`) un identifiant supérieur au plus grand message existant ; un identifiant plus petit ne change rien, `updated_at` compris. Appelé par la page `/chat` quand elle affiche des messages, onglet visible.
 
@@ -1158,13 +1164,13 @@ Un fil unique pour toute l'équipe (cahier des charges §4.11). Les messages son
 - « (corrigé) » est ajouté si le résultat a été corrigé, après « Résultat » : « Résultat (corrigé) : … » ;
 - le message porte un lien vers la question ;
 - si la question est annulée ensuite, il n'est plus affiché (ni compté dans les non lus) ; si elle est supprimée (v1.4, §5.11), il est supprimé avec elle ;
-- une correction ou une annulation se voit au prochain chargement de `/chat` : l'interrogation ne renvoie pas les messages de résultat déjà affichés (précision de l'É8d). Un message de résultat supprimé par l'admin affiche « Message supprimé. ».
+- une correction ou une annulation se voit au prochain chargement de `/chat` : l'interrogation ne renvoie pas les messages de résultat déjà affichés (précision de l'É8d). Un message de résultat supprimé par l'admin disparaît du fil (v1.5).
 
-**Anonymisation** (`anonymizeUser`, §6.3) : tous les messages du compte sont effacés comme une suppression (`deleted_by` = l'admin).
+**Anonymisation** (`anonymizeUser`, §6.3) : tous les messages du compte sont effacés comme une suppression (`deleted_by` = l'admin) ; depuis la v1.5, ils disparaissent donc du fil. Ceux que le joueur avait supprimés lui-même gardent « Message supprimé. ».
 
 **Lectures** (`src/lib/data/chat.ts`) :
-- `getChatMessages(db, viewer, { beforeId? }, now)` : les `CHAT_PAGE_SIZE` (50) messages précédant `beforeId`, ou les derniers. Chaque message contient l'identifiant, le type, la date, l'auteur (identifiant, nom, avatar, inactif), le texte ou « supprimé », le texte calculé d'un message de résultat, et `canDelete` ;
-- `getChatUpdates(db, viewer, { afterId, since }, now)` : les messages d'identifiant supérieur à `afterId` (100 au plus), les identifiants des messages supprimés depuis `since`, et `serverTime`, à repasser en `since` à l'appel suivant. Précision de l'É8d : les deux listes reprennent aussi la dernière minute avant `since` (messages créés ou supprimés), car un message peut être enregistré juste après une interrogation, avec une date ou un identifiant antérieurs ; la page fusionne par identifiant ;
+- `getChatMessages(db, viewer, { beforeId? }, now)` : les `CHAT_PAGE_SIZE` (50) messages précédant `beforeId`, ou les derniers, sans les messages retirés par un admin (v1.5). Chaque message contient l'identifiant, le type, la date, l'auteur (identifiant, nom, avatar, inactif), le texte ou « supprimé », le texte calculé d'un message de résultat, et `canDelete` ;
+- `getChatUpdates(db, viewer, { afterId, since }, now)` : les messages d'identifiant supérieur à `afterId` (100 au plus, sans les messages retirés), les identifiants des messages supprimés depuis `since`, et `serverTime`, à repasser en `since` à l'appel suivant. Depuis la v1.5, les messages supprimés forment deux listes : `deletedIds` (par leur auteur : la page met « Message supprimé. ») et `removedIds` (par un admin : la page les retire du fil). Précision de l'É8d : les deux listes reprennent aussi la dernière minute avant `since` (messages créés ou supprimés), car un message peut être enregistré juste après une interrogation, avec une date ou un identifiant antérieurs ; la page fusionne par identifiant ;
 - `getUnreadChatCount(db, viewer)` : les messages d'identifiant supérieur à `chat_read.last_read_id` (ou tous, s'il n'a jamais ouvert le chat), hors les siens et hors les messages supprimés ;
 - les dates des messages sont en ISO (texte) : les mêmes objets passent en JSON par la route ;
 - « Messages plus anciens » appelle la Server Action `loadOlderChatMessagesAction({ beforeId })`, une lecture (`getChatMessages`) qui renvoie `null` sans session valide (É8d).
@@ -1187,13 +1193,15 @@ Un fil unique pour toute l'équipe (cahier des charges §4.11). Les messages son
 | CH2 | message vide ou fait d'espaces | `EMPTY_MESSAGE` |
 | CH3 | 11e message en moins de 60 s ; puis un message 60 s après le premier | `CHAT_RATE_LIMITED` ; accepté |
 | CH4 | compte désactivé | `ACCOUNT_DISABLED` |
-| CH5 | un joueur supprime son message ; le message d'un autre ; un message de résultat | accepté (texte effacé) ; `FORBIDDEN` ; `FORBIDDEN` |
-| CH6 | un admin supprime le message d'un joueur ; un message de résultat | accepté ; accepté |
+| CH5 | un joueur supprime son message ; le message d'un autre ; un message de résultat | accepté (texte effacé, « Message supprimé. ») ; `FORBIDDEN` ; `FORBIDDEN` |
+| CH6 | un admin supprime le message d'un joueur ; un message de résultat | accepté ; accepté ; les deux disparaissent du fil pour tous, sans trace, et des non lus (v1.5) |
 | CH7 | `markChatRead` avec un identifiant plus petit que le dernier lu | rien ne change |
 | CH8 | non lus | n'incluent ni ses propres messages ni les messages supprimés |
 | CH9 | première saisie d'un résultat ; correction ; annulation de la question | un message de résultat ; pas de second message, texte corrigé ; message masqué |
-| CH10 | anonymisation d'un compte | tous ses messages effacés |
+| CH10 | anonymisation d'un compte | tous ses messages effacés ; ils disparaissent du fil, sauf ceux qu'il avait supprimés lui-même (v1.5) |
 | CH11 | `shouldPoll` : onglet caché ; visible et inactif depuis 6 min ; visible et actif il y a 1 min | non ; non ; oui |
+| CH12 | un admin supprime son propre message ; un joueur le sien ; interrogation | le premier disparaît ; le second laisse « Message supprimé. » ; `removedIds` et `deletedIds` séparés, sans aucun texte (v1.5) |
+| CH13 | l'admin qui a supprimé le message d'un joueur et le sien perd le rôle | le message du joueur reste retiré ; le sien reparaît en « Message supprimé. » |
 
 ### 5.16 Règles de la saison (v1.3, É10)
 
@@ -1696,7 +1704,7 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 - **ExtensionDialog** (É8c, back-office) : `<dialog>` « Prolonger pour <nom> », champ date-heure (heure de Paris), prérempli 48 h plus tard à l'heure pile, et rappel « Le joueur ne verra pas les pronos des autres avant d'avoir répondu. Préviens-le toi-même. » ; boutons « Annuler » et « Prolonger ». Précisé à l'É8c : les 48 h partent de la clôture de la question si elle est encore à venir (absence prévue, PR10), l'heure est arrondie à l'heure suivante ; « Changer la date » ouvre le même dialogue, prérempli avec la date limite en cours.
 - **Chat** (É8d) :
   - `ChatRoom` (client) : liste et interrogation périodique (§5.15) ;
-  - `ChatMessage` : avatar de 32 px, nom relié au profil, heure (« à 14 h 32 »), texte en `white-space: pre-wrap` et coupure des mots longs ; bouton « Supprimer le message » (icône `Trash2`, confirmation) si `canDelete` ; « Message supprimé. » en `muted` italique ;
+  - `ChatMessage` : avatar de 32 px, nom relié au profil, heure (« à 14 h 32 »), texte en `white-space: pre-wrap` et coupure des mots longs ; bouton « Supprimer le message » (icône `Trash2`, confirmation) si `canDelete` ; « Message supprimé. » en `muted` italique (message supprimé par son auteur ; supprimé par un admin, il n'est plus affiché, v1.5) ;
   - message de résultat : carte `accent-soft` avec l'icône `MessageCircle`, le texte (qui commence par « Résultat : »), l'heure et le lien « Voir la question » ;
   - `ChatComposer` : zone de texte libellée « Ton message », compteur « n / 500 », bouton `Smile` « Ajouter un emoji » (`aria-expanded`), bouton « ENVOYER ». Entrée envoie, Maj + Entrée va à la ligne (rappel affiché) ; bouton désactivé pendant l'envoi ;
   - `EmojiPalette` : grille de 8 colonnes des 48 emojis de `src/lib/chat/emojis.ts`, chaque emoji est un `<button>` dont le nom accessible est son nom français. Un clic insère l'emoji à la position du curseur et rend le focus à la zone de texte ; Échap ferme la grille ; navigation au clavier.
@@ -1808,7 +1816,7 @@ Les sections « barème (tableau des paliers) », « bonus podium » et « Juste
   - au chargement, défilement jusqu'en bas ; un nouveau message fait défiler seulement si l'on était déjà en bas, sinon un bouton « Nouveaux messages » apparaît ;
   - en haut, le bouton « Messages plus anciens » charge les 50 précédents.
 - Champ d'écriture en bas de page (fixe sur téléphone), palette d'emojis. Mise en œuvre (É8d) : la carte du chat occupe la hauteur de l'écran sous le titre ; le fil défile à l'intérieur et se réduit quand la palette s'ouvre, et le champ reste en bas de l'écran. Un champ « collé » au bas de l'écran cachait les derniers messages sur téléphone.
-- La suppression d'un message passe par une confirmation (« Supprimer ce message ? »).
+- La suppression d'un message passe par une confirmation (« Supprimer ce message ? »). Texte (v1.5) : pour un joueur, « Il sera remplacé par « Message supprimé. » pour tout le monde. » ; pour un admin, « Il disparaîtra du chat pour tout le monde, sans laisser de trace. » (`ChatRoom` reçoit `viewerIsAdmin`).
 - EmptyState « Aucun message pour l'instant. Lance la discussion ! »
 - En cas d'erreur réseau, nouvel essai au tour suivant ; au troisième échec d'affilée, « Connexion perdue, nouvel essai… » discret. Une réponse `401` renvoie vers `/connexion`.
 
@@ -2030,6 +2038,7 @@ Les étapes É1 à É8b sont faites. Elles décrivent ce qui a été construit a
 | É8c | Malus, jokers par saison, prolongations, couleur (v1.2) | 05/10 |
 | É8d | Chat général (v1.2) | 07/10 |
 | É8e | Suppression des questions, règlement réservé aux admins (v1.4) | 13/10, avant le lancement |
+| É8f | Suppression sans trace d'un message du chat par un admin (v1.5) | 12/10, avant le lancement |
 | É9 | Recette et lancement | 13/10, lancement le 14/10 |
 | É10 | Règles réglables par saison (v1.3) | après le lancement, avant le premier résultat de 2026-2027 (novembre) |
 
@@ -2592,11 +2601,35 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
   Relancer ensuite le seed sur `dev` si la question supprimée manque à la recette.
 - H-17, après la fusion dans `main` : l'utilisateur supprime lui-même, dans le back-office de production, ses questions de test. Au 12/10, ce sont les n° 1 (annulée), 2 (résolue puis annulée) et 4 (ouverte, 1 prono). L'agent vérifie ensuite en lecture seule (outil Neon) : questions, pronos, prolongations et messages de résultat restants. Supprimer la n° 2 retire le seul résultat de 2026-2027 : ses règles ne seront plus figées à l'É10 (§5.16).
 
+### É8f — Suppression sans trace d'un message du chat par un admin (v1.5)
+
+**Objectif** : un message du chat supprimé par un admin disparaît du fil pour tout le monde, au lieu de laisser « Message supprimé. » sous le nom de son auteur (cahier des charges v1.5, §4.11 ; §5.15, §8.2, §8.3). Petit changement demandé par l'utilisateur le 12/10/2026. Il a autorisé le commit, la fusion dans `main` et la mise en production si les tests passent.
+
+**Prérequis** : É8e fusionnée dans `main` (fait le 12/10).
+
+**Branche** : `etape-08f-chat-suppression-admin`, créée depuis `main`.
+
+**Aucune migration** : la règle se lit à l'affichage (`REMOVED`, §5.15). Le service `deleteChatMessage` ne change pas, et la matrice d'autorisation reste à 39 services.
+
+**Tâches**
+1. Lectures (`src/lib/data/chat.ts`) : `getChatMessages` et `getChatUpdates` écartent les messages retirés ; `getChatUpdates` renvoie `removedIds` à côté de `deletedIds`.
+2. `ChatRoom` : retire du fil les `removedIds`. Après sa propre suppression, un admin retire le message et un joueur le marque « Message supprimé. ». Le texte de la confirmation dépend du rôle (`viewerIsAdmin`, passé par `/chat`).
+
+**Tests**
+- Intégration (`tests/integration/chat.test.ts`) : CH6 et CH10 mis à jour, CH12, CH13, et la séparation `deletedIds` / `removedIds` de l'interrogation.
+- `e2e/chat.spec.ts` :
+  - la confirmation de l'admin ;
+  - le message de Hugo retiré sans mention : une ligne de moins dans le fil, et pas un « Message supprimé. » de plus ;
+  - même chose chez Thomas, dont le chat est resté ouvert (interrogation), puis après un rechargement ;
+  - `removedIds` dans la réponse de `/api/chat`.
+
+**Critères de passage** : porte commune ; aucune migration générée.
+
 ### É9 — Recette et lancement
 
 **Objectif** : des collègues testent, on corrige, la production est remplie et vérifiée, on lance le 14 octobre.
 
-**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change, l'É8c, l'É8d (sauf si l'utilisateur décide de la reporter après le lancement : le chat ne bloque rien d'autre) et l'É8e (v1.4), avec H-17 faite.
+**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change, l'É8c, l'É8d (sauf si l'utilisateur décide de la reporter après le lancement : le chat ne bloque rien d'autre), l'É8e (v1.4), avec H-17 faite, et l'É8f (v1.5).
 
 **Depuis la v1.4**, le règlement est caché aux joueurs jusqu'à l'É10 : les collègues de H-12 ne le voient pas, et H-13 ne porte plus que sur les autres textes (sa relecture passe à l'É10). L'annonce du lancement (H-15) peut résumer l'essentiel des règles : le moins de malus gagne, le malus est l'écart au résultat, jokers selon la saison, pas de prono dans le chat.
 
