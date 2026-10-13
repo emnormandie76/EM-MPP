@@ -47,8 +47,9 @@ function questionInput(formData: FormData): Record<string, unknown> {
     const value = formData.get(key);
     if (value !== null) input[key] = value;
   }
-  // The answers are sent with the kind, even when every answer line has been removed.
-  if (formData.has("kind")) input.options = formData.getAll("options");
+  // The answers are sent with the kind, even when every answer line has been removed; without the
+  // kind (locked), their labels alone may change (v1.6).
+  if (formData.has("kind") || formData.has("options")) input.options = formData.getAll("options");
   return input;
 }
 

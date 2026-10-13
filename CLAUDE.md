@@ -6,7 +6,7 @@ Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plu
 
 | Document | Rôle |
 |---|---|
-| [docs/features/cahier-des-charges.md](docs/features/cahier-des-charges.md) | Règles fonctionnelles (v1.2 du 02/10/2026 : malus, jokers par saison, prolongations, chat ; v1.3 du 12/10/2026 : règles réglables par saison, étape É10 après le lancement ; v1.4 du 12/10/2026 : suppression des questions, règlement réservé aux admins, étape É8e avant le lancement ; v1.5 du 12/10/2026 : messages du chat supprimés sans trace, étape É8f) : le **quoi** |
+| [docs/features/cahier-des-charges.md](docs/features/cahier-des-charges.md) | Règles fonctionnelles (v1.2 du 02/10/2026 : malus, jokers par saison, prolongations, chat ; v1.3 du 12/10/2026 : règles réglables par saison, étape É10 après le lancement ; v1.4 du 12/10/2026 : suppression des questions, règlement réservé aux admins, étape É8e avant le lancement ; v1.5 du 12/10/2026 : messages du chat supprimés sans trace, étape É8f ; v1.6 du 13/10/2026 : textes d'une question publiée corrigeables même avec des pronos, étape É8g) : le **quoi** |
 | [docs/architecture/architecture.md](docs/architecture/architecture.md) | Référence technique et plan de construction par étapes : le **comment** |
 | [docs/architecture/avancement.md](docs/architecture/avancement.md) | Étape en cours, interventions humaines faites, journal des décisions |
 | [docs/design/maquette-b5/](docs/design/maquette-b5/) | Maquette visuelle retenue (style B5 « Jour de match ») ; la couleur principale est #0036B3 depuis la v1.2 (architecture §8.1) |

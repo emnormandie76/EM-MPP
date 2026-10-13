@@ -21,7 +21,8 @@ import {
 
 // Question form of the back office (architecture §8.3): creation and editing. A locked field
 // (§5.11) is disabled, with its reason; disabled fields are not sent and keep their value. A choice
-// (or yes/no) question asks for the malus of a wrong answer (v1.2).
+// (or yes/no) question asks for the malus of a wrong answer (v1.2). The wording stays editable with
+// predictions and after the closing, the labels of the answers included, in place (v1.6).
 
 export type QuestionFormValues = {
   kind: QuestionKind;
@@ -67,12 +68,14 @@ function LockNote({ reason }: { reason: string | null }) {
 
 type OptionRow = { key: number; label: string };
 
-function OptionsEditor({ initial, disabled, error }: { initial: string[]; disabled: boolean; error?: string }) {
+/** `fixed`: the answers keep their number and order, their labels may still change (v1.6). */
+function OptionsEditor({ initial, disabled, fixed, error }: { initial: string[]; disabled: boolean; fixed: boolean; error?: string }) {
   const [rows, setRows] = useState<OptionRow[]>(() =>
     (initial.length > 0 ? initial : ["", ""]).map((label, key) => ({ key, label })),
   );
   const [nextKey, setNextKey] = useState(Math.max(initial.length, 2));
   const errorId = error ? "options-error" : undefined;
+  const locked = disabled || fixed;
 
   function move(index: number, delta: number) {
     const next = [...rows];
@@ -106,7 +109,7 @@ function OptionsEditor({ initial, disabled, error }: { initial: string[]; disabl
               variant="ghost"
               size="icon"
               aria-label={`Monter la réponse ${index + 1}`}
-              disabled={disabled || index === 0}
+              disabled={locked || index === 0}
               onClick={() => move(index, -1)}
             >
               <ArrowUp {...ICON} />
@@ -115,7 +118,7 @@ function OptionsEditor({ initial, disabled, error }: { initial: string[]; disabl
               variant="ghost"
               size="icon"
               aria-label={`Descendre la réponse ${index + 1}`}
-              disabled={disabled || index === rows.length - 1}
+              disabled={locked || index === rows.length - 1}
               onClick={() => move(index, 1)}
             >
               <ArrowDown {...ICON} />
@@ -124,7 +127,7 @@ function OptionsEditor({ initial, disabled, error }: { initial: string[]; disabl
               variant="ghost"
               size="icon"
               aria-label={`Retirer la réponse ${index + 1}`}
-              disabled={disabled}
+              disabled={locked}
               onClick={() => setRows(rows.filter((item) => item.key !== row.key))}
             >
               <Trash {...ICON} />
@@ -135,7 +138,7 @@ function OptionsEditor({ initial, disabled, error }: { initial: string[]; disabl
       <Button
         variant="secondary"
         className="self-start"
-        disabled={disabled || rows.length >= QUESTION_LIMITS.optionsMax}
+        disabled={locked || rows.length >= QUESTION_LIMITS.optionsMax}
         onClick={() => {
           setRows([...rows, { key: nextKey, label: "" }]);
           setNextKey(nextKey + 1);
@@ -237,7 +240,7 @@ export function QuestionForm({
           hint="Une seule question, sans ambiguïté, avec la date. Par exemple : « Combien de candidatures au 31 mai 2027 ? »"
           maxLength={QUESTION_LIMITS.titleMax}
           defaultValue={initial.title}
-          disabled={contentLocked}
+          disabled={otherLocked}
           error={errors.title}
         />
         <TextAreaField
@@ -246,7 +249,7 @@ export function QuestionForm({
           hint="Le périmètre exact : filières, date, ce qui est exclu."
           maxLength={QUESTION_LIMITS.descriptionMax}
           defaultValue={initial.description}
-          disabled={contentLocked}
+          disabled={otherLocked}
           error={errors.description}
           className="[&_textarea]:min-h-24"
         />
@@ -257,7 +260,7 @@ export function QuestionForm({
             hint="Au pluriel, par exemple « candidatures »."
             maxLength={QUESTION_LIMITS.unitMax}
             defaultValue={initial.unit}
-            disabled={contentLocked}
+            disabled={otherLocked}
             error={errors.unit}
           />
         ) : kind === "yesNo" ? (
@@ -265,7 +268,7 @@ export function QuestionForm({
             Réponses : <strong>{YES_NO_OPTIONS.join(" et ")}</strong>.
           </p>
         ) : (
-          <OptionsEditor initial={initial.options} disabled={contentLocked} error={errors.options} />
+          <OptionsEditor initial={initial.options} disabled={otherLocked} fixed={contentLocked} error={errors.options} />
         )}
         {errors.options && kind === "yesNo" ? <p className="text-sm font-medium text-hot">{errors.options}</p> : null}
         {isNumber ? null : (
@@ -310,7 +313,7 @@ export function QuestionForm({
           hint="Une source unique et incontestable, par exemple « Tableau BI Candidatures, total au 31/05 à minuit »."
           maxLength={QUESTION_LIMITS.sourceMax}
           defaultValue={initial.source}
-          disabled={contentLocked}
+          disabled={otherLocked}
           error={errors.source}
         />
       </Card>

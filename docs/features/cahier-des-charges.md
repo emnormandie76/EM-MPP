@@ -1,6 +1,8 @@
 # Cahier des charges — Les petits pronos de la promo
 
-> **Version 1.5 du 12/10/2026.** Toutes les décisions sont prises. La section 8 liste les précisions ajoutées en rédigeant ; elles restent contestables.
+> **Version 1.6 du 13/10/2026.** Toutes les décisions sont prises. La section 8 liste les précisions ajoutées en rédigeant ; elles restent contestables.
+>
+> **Changement de la v1.6** (demandé par l'utilisateur le 13/10/2026, **livré avant le lancement**, à l'étape É8g) : l'admin peut **corriger les textes** d'une question publiée même quand elle a des pronos, et même après sa clôture : énoncé, description, unité, source et libellé des réponses (renommées sur place, dans le même ordre). Le type, le nombre et l'ordre des réponses, le malus d'une mauvaise réponse et le coefficient restent figés dès le premier prono ; les règles des dates ne changent pas. Sections concernées : 4.9, 5.7, 8, 11.
 >
 > **Changement de la v1.5** (demandé par l'utilisateur le 12/10/2026, **livré avant le lancement**, à l'étape É8f) : un message supprimé du chat, par son auteur ou par un admin, **disparaît** du fil pour tout le monde, sans laisser de trace, au lieu d'afficher « Message supprimé. » sous le nom de son auteur. Sections concernées : 4.9, 4.11, 8, 11.
 >
@@ -148,7 +150,7 @@ Une prolongation rouvre une question pour un seul joueur, qu'elle soit encore ou
 - Les données des saisons passées sont conservées. La liste blanche, les comptes et les catégories passent d'une saison à l'autre.
 
 ### 4.9 Back-office admin
-- **Questions** : créer (nombre, choix, oui/non ; pour un choix, avec le malus d'une mauvaise réponse), publier, modifier, annuler, supprimer définitivement, une par une ou plusieurs à la fois (v1.4, voir 5.7) ; créer en série pour la campagne d'octobre (mêmes dates pour un lot de questions) ; dupliquer une question d'une saison passée ; saisir puis corriger la valeur réelle, avec recalcul automatique.
+- **Questions** : créer (nombre, choix, oui/non ; pour un choix, avec le malus d'une mauvaise réponse), publier, modifier (les textes restent corrigeables après les premiers pronos, v1.6, voir 5.7), annuler, supprimer définitivement, une par une ou plusieurs à la fois (v1.4, voir 5.7) ; créer en série pour la campagne d'octobre (mêmes dates pour un lot de questions) ; dupliquer une question d'une saison passée ; saisir puis corriger la valeur réelle, avec recalcul automatique.
 - **Suivi** : pour chaque question ouverte, l'état de chaque joueur (à faire, enregistré, validé), sans les valeurs. L'admin relance les retardataires par ses propres moyens (Teams, à l'oral). Depuis ce suivi, il prolonge une question pour un joueur absent (4.10).
 - **Pronos** : déverrouiller un prono validé avant la clôture.
 - **Joueurs** : gérer la liste blanche, désactiver un compte, attribuer un mot de passe provisoire, donner le rôle admin.
@@ -224,7 +226,8 @@ Sans cette règle, ne pas répondre serait la meilleure stratégie. La prolongat
 - Question supprimée (v1.4) : elle disparaît comme si elle n'avait jamais existé, avec ses pronos, ses jokers (rendus), son historique, ses prolongations et son message de résultat dans le chat. C'est définitif. La suppression sert aux questions de test et aux erreurs de saisie ; pour une vraie question dont on ne connaîtra pas la valeur, l'admin l'annule plutôt, et les joueurs la voient annulée. Une question d'une saison proclamée ne se supprime pas : le palmarès est figé, et les profils doivent rester d'accord avec lui.
 - Joueur arrivé en cours de saison : il joue les questions encore ouvertes. Sur les questions déjà résolues, il prend le malus d'absence, sinon il serait premier. Pour une question clôturée sans résultat, l'admin peut lui accorder une prolongation.
 - Joueur parti : compte désactivé, historique conservé. S'il n'a aucun prono dans une saison, il n'apparaît pas dans son classement.
-- Une fois des pronos reçus, l'admin peut modifier l'aide et repousser la clôture, mais pas changer l'énoncé, les réponses possibles ni le malus d'une mauvaise réponse, ni avancer la clôture. Pour cela, il annule la question et en crée une nouvelle.
+- Une fois des pronos reçus, l'admin peut modifier l'aide et repousser la clôture, et corriger les textes (v1.6) : énoncé, description, unité, source et libellé des réponses. Il ne peut pas changer le type, le nombre ni l'ordre des réponses, le malus d'une mauvaise réponse ni le coefficient, ni avancer la clôture. Pour cela, il annule la question et en crée une nouvelle.
+- Après la clôture, et même après le résultat, les textes se corrigent encore (v1.6), comme la catégorie, l'aide et la date de résultat prévue. Une réponse renommée garde ses pronos et, si c'est la bonne, le résultat.
 - Toutes les dates et heures sont celles de Paris.
 
 ### 5.8 Règles de la saison (v1.3)
@@ -349,6 +352,13 @@ Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.
 - **Anonymisation d'un compte** : ses messages, effacés par l'admin, disparaissent aussi.
 - **Une trace reste en base**, sans le texte. Elle sert aux pages du chat déjà ouvertes, qui retirent le message à la prochaine interrogation, et à la limite de 10 messages par minute : supprimer ses messages ne permet pas d'en écrire plus.
 
+**v1.6** (les trois premières sont des décisions de l'utilisateur du 13/10/2026)
+- **Textes seulement** : avec des pronos, seuls les textes se corrigent. Le coefficient et le malus d'une mauvaise réponse changeraient l'enjeu après coup (un joueur a pu poser son joker pour un ×3) ; le type, le nombre et l'ordre des réponses effaceraient le sens des pronos. Options écartées : rendre aussi modifiables le coefficient et le malus ; tout rendre modifiable en effaçant les pronos (la suppression existe déjà).
+- **Dates inchangées** : l'ouverture reste figée une fois la question ouverte, et la clôture peut seulement être repoussée, dans la même saison. Option écartée : permettre d'avancer la clôture.
+- **Après la clôture aussi** : une faute vue au moment du résultat se corrige. Option écartée : figer les textes à la clôture.
+- **Réponses renommées sur place** : chaque prono garde sa réponse, sous son nouveau libellé. Échanger deux libellés reviendrait à donner à chacun la réponse de l'autre : c'est refusé, comme ajouter, retirer ou déplacer une réponse.
+- **Aucune trace de la correction** : ni historique, ni mention pour les joueurs. Le formulaire conseille à l'admin de prévenir l'équipe dans le chat si la correction change le sens de la question ; avant la clôture, il peut aussi déverrouiller les pronos validés.
+
 ## 9. Contraintes non fonctionnelles
 
 - **Coût** : 0 €.
@@ -382,5 +392,5 @@ Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.
 
 1. **Design** : fait. Style B5 « Jour de match », maquette dans [docs/design/maquette-b5/](../design/maquette-b5/). La couleur principale a changé en v1.2 (#0036B3).
 2. **Architecture et plan de construction** : [docs/architecture/architecture.md](../architecture/architecture.md), suivi dans [avancement.md](../architecture/avancement.md).
-3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur), É8d (chat), É8e (suppression des questions, règlement réservé aux admins, v1.4) et É8f (suppression sans trace des messages du chat, v1.5), puis recette avec deux ou trois collègues avant le 14 octobre. Après le lancement : É10 (règles réglables par saison, v1.3), avant le premier résultat.
+3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur), É8d (chat), É8e (suppression des questions, règlement réservé aux admins, v1.4), É8f (suppression sans trace des messages du chat, v1.5) et É8g (correction des textes d'une question publiée, v1.6), puis recette avec deux ou trois collègues avant le 14 octobre. Après le lancement : É10 (règles réglables par saison, v1.3), avant le premier résultat.
 4. **Contenu** : l'admin rédige les questions de la campagne d'octobre (énoncés, sources, liens BI, valeurs de l'an dernier, malus des questions à choix) avec le gabarit de l'architecture (annexe B), et les saisit avant le lancement.

@@ -25,7 +25,8 @@ export const ERROR_MESSAGES = {
   CATEGORY_NAME_TAKEN: "Cette catégorie existe déjà.",
   CATEGORY_ARCHIVED: "Cette catégorie est archivée : choisis-en une autre.",
   QUESTION_LOCKED: "Des pronos existent : ce champ ne peut plus changer. Pour le modifier, annule la question et crée une nouvelle question.",
-  QUESTION_CLOSED: "La question est clôturée : seuls la catégorie, l'aide et la date de résultat prévue peuvent encore changer.",
+  QUESTION_CLOSED:
+    "La question est clôturée : seuls les textes (énoncé, description, unité, source, libellé des réponses), la catégorie, l'aide et la date de résultat prévue peuvent encore changer.",
   QUESTION_CANCELLED: "Cette question est annulée : elle ne peut plus être modifiée.",
   NOT_CANCELLABLE: "Un brouillon ne s'annule pas : supprime-le.",
   ALREADY_CANCELLED: "Cette question est déjà annulée.",

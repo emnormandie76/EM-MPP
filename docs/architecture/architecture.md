@@ -1,7 +1,8 @@
 # Architecture et plan de construction — Les petits pronos de la promo
 
-> **Version 1.5 du 12/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
+> **Version 1.6 du 13/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
+> - **Changement de la v1.6** (demandé par l'utilisateur le 13/10/2026, cahier des charges v1.6, **étape É8g avant le lancement**) : les textes d'une question (énoncé, description, unité, source, libellé des réponses) restent modifiables avec des pronos et après la clôture ; les réponses sont renommées sur place (§5.11). Sections touchées : §5.11, §8.3, §11 (É8g, É9). Aucune migration.
 > - **Changement de la v1.5** (demandé par l'utilisateur le 12/10/2026, cahier des charges v1.5, **étape É8f avant le lancement**) : un message supprimé du chat, par son auteur ou par un admin, disparaît du fil pour tout le monde, sans laisser « Message supprimé. » (§5.15). Sections touchées : §5.15, §8.2, §8.3, §11 (É8f). Aucune migration.
 > - **Changements de la v1.4** (demandés par l'utilisateur le 12/10/2026 après ses essais en production, cahier des charges v1.4, **étape É8e avant le lancement**, donc livrée avant la v1.3) :
 >   - suppression définitive d'une question dans tous ses états, sauf dans une saison proclamée, avec tout ce qui s'y rattache (§5.11), et une confirmation renforcée (§8.3) ;
@@ -959,14 +960,21 @@ Une question publiée avec `opens_at` dans le futur est « programmée » : l'ad
 
 | Champ | Sans prono | Avec au moins un prono | Après la clôture |
 |---|---|---|---|
-| type, énoncé, description, unité, réponses, malus d'une mauvaise réponse, source, coefficient | oui | **non** | non |
+| type, nombre et ordre des réponses, malus d'une mauvaise réponse, coefficient | oui | **non** | non |
+| énoncé, description, unité, source, libellé des réponses (v1.6) | oui | oui | oui |
 | catégorie | oui | oui | oui |
 | aide (lien BI, valeur de l'an dernier, indice) | oui | oui | oui |
 | ouverture | oui | non si déjà ouverte | non |
 | clôture | oui | **seulement plus tard** (et > `now`) | non |
 | résultat prévu | oui | oui | oui |
 
-Pour changer un champ verrouillé, l'admin annule la question et en crée une nouvelle (le message d'erreur le dit).
+Pour changer un champ verrouillé, l'admin annule la question et en crée une nouvelle (le message d'erreur le dit). Une question annulée ne change plus du tout (`QUESTION_CANCELLED`).
+
+**Textes (v1.6, É8g ; décisions de l'utilisateur du 13/10/2026, à ne pas rediscuter)** : énoncé, description, unité, source et libellé des réponses restent modifiables avec des pronos et après la clôture, résultat saisi compris. Dans `editRules`, ils rejoignent le groupe `other` (verrouillé seulement par l'annulation) ; `content` ne garde que le type, le nombre et l'ordre des réponses, le malus d'une mauvaise réponse et le coefficient. Les réponses :
+- **renommées sur place** (`renameOptions`) quand leur nombre ne change pas et qu'aucun libellé ne prend la place d'une autre réponse (comparaison sans tenir compte de la casse) : chaque ligne `question_option` garde son identifiant, donc les pronos (`prediction_option_fk`), leurs événements et le résultat (`question_result_option_fk`) gardent leur réponse ;
+- **remplacées** (`replaceOptions`, comme avant) dans les autres cas : ajout, retrait, déplacement ou échange de libellés. C'est un changement de `content`, refusé avec des pronos ou après la clôture, avec la raison sous les réponses : « Les réponses gardent leur nombre et leur ordre : seul leur libellé peut encore changer. »
+
+Dans le formulaire, le type, le malus, le coefficient et les boutons qui ajoutent, retirent ou déplacent une réponse sont désactivés ; les libellés restent modifiables. L'action envoie les réponses dès qu'elles sont dans le formulaire, même sans le type. La correction ne laisse aucune trace (ni historique, ni mention aux joueurs) ; la note du formulaire conseille de prévenir l'équipe dans le chat si le sens change.
 
 **Suppression** (v1.4, É8e ; décisions de l'utilisateur du 12/10/2026, à ne pas rediscuter). Jusqu'à l'É8e : uniquement un brouillon sans prono (`deleteDraftQuestion`). Depuis : `deleteQuestion(db, admin, { questionId, confirmation? }, now)`, qui remplace `deleteDraftQuestion`. La suppression sert aux questions de test et aux erreurs de saisie : la question disparaît comme si elle n'avait jamais existé. Pour une vraie question dont la valeur ne sera pas connue, l'admin l'annule plutôt (ci-dessous).
 
@@ -1834,7 +1842,7 @@ Les sections « barème (tableau des paliers) », « bonus podium » et « Juste
 4. Dates : ouverture, clôture, résultat prévu, avec la mention « heure de Paris ».
 5. Actions : Enregistrer, Publier, Annuler la question (confirmation), Supprimer (brouillon sans prono jusqu'à l'É8e ; depuis, toute question, avec `QuestionDeleteDialog`, §8.2 ; pour une question publiée ou annulée d'une saison proclamée, bouton désactivé avec la raison).
 
-Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Dans la page d'une question existante :
+Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. Depuis la v1.6 (É8g), avec des pronos ou après la clôture, les textes et les libellés des réponses restent modifiables ; seuls le type, le malus, le coefficient et les boutons d'ajout, de retrait et de déplacement des réponses sont désactivés. Dans la page d'une question existante :
 - **Suivi** :
   - colonnes : joueur, état, date de validation, et, depuis la v1.2, prolongation (« jusqu'au … ») ;
   - bouton « Déverrouiller » si la question est ouverte pour ce joueur et son prono validé ;
@@ -2035,6 +2043,7 @@ Les étapes É1 à É8b sont faites. Elles décrivent ce qui a été construit a
 | É8d | Chat général (v1.2) | 07/10 |
 | É8e | Suppression des questions, règlement réservé aux admins (v1.4) | 13/10, avant le lancement |
 | É8f | Suppression sans trace des messages du chat (v1.5) | 12/10, avant le lancement |
+| É8g | Correction des textes d'une question publiée (v1.6) | 13/10, avant le lancement |
 | É9 | Recette et lancement | 13/10, lancement le 14/10 |
 | É10 | Règles réglables par saison (v1.3) | après le lancement, avant le premier résultat de 2026-2027 (novembre) |
 
@@ -2620,11 +2629,32 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
 
 **Critères de passage** : porte commune ; aucune migration générée.
 
+### É8g — Correction des textes d'une question publiée (v1.6)
+
+**Objectif** : l'admin corrige l'énoncé, la description, l'unité, la source et le libellé des réponses d'une question publiée, même avec des pronos et après la clôture (cahier des charges v1.6, §4.9, §5.7 ; §5.11). Petit changement demandé par l'utilisateur le 13/10/2026, la veille du lancement ; périmètre choisi par lui : les textes seulement, dates inchangées, aussi après la clôture.
+
+**Prérequis** : É8f fusionnée dans `main` (fait le 12/10).
+
+**Branche** : `etape-08g-modification-questions`, créée depuis `main`.
+
+**Aucune migration**, aucun nouveau service : `updateQuestion` change ses règles, et la matrice d'autorisation reste à 39 services.
+
+**Tâches**
+1. `editRules` et `updateQuestion` (`src/lib/services/questions.ts`) : les textes passent dans `other` ; réponses renommées sur place ou remplacées (§5.11) ; message `QUESTION_CLOSED` mis à jour (`result.ts`).
+2. `QuestionForm` : énoncé, description, unité, source et libellés des réponses suivent le verrou `other` ; type, malus, coefficient et boutons de la liste des réponses suivent `content`. Notes de verrouillage de `/admin/questions/[id]`.
+3. `saveQuestionAction` : les réponses sont envoyées dès qu'elles sont dans le formulaire.
+
+**Tests**
+- Intégration (`tests/integration/questions.test.ts`) : avec un prono, textes acceptés, type et coefficient refusés ; réponses renommées sur place (mêmes identifiants, le prono garde sa réponse) ; ajout, retrait, déplacement et échange refusés, raison sous les réponses ; après la clôture et le résultat, textes acceptés et résultat conservé, le reste refusé.
+- `e2e/admin-edit-question.spec.ts` : l'admin publie une question à choix, Julien y enregistre un prono ; l'admin corrige l'énoncé et renomme une réponse (champs figés désactivés) ; Julien voit le nouvel énoncé, et son prono sur la réponse renommée ; la question est ensuite supprimée.
+
+**Critères de passage** : porte commune ; aucune migration générée.
+
 ### É9 — Recette et lancement
 
 **Objectif** : des collègues testent, on corrige, la production est remplie et vérifiée, on lance le 14 octobre.
 
-**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change, l'É8c, l'É8d (sauf si l'utilisateur décide de la reporter après le lancement : le chat ne bloque rien d'autre), l'É8e (v1.4), avec H-17 faite, et l'É8f (v1.5).
+**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change, l'É8c, l'É8d (sauf si l'utilisateur décide de la reporter après le lancement : le chat ne bloque rien d'autre), l'É8e (v1.4), avec H-17 faite, l'É8f (v1.5) et l'É8g (v1.6).
 
 **Depuis la v1.4**, le règlement est caché aux joueurs jusqu'à l'É10 : les collègues de H-12 ne le voient pas, et H-13 ne porte plus que sur les autres textes (sa relecture passe à l'É10). L'annonce du lancement (H-15) peut résumer l'essentiel des règles : le moins de malus gagne, le malus est l'écart au résultat, jokers selon la saison, pas de prono dans le chat.
 

@@ -1,7 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db/client";
-import { category, question, questionExtension, questionOption, season } from "@/lib/db/schema";
+import { category, prediction, question, questionExtension, questionOption, season } from "@/lib/db/schema";
 import { formatNumber } from "@/lib/format";
 import { parseNumberInput } from "@/lib/game/number-input";
 import {
@@ -486,23 +486,24 @@ describe("editing locks (§5.11)", () => {
     expect(await load(q.id)).toMatchObject({ wrongAnswerMalus: 80, helpHint: "Nouvel indice" });
   });
 
-  it("with a prediction: title refused, help accepted, closing moved earlier refused, later accepted", async () => {
+  it("with a prediction: type and coefficient refused, wording and help accepted, closing moved earlier refused, later accepted", async () => {
     const q = await openQuestionWithPrediction();
 
-    expect(await updateQuestion(db, admin, { questionId: q.id, title: "Un autre énoncé ?" }, now)).toMatchObject({
+    expect(await updateQuestion(db, admin, { questionId: q.id, coefficient: 2 }, now)).toEqual({
       ok: false,
       code: "QUESTION_LOCKED",
       message: "Des pronos existent : ce champ ne peut plus changer. Pour le modifier, annule la question et crée une nouvelle question.",
     });
-    for (const patch of [
-      { kind: "choice", options: ["A", "B"], wrongAnswerMalus: "10" },
-      { unit: "visiteurs" },
-      { source: "Autre source" },
-      { coefficient: 2 },
-      { description: "Précision" },
-    ]) {
-      expect(await updateQuestion(db, admin, { questionId: q.id, ...patch }, now)).toMatchObject({ ok: false, code: "QUESTION_LOCKED" });
-    }
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "choice", options: ["A", "B"], wrongAnswerMalus: "10" }, now)).toEqual({
+      ok: false,
+      code: "QUESTION_LOCKED",
+      message: "Des pronos existent : ce champ ne peut plus changer. Pour le modifier, annule la question et crée une nouvelle question.",
+    });
+
+    // The wording stays editable (v1.6).
+    const wording = { title: "Combien de visiteurs à la JPO ?", description: "Hors accompagnants.", unit: "visiteurs", source: "Autre source" };
+    expect(await updateQuestion(db, admin, { questionId: q.id, ...wording }, now)).toEqual({ ok: true, data: { id: q.id } });
+    expect(await load(q.id)).toMatchObject({ ...wording, type: "number", coefficient: 1 });
 
     const newCategory = await createCategory(db, "Candidatures");
     expect(
@@ -568,17 +569,103 @@ describe("editing locks (§5.11)", () => {
     });
   });
 
-  it("after the closing, only the category, the help and the expected result date change", async () => {
-    const q = await insertQuestion(db, { categoryId, status: "published", opensAt: clock.at("-3d"), closesAt: clock.at("-1d") });
-    expect(await updateQuestion(db, admin, { questionId: q.id, title: "Un autre énoncé ?" }, now)).toMatchObject({
-      code: "QUESTION_CLOSED",
+  it("with a prediction, the answers are renamed in place: the prediction keeps its answer (v1.6)", async () => {
+    const q = await insertQuestion(db, {
+      categoryId,
+      status: "published",
+      type: "choice",
+      unit: null,
+      options: ["BBA", "MSc", "Grande École"],
+      opensAt: clock.at("-1d"),
+      closesAt: clock.at("+5d"),
     });
+    const player = await createUser(db);
+    const saved = await createPrediction(db, { questionId: q.id, userId: player.id, optionId: q.options[1].id });
+
+    const labels = ["BBA", "Master of Science (MSc)", "grande école"];
+    expect(await updateQuestion(db, admin, { questionId: q.id, options: labels }, now)).toEqual({ ok: true, data: { id: q.id } });
+    const rows = await db.select().from(questionOption).where(eq(questionOption.questionId, q.id)).orderBy(asc(questionOption.position));
+    expect(rows.map(({ id, label }) => ({ id, label }))).toEqual(q.options.map(({ id }, index) => ({ id, label: labels[index] })));
+    const [after] = await db.select().from(prediction).where(eq(prediction.id, saved.id));
+    expect(after.optionId).toBe(q.options[1].id);
+  });
+
+  it("with a prediction, adding, removing or swapping answers is refused, next to the answers (v1.6)", async () => {
+    const q = await insertQuestion(db, {
+      categoryId,
+      status: "published",
+      type: "choice",
+      unit: null,
+      options: ["BBA", "MSc", "Grande École"],
+      opensAt: clock.at("-1d"),
+      closesAt: clock.at("+5d"),
+    });
+    const player = await createUser(db);
+    await createPrediction(db, { questionId: q.id, userId: player.id, optionId: q.options[0].id });
+
+    for (const options of [
+      ["BBA", "MSc", "Grande École", "Bachelor"],
+      ["BBA", "MSc"],
+      ["MSc", "BBA", "Grande École"],
+      // A swap whatever the case: each prediction would get the other answer.
+      ["msc", "bba", "Grande École"],
+      ["BBA", "Grande École", "Master"],
+    ]) {
+      expect(await updateQuestion(db, admin, { questionId: q.id, options }, now)).toEqual({
+        ok: false,
+        code: "QUESTION_LOCKED",
+        message: "Des pronos existent : ce champ ne peut plus changer. Pour le modifier, annule la question et crée une nouvelle question.",
+        fieldErrors: { options: "Les réponses gardent leur nombre et leur ordre : seul leur libellé peut encore changer." },
+      });
+    }
+    expect((await load(q.id)).options).toEqual(["BBA", "MSc", "Grande École"]);
+  });
+
+  it("after the closing, the wording, the category, the help and the expected result date change; renamed answers keep the result (v1.6)", async () => {
+    const q = await insertQuestion(db, {
+      categoryId,
+      status: "published",
+      type: "choice",
+      unit: null,
+      options: ["Caen", "Le Havre"],
+      opensAt: clock.at("-3d"),
+      closesAt: clock.at("-1d"),
+    });
+    expect(await resolveQuestion(db, admin, { questionId: q.id, optionId: q.options[1].id }, now)).toMatchObject({ ok: true });
+
+    for (const patch of [{ coefficient: 2 }, { wrongAnswerMalus: "90" }, { options: ["Le Havre", "Caen"] }, { options: ["Caen", "Le Havre", "Rouen"] }]) {
+      expect(await updateQuestion(db, admin, { questionId: q.id, ...patch }, now)).toMatchObject({ ok: false, code: "QUESTION_CLOSED" });
+    }
     expect(await updateQuestion(db, admin, { questionId: q.id, closesAt: "2026-10-30T18:00" }, now)).toMatchObject({
+      ok: false,
       code: "QUESTION_CLOSED",
+      fieldErrors: { closesAt: "La question est clôturée : seuls les textes (énoncé, description, unité, source, libellé des réponses), la catégorie, l'aide et la date de résultat prévue peuvent encore changer." },
     });
-    expect(await updateQuestion(db, admin, { questionId: q.id, helpHint: "Indice", expectedResultAt: "2026-11-01T10:00" }, now)).toMatchObject({
-      ok: true,
+
+    const patch = {
+      title: "Quel campus aura le plus de visiteurs ?",
+      description: "Visiteurs comptés à l'entrée.",
+      source: "Compteurs des campus",
+      options: ["Caen", "Le Havre (campus)"],
+      helpHint: "Indice",
+      expectedResultAt: "2026-11-01T10:00",
+    };
+    expect(await updateQuestion(db, admin, { questionId: q.id, ...patch }, now)).toEqual({ ok: true, data: { id: q.id } });
+    expect(await load(q.id)).toMatchObject({
+      title: patch.title,
+      description: patch.description,
+      source: patch.source,
+      options: patch.options,
+      helpHint: "Indice",
+      resultOptionId: q.options[1].id,
     });
+  });
+
+  it("after the closing, a number question keeps its result when its unit changes", async () => {
+    const q = await insertQuestion(db, { categoryId, status: "published", opensAt: clock.at("-3d"), closesAt: clock.at("-1d") });
+    expect(await resolveQuestion(db, admin, { questionId: q.id, rawValue: "212" }, now)).toMatchObject({ ok: true });
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "number", unit: "visiteurs" }, now)).toEqual({ ok: true, data: { id: q.id } });
+    expect(await load(q.id)).toMatchObject({ unit: "visiteurs", resultNumber: 212 });
   });
 
   it("a cancelled question no longer changes", async () => {

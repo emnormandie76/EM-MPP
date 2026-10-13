@@ -35,8 +35,9 @@ const TD = "px-3 py-2.5 align-middle";
 
 const CONTENT_LOCKS = {
   QUESTION_LOCKED:
-    "Des pronos existent : le type, l'énoncé, la description, l'unité, les réponses, le malus d'une mauvaise réponse, la source et le coefficient ne peuvent plus changer. Pour les modifier, annule la question et crée une nouvelle question.",
-  QUESTION_CLOSED: "La question est clôturée : seuls la catégorie, l'aide et la date de résultat prévue peuvent encore changer.",
+    "Des pronos existent : tu peux encore corriger l'énoncé, la description, l'unité, la source et le libellé des réponses. Le type, le nombre et l'ordre des réponses, le malus d'une mauvaise réponse et le coefficient ne peuvent plus changer : pour les modifier, annule la question et crée une nouvelle question. Si ta correction change le sens de la question, préviens l'équipe dans le chat.",
+  QUESTION_CLOSED:
+    "La question est clôturée : tu peux encore corriger l'énoncé, la description, l'unité, la source et le libellé des réponses, ainsi que la catégorie, l'aide et la date de résultat prévue. Le reste ne peut plus changer.",
   QUESTION_CANCELLED: "La question est annulée : elle ne peut plus être modifiée.",
 } as const;
 

@@ -47,9 +47,12 @@ const notFound = () => fail("NOT_FOUND", NOT_FOUND);
 
 /** What may still change, given the status and whether predictions exist; null means free. */
 export type EditRules = {
-  /** Type, title, description, unit, answers, malus of a wrong answer, source, coefficient. */
+  /** Type, number and order of the answers, malus of a wrong answer, coefficient. */
   content: ErrorCode | null;
-  /** Category, help and expected result date: locked only once cancelled. */
+  /**
+   * Wording (title, description, unit, source, labels of the answers), category, help and expected
+   * result date: locked only once cancelled (v1.6).
+   */
   other: ErrorCode | null;
   opensAt: ErrorCode | null;
   closesAt: ErrorCode | null;
@@ -146,6 +149,27 @@ async function replaceOptions(db: Database, questionId: number, labels: readonly
   }
 }
 
+/** New labels, each answer keeping its row: the predictions and the result point to it (v1.6). */
+async function renameOptions(db: Database, rows: readonly { id: number; label: string }[], labels: readonly string[]): Promise<void> {
+  for (const [index, row] of rows.entries()) {
+    if (labels[index] !== row.label) await db.update(questionOption).set({ label: labels[index] }).where(eq(questionOption.id, row.id));
+  }
+}
+
+const labelKey = (label: string) => label.toLocaleLowerCase("fr");
+
+/**
+ * Whether new labels add, remove or move answers rather than rename them in place: another count,
+ * or a label that was another answer's (a swap would hand each prediction the other answer).
+ */
+function optionsMoved(next: readonly string[], current: readonly string[]): boolean {
+  if (next.length !== current.length) return true;
+  const positions = new Map(current.map((label, index) => [labelKey(label), index]));
+  return next.some((label, index) => (positions.get(labelKey(label)) ?? index) !== index);
+}
+
+const ANSWERS_STAY = "Les réponses gardent leur nombre et leur ordre : seul leur libellé peut encore changer.";
+
 /** Seasons whose final standings are proclaimed: no question may enter them any more. */
 function proclaimedIds(seasons: readonly { id: number; proclaimedAt: Date | null }[]): Set<number> {
   return new Set(seasons.filter(({ proclaimedAt }) => proclaimedAt !== null).map(({ id }) => id));
@@ -221,6 +245,8 @@ export async function createQuestion(
 /**
  * Changes the fields present in `input`; absent fields keep their value. A field locked by §5.11
  * may be sent unchanged, but not changed: the refusal says to cancel and create a new question.
+ * The wording stays editable with predictions and after the closing (v1.6): renamed answers keep
+ * their rows, so the predictions and the result keep their answer.
  */
 export async function updateQuestion(
   db: Database,
@@ -238,7 +264,8 @@ export async function updateQuestion(
     const seasons = await seasonsForQuestions(tx);
     const current = await lockQuestion(tx, patch.questionId);
     if (!current) return notFound();
-    const currentOptions = (await optionsOf(tx, current.id)).map(({ label }) => label);
+    const optionRows = await optionsOf(tx, current.id);
+    const currentOptions = optionRows.map(({ label }) => label);
     const predictions = (await predictionCounts(tx, [current.id])).get(current.id) ?? 0;
     const rules = editRules(questionStatus(current, now), predictions);
 
@@ -284,21 +311,22 @@ export async function updateQuestion(
     };
 
     const optionsChanged = !sameList(shape.options, currentOptions);
-    const contentChanged =
-      optionsChanged ||
-      (["type", "wrongAnswerMalus", "title", "description", "unit", "source", "coefficient"] as const).some(
-        (key) => next[key] !== current[key],
-      );
+    const answersMoved = optionsChanged && optionsMoved(shape.options, currentOptions);
+    const structureChanged = (["type", "wrongAnswerMalus", "coefficient"] as const).some((key) => next[key] !== current[key]);
+    const contentChanged = structureChanged || answersMoved;
     const otherChanged =
-      (["categoryId", "helpBiUrl", "helpLastYear", "helpHint"] as const).some((key) => next[key] !== current[key]) ||
+      (optionsChanged && !answersMoved) ||
+      (["categoryId", "title", "description", "unit", "source", "helpBiUrl", "helpLastYear", "helpHint"] as const).some(
+        (key) => next[key] !== current[key],
+      ) ||
       next.expectedResultAt !== current.expectedResultAt;
     const opensChanged = next.opensAt !== current.opensAt;
     const closesChanged = next.closesAt !== current.closesAt;
     const seasonId = closesChanged ? (next.closesAt ? (seasonAt(seasons, next.closesAt)?.id ?? null) : null) : current.seasonId;
     if (!contentChanged && !otherChanged && !opensChanged && !closesChanged) return ok({ id: current.id });
 
-    // Locks (§5.11).
-    if (contentChanged && rules.content) return fail(rules.content);
+    // Locks (§5.11). When only the answers moved, the reason goes next to them.
+    if (contentChanged && rules.content) return fail(rules.content, undefined, structureChanged ? undefined : { options: ANSWERS_STAY });
     if (otherChanged && rules.other) return fail(rules.other);
     if (opensChanged && rules.opensAt) return fail(rules.opensAt, undefined, { opensAt: ERROR_MESSAGES[rules.opensAt] });
     if (closesChanged && rules.closesAt) return fail(rules.closesAt, undefined, { closesAt: ERROR_MESSAGES[rules.closesAt] });
@@ -334,7 +362,8 @@ export async function updateQuestion(
       .update(question)
       .set({ ...next, seasonId, updatedAt: now })
       .where(eq(question.id, current.id));
-    if (optionsChanged) await replaceOptions(tx, current.id, shape.options);
+    if (answersMoved) await replaceOptions(tx, current.id, shape.options);
+    else if (optionsChanged) await renameOptions(tx, optionRows, shape.options);
     return ok({ id: current.id });
   });
 }
