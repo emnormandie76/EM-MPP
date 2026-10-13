@@ -130,7 +130,8 @@ export function PredictionForm(props: PredictionFormProps) {
           id={inputId}
           name="rawValue"
           value={raw}
-          onChange={(event) => setRaw(event.target.value)}
+          // Only digits, spaces, a comma or a point can be typed: a letter never shows (§5.3).
+          onChange={(event) => setRaw(event.target.value.replace(/[^\d\s,.]/g, ""))}
           readOnly={validated}
           inputMode="decimal"
           autoComplete="off"

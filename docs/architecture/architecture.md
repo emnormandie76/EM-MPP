@@ -702,6 +702,8 @@ L'ouverture est **incluse** (`now = opens_at` → ouverte), la clôture **exclue
 7. Valeur maximale 999 999 999,99 : « Nombre trop grand. »
 8. Les nombres négatifs sont refusés (règle 5).
 
+**Champ du prono** (v1.7, É8i, demande de l'utilisateur du 13/10/2026) : `PredictionForm` efface dès la frappe tout caractère autre qu'un chiffre, un espace, une virgule ou un point. Une lettre ou un signe tapé ne s'affiche pas, et un collage comme « 2 500 candidatures » devient « 2 500 ». `parseNumberInput` reste la règle, côté navigateur comme côté serveur, pour ce que le filtre laisse passer (`2.450`, trois décimales, champ vide). Pas de `type="number"` : Firefox y laisse taper des lettres, la virgule décimale et les espaces de milliers y sont mal gérés, et la molette changerait la valeur.
+
 | Vecteur | Entrée | Attendu |
 |---|---|---|
 | N1 | `'2 450'` | 2450 |
