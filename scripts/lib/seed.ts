@@ -289,8 +289,8 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
         await tx.update(question).set({ resultOptionId }).where(eq(question.id, row.id));
       }
       questionCount += 1;
-      const { id, type, coefficient, resultNumber, wrongAnswerMalus, resolvedAt } = row;
-      const scoring = resolvedAt ? { id, type, coefficient, resultNumber, resultOptionId, wrongAnswerMalus, resolvedAt } : null;
+      const { id, type, coefficient, resultNumber, wrongAnswerMalus, placeMalus, resolvedAt } = row;
+      const scoring = resolvedAt ? { id, type, coefficient, resultNumber, resultOptionId, wrongAnswerMalus, placeMalus, resolvedAt } : null;
       return { id, optionIds, scoring };
     }
 

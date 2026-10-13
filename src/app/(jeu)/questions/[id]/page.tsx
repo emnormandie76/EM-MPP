@@ -16,7 +16,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getQuestionDetail, type QuestionDetail } from "@/lib/data/questions";
 import { getQuestionResults, type QuestionResults } from "@/lib/data/results";
 import { getDb } from "@/lib/db/client";
-import { formatCount, formatDateTime, formatNumber, malusText } from "@/lib/format";
+import { formatCount, formatDateTime, formatNumber, malusText, placeMalusText } from "@/lib/format";
 import { JOKER_DIVISOR } from "@/lib/game/constants";
 import { toHundredths } from "@/lib/game/scoring";
 
@@ -144,6 +144,7 @@ export default async function QuestionPage({ params }: PageProps<"/questions/[id
           <Chip>{q.categoryName}</Chip>
           <Chip tone="outline">Coef ×{q.coefficient}</Chip>
           {q.wrongAnswerMalus !== null ? <Chip tone="outline">Mauvaise réponse : {malusText(toHundredths(q.wrongAnswerMalus))}</Chip> : null}
+          {q.placeMalus !== null ? <Chip tone="outline">Fun : {placeMalusText(toHundredths(q.placeMalus))}</Chip> : null}
           {q.extendedUntil ? <ExtendedChip /> : null}
           <span className="lg:ml-auto">
             {q.status === "open" ? (

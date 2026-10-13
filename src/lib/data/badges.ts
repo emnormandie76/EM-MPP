@@ -59,6 +59,7 @@ export async function getPlayerResults(db: Database, _viewer: ViewerRole, userId
       unit: question.unit,
       coefficient: question.coefficient,
       wrongAnswerMalus: question.wrongAnswerMalus,
+      placeMalus: question.placeMalus,
       resultNumber: question.resultNumber,
       resultOptionId: question.resultOptionId,
       resolvedAt: question.resolvedAt,

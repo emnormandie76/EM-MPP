@@ -1,7 +1,8 @@
 # Architecture et plan de construction — Les petits pronos de la promo
 
-> **Version 1.6 du 13/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
+> **Version 1.7 du 13/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
+> - **Changement de la v1.7** (demandé par l'utilisateur le 13/10/2026, cahier des charges v1.7, **étape É8h**) : questions fun, des questions à nombre notées à la place, `(place − 1) × malus par place`, au coefficient ×1 (§5.5). Sections touchées : §4.3, §5.5, §5.6, §5.11, §5.16, §8.2, §8.3, §11 (É8h, É9, É10), annexes A et B. Migration `0005_fun_questions` (ajouts seulement) ; celle de l'É10 devient `0006_season_rules`.
 > - **Changement de la v1.6** (demandé par l'utilisateur le 13/10/2026, cahier des charges v1.6, **étape É8g avant le lancement**) : les textes d'une question (énoncé, description, unité, source, libellé des réponses) restent modifiables avec des pronos et après la clôture ; les réponses sont renommées sur place (§5.11). Sections touchées : §5.11, §8.3, §11 (É8g, É9). Aucune migration.
 > - **Changement de la v1.5** (demandé par l'utilisateur le 12/10/2026, cahier des charges v1.5, **étape É8f avant le lancement**) : un message supprimé du chat, par son auteur ou par un admin, disparaît du fil pour tout le monde, sans laisser « Message supprimé. » (§5.15). Sections touchées : §5.15, §8.2, §8.3, §11 (É8f). Aucune migration.
 > - **Changements de la v1.4** (demandés par l'utilisateur le 12/10/2026 après ses essais en production, cahier des charges v1.4, **étape É8e avant le lancement**, donc livrée avant la v1.3) :
@@ -424,7 +425,7 @@ Seule clé utilisée : `environment`, qui vaut `production` sur la base de produ
 | `proclaimed_at` | timestamptz | nullable |
 | `created_at` | timestamptz | défaut `now()` |
 
-Les six colonnes de la v1.3 arrivent avec la migration `0005_season_rules` de l'É10. Elle ne fait qu'ajouter, et ses valeurs par défaut sont celles de la v1.2 : aucune saison existante ne change de règles.
+Les six colonnes de la v1.3 arrivent avec la migration `0006_season_rules` de l'É10 (`0005` jusqu'à la v1.6 : le numéro a été pris par les questions fun de l'É8h). Elle ne fait qu'ajouter, et ses valeurs par défaut sont celles de la v1.2 : aucune saison existante ne change de règles.
 
 **`season_rules_event`** (v1.3, É10) : historique des changements de règles d'une saison (§5.16). Jamais lu pour calculer un malus.
 
@@ -460,6 +461,7 @@ Une saison n'a pas de date de fin enregistrée : elle se termine au début de la
 | `type` | enum `question_type` (`number`, `choice`) | non nul |
 | `price_is_right` | boolean | défaut `false`. **Juste Prix supprimé en v1.2** : la colonne reste (la supprimer serait une migration destructive, §0.4), toujours `false` (`CHECK (NOT price_is_right)`), et le code ne la lit plus |
 | `wrong_answer_malus` | numeric(14,2) | malus d'une mauvaise réponse (v1.2, §5.5) ; renseigné si et seulement si `type = choice`, > 0 |
+| `place_malus` | numeric(14,2) | malus par place d'une question fun (v1.7, §5.5) ; nul pour toute autre question |
 | `title` | text | énoncé, 5 à 200 caractères |
 | `description` | text | nullable, précisions, 2 000 caractères au plus |
 | `unit` | text | nullable ; pour `number` (ex. « candidatures ») |
@@ -486,6 +488,11 @@ Contraintes : `CHECK (opens_at IS NULL OR closes_at IS NULL OR opens_at < closes
 Ajouts de l'É8c (v1.2), par une migration qui n'ajoute que des colonnes, des tables et des contraintes :
 - `question_wrong_answer_malus` : `CHECK ((type = 'choice') = (wrong_answer_malus IS NOT NULL))` et `CHECK (wrong_answer_malus > 0)`. Avant d'ajouter la contrainte, la migration renseigne `50` sur les questions à choix existantes : il y en a sur `dev` (seed), aucune en production (vérifié le 02/10/2026, à revérifier au début de l'É8c).
 - `question_price_is_right_removed` : `CHECK (NOT price_is_right)`, qui remplace `question_price_is_right_number`. La migration remet d'abord `price_is_right` à `false` (une question du seed sur `dev` ; aucune en production au 02/10/2026).
+
+Ajouts de l'É8h (v1.7), migration `0005_fun_questions`, qui n'ajoute qu'une colonne et des contraintes (aucune question existante n'est touchée, `place_malus` restant nul) :
+- `question_place_malus_number` : `CHECK (place_malus IS NULL OR type = 'number')` ;
+- `question_place_malus_coefficient` : `CHECK (place_malus IS NULL OR coefficient = 1)` ;
+- `question_place_malus_positive` : `CHECK (place_malus > 0)`.
 
 **`question_option`** : réponses possibles d'une question à choix.
 
@@ -795,14 +802,22 @@ Les malus restent en centièmes entiers jusqu'à l'affichage, sommes du classeme
 
 **Question à choix** : malus de base = 0 pour la bonne réponse, `W` sinon. Pas de rang de proximité, pas d'écart.
 
+**Question fun** (v1.7, É8h ; idée retenue par l'utilisateur le 13/10/2026, cahier des charges §5.9) : une question à nombre dont `place_malus` est renseigné. Avec `S = round(malus par place × 100)` :
+- malus de base = `(podiumRank − 1) × S` : le plus proche prend 0, chaque place derrière lui coûte `S`, les ex æquo partageant leur place ;
+- `gap` (l'écart `D`), « Dans le mille », écart relatif et rang de proximité se calculent comme sur toute question à nombre ;
+- coefficient toujours 1 (contrainte `question_place_malus_coefficient`), joker comme ailleurs ;
+- malus d'absence : celui du pire prono, donc de la dernière place, `(rang du plus grand D − 1) × S` ;
+- l'écart relatif d'une question fun n'entre pas dans `meanError` (§5.6).
+
 **Malus d'une question** = malus de base × coefficient, divisé par `JOKER_DIVISOR` s'il y a un joker. La division arrondit au centième, la moitié vers le haut : en centièmes, `x` devient `floor((x + 1) / 2)`.
 
 **Malus d'absence** (`absentMalus`) : le malus d'un joueur du classement (§5.6) qui n'a pas de prono sur une question résolue (décision du 02/10/2026 : « le malus du pire prono »).
 - Question à nombre : le plus grand `D` parmi les pronos de la question, × coefficient. C'est le pire écart, sans tenir compte des jokers des autres.
+- Question fun (v1.7) : le malus de base de la dernière place, × coefficient (toujours 1).
 - Question à choix : `W` × coefficient. Pas de réponse = mauvaise réponse, même si tous les autres ont trouvé (précision de l'agent, contestable).
 - Question sans aucun prono : 0, tout le monde étant à égalité.
 
-`scoreQuestion(question, predictions)` reçoit `{ type, coefficient, resultNumber, resultOptionId, wrongAnswerMalus }` et renvoie `{ scores, absentMalus }`. Chaque élément de `scores` contient `baseMalus`, `total` (en centièmes), `bullseye`, `relativeError | null` et `podiumRank | null`. Les champs `basePoints`, `podiumBonus` et `wentOver` disparaissent, comme `priceIsRight`.
+`scoreQuestion(question, predictions)` reçoit `{ type, coefficient, resultNumber, resultOptionId, wrongAnswerMalus, placeMalus }` et renvoie `{ scores, absentMalus }`. Chaque élément de `scores` contient `baseMalus`, `gap | null` (l'écart `D` d'une question à nombre, en centièmes, v1.7 : sur une question fun, il diffère du malus de base), `total` (en centièmes), `bullseye`, `relativeError | null` et `podiumRank | null`. Les champs `basePoints`, `podiumBonus` et `wentOver` disparaissent, comme `priceIsRight`.
 
 **Vecteurs, question à nombre, valeur réelle 1 000, coefficient 1, sans joker**
 
@@ -851,6 +866,18 @@ Les malus restent en centièmes entiers jusqu'à l'affichage, sommes du classeme
 | A4 | réel 1 000, un seul prono : 1 000 | malus d'absence 0 (le pire écart est 0) |
 | X6 | liste de pronos vide | pas d'erreur |
 
+**Vecteurs, question fun (v1.7, malus par place 5 sauf mention contraire)**
+
+| # | Cas | Attendu |
+|---|---|---|
+| FU1 | réel 4 200 : Julien 4 000, Léa 5 000, Sarah 2 500, Hugo 900, Mehdi 8 000, Camille 20 000 | rangs 1 à 6 ; malus 0, 5, 10, 15, 20, 25 ; malus d'absence 25 ; `gap` de Camille 15 800 |
+| FU2 | réel 250 : A 240, B 260, C 300 | rangs 1, 1, 3 ; malus 0, 0, 10 ; malus d'absence 10 |
+| FU3 | réel 250 : A 250, B 260, C 300 avec joker ; puis malus par place 2,5, A 250, B 260 avec joker | C 10 ÷ 2 = 5 ; B 2,5 ÷ 2 = 1,25 |
+| FU4 | un seul prono, loin du réel | 0 ; malus d'absence 0 |
+| FU5 | réel 1 000 : A 1 005, B 2 000 | A « Dans le mille », écart relatif 0,005, malus 0 ; B écart relatif 1, malus 5 |
+| FU6 | aucun prono | malus d'absence 0 |
+| FU7 | réel 100 : A 101, B 1 000 000 | B : malus 5 (une place), `gap` 999 900 |
+
 ### 5.6 Classement (`standings.ts`)
 
 `computeStandings({ questions, predictions, players })`, où `questions` sont les questions **publiées, résolues et non annulées** de la saison.
@@ -859,7 +886,7 @@ Les malus restent en centièmes entiers jusqu'à l'affichage, sommes du classeme
 - **Par joueur** (v1.2) :
   - `malus` : somme des malus de ses pronos et des malus d'absence des questions où il n'a pas de prono (en centièmes entiers) ;
   - `bullseyes` : nombre de « Dans le mille » ;
-  - `meanError` : moyenne des écarts relatifs finis de ses pronos sur les questions à nombre, ou `null`. Les absences n'y comptent pas. La règle du 01/10/2026 sur les pronos Juste Prix qui dépassent disparaît avec le Juste Prix ;
+  - `meanError` : moyenne des écarts relatifs finis de ses pronos sur les questions à nombre, ou `null`. Les absences n'y comptent pas, ni les questions fun (v1.7) : une seule question extrême écraserait la moyenne. La règle du 01/10/2026 sur les pronos Juste Prix qui dépassent disparaît avec le Juste Prix ;
   - `questionsPlayed` : nombre de questions résolues avec un prono.
 - **Tri** (v1.2) : `malus` **croissant**, puis `bullseyes` décroissants, puis `meanError` croissant (`null` en dernier). Le départage est celui de la v1.1, confirmé par l'utilisateur le 02/10/2026. À égalité parfaite (même malus, même nombre de « Dans le mille », écart moyen égal à 1e-12 près), même rang ; l'affichage départage alors par nom (ordre alphabétique français).
 - **Rang** : classement avec ex æquo (1, 1, 3).
@@ -876,6 +903,7 @@ Les malus restent en centièmes entiers jusqu'à l'affichage, sommes du classeme
 | C7 | A 100 de malus sans « Dans le mille », B 150 avec 2 | A 1er (le malus passe avant le départage) |
 | C8 | compte créé après la résolution d'une question de la saison (avant la fin de la saison) | il prend le malus d'absence de cette question |
 | C9 | compte désactivé sans prono dans la saison ; compte désactivé avec un prono | le premier n'est pas listé ; le second est listé (inactif), avec le malus d'absence des autres questions |
+| C10 | question à nombre (réel 100 : A 90, B 80, C 100) et question fun (réel 4 200, 5 par place : A 20 000, B 4 210, C sans prono) | malus A 10 + 5, B 20 + 0, C 0 + 5 ; écart moyen A 10 %, B 20 % (la question fun n'y compte pas) ; le « Dans le mille » de B sur la question fun compte |
 
 **Saison affichée par défaut** (classement et accueil), fonction `defaultSeason(now, seasons)` qui renvoie une saison ou `null` : la saison qui contient `now` (`seasonAt`, §5.1). Si elle n'a encore aucune question résolue, que la précédente a au moins une question publiée et qu'elle n'est pas proclamée, on affiche la précédente. S'il n'existe encore aucune saison (ou si `now` précède la première), on affiche l'état vide. Un sélecteur liste les saisons ayant au moins une question publiée.
 
@@ -945,6 +973,8 @@ v1.2 : les conditions ne changent pas. Le « podium » est désormais le rang de
 
 Le formulaire rappelle de le comparer aux écarts attendus sur les questions à nombre (par exemple quelques dizaines pour une JPO, quelques centaines pour des candidatures). Le modèle « oui/non » crée les réponses « Oui » et « Non ». Passer un brouillon de nombre à choix demande ce malus ; passer de choix à nombre l'efface.
 
+**Question fun** (v1.7, É8h) : le type « Fun » du formulaire (`kind: 'fun'`) crée une question `number` avec une unité et un **malus par place** (`place_malus`) obligatoire, lu comme le malus d'une mauvaise réponse : refusé s'il est absent (« Indique le malus par place. »), s'il vaut 0 (« Le malus doit être supérieur à 0. ») ou s'il n'est pas entier (« Le malus par place est un nombre entier. », décision de l'utilisateur du 13/10/2026 ; le contrôle est fait par le service, la colonne garde ses 2 décimales). Son champ n'avance que par nombres entiers (`step` 1, `min` 1). Son coefficient est toujours 1 : le formulaire ne l'envoie pas, le service le met à 1, et refuse une autre valeur envoyée (« Une question fun garde le coefficient ×1 : le malus par place fait son poids. »). Passer à un autre type efface le malus par place ; passer au type « Fun » remet le coefficient à 1. `kindOf` lit une question `number` avec un `place_malus` comme « Fun ».
+
 **Publication** (`published`), vérifications :
 - `opens_at` et `closes_at` renseignés, `opens_at < closes_at`, `closes_at > now` ;
 - `expected_result_at ≥ closes_at` s'il est renseigné ;
@@ -960,7 +990,7 @@ Une question publiée avec `opens_at` dans le futur est « programmée » : l'ad
 
 | Champ | Sans prono | Avec au moins un prono | Après la clôture |
 |---|---|---|---|
-| type, nombre et ordre des réponses, malus d'une mauvaise réponse, coefficient | oui | **non** | non |
+| type (fun compris), nombre et ordre des réponses, malus d'une mauvaise réponse ou par place (v1.7), coefficient | oui | **non** | non |
 | énoncé, description, unité, source, libellé des réponses (v1.6) | oui | oui | oui |
 | catégorie | oui | oui | oui |
 | aide (lien BI, valeur de l'an dernier, indice) | oui | oui | oui |
@@ -1033,7 +1063,7 @@ Le service renvoie le bilan (`{ predictions, extensions, resultMessage }`, des n
 
 **Saison** : à chaque enregistrement de `closes_at`, `season_id` devient l'identifiant de la saison de cette date (§5.1), ou `null` si aucune saison ne la couvre. Les services ne créent plus de saison (v1.1 : `ensureSeason` disparaît). La publication (et les dates en série sur une question publiée) exige une saison : « Aucune saison ne couvre cette date de clôture : crée d'abord la saison dans Saisons et lots. » Une question qui a des pronos ne peut pas changer de saison (décision du 30/09/2026).
 
-**Duplication** : copie catégorie, type, énoncé, description, unité, source, aide, coefficient, réponses et malus d'une mauvaise réponse, en brouillon sans dates, avec `duplicated_from_id`. Les prolongations ne sont pas copiées. Si l'originale est résolue, `help_last_year` est prérempli avec son résultat formaté (nombre + unité, ou libellé de la bonne réponse).
+**Duplication** : copie catégorie, type, énoncé, description, unité, source, aide, coefficient, réponses, malus d'une mauvaise réponse et malus par place (v1.7), en brouillon sans dates, avec `duplicated_from_id`. Les prolongations ne sont pas copiées. Si l'originale est résolue, `help_last_year` est prérempli avec son résultat formaté (nombre + unité, ou libellé de la bonne réponse).
 
 ### 5.12 Proclamation et palmarès
 
@@ -1247,6 +1277,8 @@ export const DEFAULT_RULES: GameRules = {
 
    Les entiers restent sûrs : avec un prono et un réel bornés à 999 999 999,99, `2 × D × 10 000` reste sous 2⁵³ (vecteur E10).
 2. **Question à choix** : `B = 0` ou `W`, comme au §5.5. Le plafond ne s'y applique pas.
+
+   **Question fun** (v1.7, É8h) : `B = (podiumRank − 1) × S`, comme au §5.5, quels que soient le barème et le plafond de la saison, qui ne s'y appliquent pas. La règle d'absence `real_value` non plus : un absent y prend toujours le malus de la dernière place. Le nombre et l'effet des jokers et le seuil du « Dans le mille » s'y appliquent.
 3. **« Dans le mille »** : `D × 1 000 ≤ t × |R|`. Avec le seuil par défaut (`t = 10`), c'est la règle du §5.5. `relativeError` et `podiumRank` ne changent pas : ils se calculent toujours sur `D`, quel que soit le barème (précision approuvée par l'utilisateur). Les badges, le message de résultat du chat et le départage restent donc indépendants du barème.
 4. **Malus d'une question** = `B × coefficient`, puis, avec un joker, division par `d = jokerDivisor` arrondie au centième, la moitié vers le haut : `floor((2x + d) / (2d))`. Pour `d = 2`, c'est le `floor((x + 1) / 2)` du §5.5.
 5. **Malus d'absence** :
@@ -1355,7 +1387,7 @@ Effet : met à jour la saison et, si au moins une règle change, ajoute une lign
 | SR10 | `jokerDivisor` 3 | malus divisé par 3 dans le classement, les résultats, le profil et le palmarès proclamé |
 | SR11 | bornes : 0 ou 6 jokers, diviseur 5, seuil 0,4 ou 10,1, plafond 0 ou négatif, plafond à 3 décimales | `INVALID_INPUT` |
 | SR12 | changement de règles et premier résultat lancés en même temps | jamais des règles changées après un résultat (l'un attend l'autre) |
-| SR13 | migration `0005` sur une base avec des données | toutes les saisons prennent `DEFAULT_RULES` ; le classement de chaque saison est identique avant et après |
+| SR13 | migration `0006` sur une base avec des données | toutes les saisons prennent `DEFAULT_RULES` ; le classement de chaque saison est identique avant et après |
 | SR14 | le seul résultat de la saison est sur une question supprimée ensuite (v1.4) ; le seul joker de la saison est sur une question supprimée | les règles se changent de nouveau ; le nombre et l'effet des jokers aussi |
 
 ---
@@ -1646,10 +1678,11 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
   - variante compacte en ligne : « 3 j 07:45:10 » ;
   - après la clôture : « CLÔTURÉ » ;
   - `role="timer"` et un `aria-label` lisible.
-- **QuestionCard** : catégorie, pastille Nouveau (ou « PROLONGÉE POUR TOI »), titre, métadonnées (« Nombre · coef. ×3 » ; pour un choix, v1.2 : « Choix · coef. ×2 · mauvaise réponse : 200 de malus »), compte à rebours (jusqu'à ma date limite si ma prolongation court), statut, bouton (« Pronostiquer », « Modifier » ou « Voir »).
+- **QuestionCard** : catégorie, pastille Nouveau (ou « PROLONGÉE POUR TOI »), titre, métadonnées (« Nombre · coef. ×3 » ; pour un choix, v1.2 : « Choix · coef. ×2 · mauvaise réponse : 200 de malus » ; pour une question fun, v1.7 : « Fun · 5 de malus par place »), compte à rebours (jusqu'à ma date limite si ma prolongation court), statut, bouton (« Pronostiquer », « Modifier » ou « Voir »).
 - **PredictionForm** :
   - **nombre** : champ de 62 px de haut, bordure de 2 px `accent`, fond `bg`, valeur en display 36 px, unité en suffixe `muted` ;
   - **choix** : tuiles-boutons radio (bordure `line-strong`, sélection : bordure de 2 px `accent` et fond `accent-soft`) ; le oui/non affiche deux grandes tuiles ; rappel « Mauvaise réponse : n de malus » (v1.2) ;
+  - **question fun** (v1.7) : le champ du nombre, avec le rappel « Question fun : seul l'ordre compte. Le prono le plus proche prend 0, puis chaque place derrière lui coûte n de malus. » ;
   - ~~Juste Prix~~ : supprimé en v1.2 (étiquette et rappel retirés) ;
   - **joker** : case dans un encadré en pointillés, « JOKER ÷2 » en `accent-text` (v1.2 ; « JOKER ×2 » avant), avec « Divise ton malus par deux » et « n restant(s) cette saison ». Désactivé s'il n'en reste plus. **Absent si la saison de la question n'autorise pas les jokers** (v1.2). La case pose ou retire le joker aussitôt (`setJoker`), et reste grisée avec « Enregistre d'abord ton prono. » tant qu'aucun prono n'est enregistré (décision du 30/09/2026) ;
   - boutons « ENREGISTRER » (secondaire) et « VALIDER » (principal) ;
@@ -1750,7 +1783,7 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 - Cartes avec statut, date de clôture ou de résultat, et mon malus une fois la question résolue.
 
 **`/questions/[id]` Détail**
-- En-tête : catégorie, coefficient, malus d'une mauvaise réponse (choix, v1.2), compte à rebours ou état, titre en display 32 px, description, « Source : … ».
+- En-tête : catégorie, coefficient, malus d'une mauvaise réponse (choix, v1.2) ou « Fun : n de malus par place » (v1.7), compte à rebours ou état, titre en display 32 px, description, « Source : … ».
 - **Ouverte pour moi** (ouverte, ou clôturée avec ma prolongation en cours) : PredictionForm (ou le prono validé en lecture seule) et HelpPanel en deux colonnes. Pendant ma prolongation : pastille « PROLONGÉE POUR TOI » et compte à rebours jusqu'à ma date limite.
 - **Clôturée, j'ai un prono** : mon prono, le tableau des pronos visibles (joueur, valeur, joker), la sagesse de la foule et le StripChart (ou ChoiceDistribution), sans valeur réelle. Mention « Résultat attendu le … ». Si une prolongation court : « Prolongation en cours pour n joueur(s), jusqu'au … : son prono s'affichera ensuite. » (§6.6).
 - **Clôturée, je n'ai pas de prono** (v1.2) : « Tu n'as pas pronostiqué cette question : les pronos s'afficheront au résultat. », sans tableau ni graphique, et la mention « Résultat attendu le … ».
@@ -1787,6 +1820,7 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 - malus d'une question à nombre : l'écart brut, sans plafond, avec l'exemple 500 et 1 500 pour 1 000, et la faute de frappe ;
 - « Dans le mille » ;
 - questions à choix : le malus d'une mauvaise réponse, fixé sur chaque question ;
+- questions fun (v1.7) : la notation à la place, avec un exemple calculé par `scoreQuestion` ;
 - coefficient ;
 - jokers : ÷2, selon la saison (« Cette saison : jokers autorisés » ou « pas de jokers ») ;
 - pas de prono : le malus du pire prono ;
@@ -1836,7 +1870,7 @@ Les sections « barème (tableau des paliers) », « bonus podium » et « Juste
 - Boutons « Nouvelle question » et « Dupliquer ».
 
 **`/admin/questions/nouvelle` et `/admin/questions/[id]`**, formulaire en sections :
-1. Question : type (Nombre, Choix, Oui/Non ; « Nombre Juste Prix » disparaît en v1.2), catégorie, énoncé, description, unité ou réponses (ajout, suppression, ordre), malus d'une mauvaise réponse (choix et oui/non, v1.2, avec l'aide du §5.11), coefficient.
+1. Question : type (Nombre, Choix, Oui/Non, Fun depuis la v1.7 ; « Nombre Juste Prix » disparaît en v1.2), catégorie, énoncé, description, unité ou réponses (ajout, suppression, ordre), malus d'une mauvaise réponse (choix et oui/non, v1.2, avec l'aide du §5.11) ou malus par place (fun, v1.7), coefficient (pour une question fun, la mention « ×1 » à la place des tuiles). Les deux champs de malus sont des champs numériques (`type="number"`, demandé par l'utilisateur le 13/10/2026) : le navigateur n'y laisse taper que des nombres et les envoie avec un point (« 12.5 »), que `parseNumberInput` lit ; en modification, leur valeur initiale est donc écrite avec un point, et non au format français.
 2. Source de la valeur réelle.
 3. Pour t'aider : lien BI, valeur de l'an dernier, indice.
 4. Dates : ouverture, clôture, résultat prévu, avec la mention « heure de Paris ».
@@ -2044,6 +2078,7 @@ Les étapes É1 à É8b sont faites. Elles décrivent ce qui a été construit a
 | É8e | Suppression des questions, règlement réservé aux admins (v1.4) | 13/10, avant le lancement |
 | É8f | Suppression sans trace des messages du chat (v1.5) | 12/10, avant le lancement |
 | É8g | Correction des textes d'une question publiée (v1.6) | 13/10, avant le lancement |
+| É8h | Questions fun, notées à la place (v1.7) | 13/10, avant le lancement |
 | É9 | Recette et lancement | 13/10, lancement le 14/10 |
 | É10 | Règles réglables par saison (v1.3) | après le lancement, avant le premier résultat de 2026-2027 (novembre) |
 
@@ -2650,11 +2685,34 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
 
 **Critères de passage** : porte commune ; aucune migration générée.
 
+### É8h — Questions fun, notées à la place (v1.7)
+
+**Objectif** : l'admin crée des questions fun, des questions à nombre où les réponses peuvent varier énormément, notées à la place : `(place − 1) × malus par place`, au coefficient ×1 (cahier des charges v1.7, §5.9 ; §5.5). Demandé par l'utilisateur le 13/10/2026, la veille du lancement : il voulait « un coeff 0,5 ou moins » ; l'agent a montré qu'un coefficient ne borne pas un écart énorme et proposé la notation à la place, que l'utilisateur a retenue.
+
+**Prérequis** : É8g fusionnée dans `main` (fait le 13/10).
+
+**Branche** : `etape-08h-questions-fun`, créée depuis `main`.
+
+**Migration** `0005_fun_questions` : une colonne `question.place_malus` et trois contraintes, ajouts seulement (§4.3). Aucun nouveau service : la matrice d'autorisation reste à 39 services.
+
+**Tâches**
+1. Schéma, migration, `scoreQuestion` (`placeMalus`, `gap`) et `computeStandings` (écart moyen sans les questions fun).
+2. Validation : type `fun`, `placeMalusSchema`, `shapeOf` et `kindOf` ; services `createQuestion`, `updateQuestion` (coefficient ×1, verrou du malus par place avec le contenu), `duplicateQuestion`, `publicationProblems`.
+3. Lectures : `placeMalus` transmis à chaque calcul (résultats, classement, badges, chat, proclamation, seed) et aux vues du joueur (`PlayerQuestion`, `QuestionListItem`).
+4. Interface : formulaire de question, cartes, page de la question, rappel du formulaire de prono, colonne « Place » du tableau des pronos, détail du malus dans le bandeau « Ton prono », règlement (section « Questions fun »).
+
+**Tests**
+- Unitaires : vecteurs FU1 à FU7 (`scoring.test.ts`), C10 (`standings.test.ts`).
+- Intégration : création (malus par place obligatoire et > 0, coefficient ×1, malus par place ignoré sur un autre type), passage d'un brouillon au type fun et retour, verrous avec un prono, duplication (`questions.test.ts`) ; contraintes de la base (`schema.test.ts`) ; résultats d'une question fun résolue (places, écarts, absents, joker) et classement (`fun-question-data.test.ts`).
+- `e2e/admin-fun-question.spec.ts` : l'admin crée une question fun (pas de tuiles de coefficient, malus par place exigé), la publie ; Julien voit la règle et enregistre un prono ; le type et le malus par place sont verrouillés ; la question est supprimée.
+
+**Critères de passage** : porte commune ; `db:generate` ne produit plus rien après `0005_fun_questions`.
+
 ### É9 — Recette et lancement
 
 **Objectif** : des collègues testent, on corrige, la production est remplie et vérifiée, on lance le 14 octobre.
 
-**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change, l'É8c, l'É8d (sauf si l'utilisateur décide de la reporter après le lancement : le chat ne bloque rien d'autre), l'É8e (v1.4), avec H-17 faite, l'É8f (v1.5) et l'É8g (v1.6).
+**Prérequis** : É8 validée et fusionnée dans `main`, ainsi que l'É8b si le nom change, l'É8c, l'É8d (sauf si l'utilisateur décide de la reporter après le lancement : le chat ne bloque rien d'autre), l'É8e (v1.4), avec H-17 faite, l'É8f (v1.5), l'É8g (v1.6) et l'É8h (v1.7).
 
 **Depuis la v1.4**, le règlement est caché aux joueurs jusqu'à l'É10 : les collègues de H-12 ne le voient pas, et H-13 ne porte plus que sur les autres textes (sa relecture passe à l'É10). L'annonce du lancement (H-15) peut résumer l'essentiel des règles : le moins de malus gagne, le malus est l'écart au résultat, jokers selon la saison, pas de prono dans le chat.
 
@@ -2696,7 +2754,7 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
    - `scoreQuestion(…, rules)` et `computeStandings({ …, rules })` (§5.16) ;
    - retrait de `JOKER_DIVISOR`, `JOKERS_PER_SEASON` et `BULLSEYE_PERCENT` de `constants.ts` ;
    - tous les vecteurs du §5.16, et la non-régression avec `DEFAULT_RULES`.
-3. **Schéma et migration `0005_season_rules`** (ajouts seulement) :
+3. **Schéma et migration `0006_season_rules`** (ajouts seulement) :
    - enums `scoring_mode` et `absent_rule` ;
    - six colonnes de `season`, avec leurs contraintes ;
    - table `season_rules_event` (§4.3).
@@ -2723,7 +2781,7 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
    - aide du malus d'une mauvaise réponse.
 7. **Seed** : règles par défaut pour toutes les saisons (aucun attendu ne change), pas de ligne d'historique.
 8. **Après la fusion dans `main`** :
-   - lire la production (migration `0005` appliquée, saisons aux règles par défaut, aucune ligne d'historique) ;
+   - lire la production (migration `0006` appliquée, saisons aux règles par défaut, aucune ligne d'historique) ;
    - test rapide de la production (`e2e/prod-smoke.spec.ts`).
 
 **Tests à écrire**
@@ -2736,7 +2794,7 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
   - un classement en écart en % avec un plafond, des jokers ÷ 3 et des absents en `real_value`, calculé à la main.
 - `tests/integration/season-rules.test.ts` : SR1 à SR12, et SR14 (question supprimée, v1.4).
 - `tests/integration/seasons.test.ts` : SA9 à SA13, qui passent par `updateSeasonRules`.
-- `tests/integration/migrate.test.ts` : SR13, avec la migration `0005` sur une base remplie par le seed.
+- `tests/integration/migrate.test.ts` : SR13, avec la migration `0006` sur une base remplie par le seed.
 - `tests/integration/schema.test.ts` : les cinq contraintes de `season`.
 - `standings`, `results-data`, `badges-data`, `proclaim` : une saison en écart en % avec un plafond, attendus calculés à la main.
 - `tests/integration/authorization-matrix.test.ts` : 40 services.
@@ -2947,6 +3005,7 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | Jokers autorisés (saison) | `jokersEnabled` |
 | Malus | `malus` ; malus de base `baseMalus` ; malus d'une question `total` |
 | Malus d'une mauvaise réponse | `wrongAnswerMalus` |
+| Question fun, malus par place (v1.7) | `kind: 'fun'`, `placeMalus` (`place_malus`) |
 | Malus d'absence (pire prono) | `absentMalus` |
 | Prolongation | `extension` (`questionExtension`) |
 | Rang de proximité | `podiumRank` |
@@ -2981,11 +3040,12 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | Champ | Exemple | Conseil |
 |---|---|---|
 | Catégorie | Candidatures | Réutiliser les mêmes catégories d'une année sur l'autre. |
-| Type | Nombre / Choix / Oui-Non | Le malus d'une question à nombre est l'écart brut (v1.2) : une question sur des milliers (candidatures) pèse bien plus qu'une question sur des dizaines (JPO) ou sur un taux. En tenir compte dans le choix des questions et des coefficients. |
+| Type | Nombre / Choix / Oui-Non / Fun | Le malus d'une question à nombre est l'écart brut (v1.2) : une question sur des milliers (candidatures) pèse bien plus qu'une question sur des dizaines (JPO) ou sur un taux. En tenir compte dans le choix des questions et des coefficients. |
 | Énoncé | Combien de candidatures au total au 31 mai 2027 ? | Une seule question, sans ambiguïté, avec la date. |
 | Description | Toutes filières confondues, hors désistements. | Préciser le périmètre. |
 | Unité | candidatures | Au pluriel. |
 | Réponses possibles (choix) | Programme A / Programme B / Programme C | Entre 2 et 6 réponses. |
+| Malus par place (fun, v1.7) | 5 | Obligatoire pour une question fun : une question à nombre dont les réponses peuvent varier énormément, notée à la place, au coefficient ×1. Avec 20 joueurs et 5 par place, le dernier prend 95. |
 | Malus d'une mauvaise réponse (choix) | 100 | Obligatoire (v1.2). Le comparer aux écarts attendus sur les questions à nombre de la saison : quelques dizaines pour une JPO, quelques centaines pour des candidatures. |
 | Source de la valeur réelle | Tableau BI « Candidatures », total au 31/05/2027 à minuit | **Une source unique et incontestable.** |
 | Lien BI | https://… | Le tableau exact, pas l'accueil du BI. |

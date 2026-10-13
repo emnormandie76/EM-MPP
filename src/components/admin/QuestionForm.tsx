@@ -21,8 +21,9 @@ import {
 
 // Question form of the back office (architecture §8.3): creation and editing. A locked field
 // (§5.11) is disabled, with its reason; disabled fields are not sent and keep their value. A choice
-// (or yes/no) question asks for the malus of a wrong answer (v1.2). The wording stays editable with
-// predictions and after the closing, the labels of the answers included, in place (v1.6).
+// (or yes/no) question asks for the malus of a wrong answer (v1.2), a fun question for the malus per
+// place, its coefficient staying ×1 (v1.7). The wording stays editable with predictions and after the
+// closing, the labels of the answers included, in place (v1.6).
 
 export type QuestionFormValues = {
   kind: QuestionKind;
@@ -31,8 +32,10 @@ export type QuestionFormValues = {
   description: string;
   unit: string;
   options: string[];
-  /** Malus of a wrong answer, as typed (choice and yes/no). */
+  /** Malus of a wrong answer (choice and yes/no), a number field value: "12.5", not "12,5". */
   wrongAnswerMalus: string;
+  /** Malus per place (fun question), a number field value as well. */
+  placeMalus: string;
   source: string;
   coefficient: number;
   helpBiUrl: string;
@@ -61,6 +64,10 @@ const LEGEND = "font-display text-[15px] font-bold uppercase tracking-[0.08em] t
 const TILE =
   "flex h-11 cursor-pointer items-center gap-2.5 rounded-field border border-line-strong px-3.5 text-[15px] font-semibold has-checked:border-2 has-checked:border-accent has-checked:bg-accent-soft has-disabled:cursor-not-allowed has-disabled:opacity-60";
 const ICON = { "aria-hidden": true, size: 16, strokeWidth: 2.4 } as const;
+/** A malus field takes numbers only (the browser sends them with a point, read by parseNumberInput). */
+const MALUS_INPUT = { type: "number", inputMode: "decimal", min: 0, step: 0.01, autoComplete: "off" } as const;
+/** The malus per place is a whole number (13/10/2026). */
+const PLACE_MALUS_INPUT = { ...MALUS_INPUT, inputMode: "numeric", min: 1, step: 1 } as const;
 
 function LockNote({ reason }: { reason: string | null }) {
   return reason ? <p className="rounded-field bg-raised px-3 py-2 text-sm text-ink-2">{reason}</p> : null;
@@ -185,7 +192,9 @@ export function QuestionForm({
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
   const contentLocked = readOnly || locks.content !== null;
   const otherLocked = readOnly || locks.other !== null;
-  const isNumber = kind === "number";
+  // A fun question is a number question: it has a unit and no answers (v1.7).
+  const isNumber = kind === "number" || kind === "fun";
+  const isFun = kind === "fun";
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
@@ -196,7 +205,7 @@ export function QuestionForm({
         <LockNote reason={locks.content} />
         <fieldset className="flex min-w-0 flex-col gap-1.5" aria-describedby={errors.kind ? "kind-error" : undefined}>
           <legend className={`${LEGEND} mb-1.5`}>Type</legend>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
             {QUESTION_KINDS.map((value) => (
               <label key={value} className={TILE}>
                 <input
@@ -271,12 +280,22 @@ export function QuestionForm({
           <OptionsEditor initial={initial.options} disabled={otherLocked} fixed={contentLocked} error={errors.options} />
         )}
         {errors.options && kind === "yesNo" ? <p className="text-sm font-medium text-hot">{errors.options}</p> : null}
+        {isFun ? (
+          <Field
+            name="placeMalus"
+            label="Malus par place"
+            {...PLACE_MALUS_INPUT}
+            hint="Obligatoire, nombre entier supérieur à 0. Pour une question dont les réponses peuvent varier énormément : seul l'ordre compte, le prono le plus proche prend 0, puis chaque place derrière lui coûte ce malus. Avec 20 joueurs et 5 par place, le dernier prend 95."
+            defaultValue={initial.placeMalus}
+            disabled={contentLocked}
+            error={errors.placeMalus}
+          />
+        ) : null}
         {isNumber ? null : (
           <Field
             name="wrongAnswerMalus"
             label="Malus d'une mauvaise réponse"
-            inputMode="decimal"
-            autoComplete="off"
+            {...MALUS_INPUT}
             hint="Obligatoire, supérieur à 0. Compare-le aux écarts attendus sur les questions à nombre : quelques dizaines pour une JPO, quelques centaines pour des candidatures."
             defaultValue={initial.wrongAnswerMalus}
             disabled={contentLocked}
@@ -284,25 +303,33 @@ export function QuestionForm({
           />
         )}
 
-        <fieldset className="flex min-w-0 flex-col gap-1.5">
-          <legend className={`${LEGEND} mb-1.5`}>Coefficient</legend>
-          <div className="flex flex-wrap gap-2">
-            {COEFFICIENTS.map((value) => (
-              <label key={value} className={`${TILE} w-24 justify-center`}>
-                <input
-                  type="radio"
-                  name="coefficient"
-                  value={value}
-                  defaultChecked={initial.coefficient === value}
-                  disabled={contentLocked}
-                  className="size-4 accent-accent"
-                />
-                ×{value}
-              </label>
-            ))}
+        {isFun ? (
+          <div className="flex flex-col gap-1.5">
+            <p className={LEGEND}>Coefficient</p>
+            <p className="text-[15px] text-ink-2">×1 : une question fun garde ce coefficient, le malus par place fait son poids.</p>
+            {errors.coefficient ? <p className="text-sm font-medium text-hot">{errors.coefficient}</p> : null}
           </div>
-          <p className="text-[13px] text-muted">Réserve le ×3 à une ou deux grosses questions.</p>
-        </fieldset>
+        ) : (
+          <fieldset className="flex min-w-0 flex-col gap-1.5">
+            <legend className={`${LEGEND} mb-1.5`}>Coefficient</legend>
+            <div className="flex flex-wrap gap-2">
+              {COEFFICIENTS.map((value) => (
+                <label key={value} className={`${TILE} w-24 justify-center`}>
+                  <input
+                    type="radio"
+                    name="coefficient"
+                    value={value}
+                    defaultChecked={initial.coefficient === value}
+                    disabled={contentLocked}
+                    className="size-4 accent-accent"
+                  />
+                  ×{value}
+                </label>
+              ))}
+            </div>
+            <p className="text-[13px] text-muted">Réserve le ×3 à une ou deux grosses questions.</p>
+          </fieldset>
+        )}
       </Card>
 
       <Card as="section" className="flex flex-col gap-4">

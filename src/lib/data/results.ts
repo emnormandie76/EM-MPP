@@ -81,10 +81,17 @@ export async function getQuestionResults(db: Database, viewer: PlayerViewer, q: 
   if (q.result) {
     // Resolved: every prediction is visible (§6.6), so the malus of an absence is the true one.
     const scored = scoreQuestion(
-      { type: q.type, coefficient: q.coefficient, resultNumber: q.result.valueNumber, resultOptionId: q.result.optionId, wrongAnswerMalus: q.wrongAnswerMalus },
+      {
+        type: q.type,
+        coefficient: q.coefficient,
+        resultNumber: q.result.valueNumber,
+        resultOptionId: q.result.optionId,
+        wrongAnswerMalus: q.wrongAnswerMalus,
+        placeMalus: q.placeMalus,
+      },
       answered.map(({ answer }) => answer),
     );
-    scores = scored.scores.map(({ baseMalus, total, bullseye, relativeError, podiumRank }) => ({ baseMalus, total, bullseye, relativeError, podiumRank }));
+    scores = scored.scores.map(({ baseMalus, gap, total, bullseye, relativeError, podiumRank }) => ({ baseMalus, gap, total, bullseye, relativeError, podiumRank }));
     absentMalus = scored.absentMalus;
     const predicted = new Set(answered.map(({ userId }) => userId));
     const seasonId = await seasonOf(db, q.id);

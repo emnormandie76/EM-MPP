@@ -47,7 +47,7 @@ const notFound = () => fail("NOT_FOUND", NOT_FOUND);
 
 /** What may still change, given the status and whether predictions exist; null means free. */
 export type EditRules = {
-  /** Type, number and order of the answers, malus of a wrong answer, coefficient. */
+  /** Type, number and order of the answers, malus of a wrong answer or per place, coefficient. */
   content: ErrorCode | null;
   /**
    * Wording (title, description, unit, source, labels of the answers), category, help and expected
@@ -82,7 +82,7 @@ export function editRules(status: QuestionStatus, predictionCount: number): Edit
  * that would close in a proclaimed season would never count (decision of 30/09/2026).
  */
 export function publicationProblems(
-  row: Pick<QuestionRow, "type" | "opensAt" | "closesAt" | "expectedResultAt" | "coefficient" | "seasonId" | "wrongAnswerMalus">,
+  row: Pick<QuestionRow, "type" | "opensAt" | "closesAt" | "expectedResultAt" | "coefficient" | "seasonId" | "wrongAnswerMalus" | "placeMalus">,
   optionLabels: readonly string[],
   now: Date,
   proclaimedSeasonIds: ReadonlySet<number> = new Set(),
@@ -98,9 +98,11 @@ export function publicationProblems(
     problems.push(QUESTION_MESSAGES.resultBeforeCloses);
   }
   if (!(COEFFICIENTS as readonly number[]).includes(row.coefficient)) problems.push(QUESTION_MESSAGES.coefficient);
+  // The database guarantees the coefficient ×1 of a fun question (v1.7).
+  if (row.placeMalus !== null && row.coefficient !== 1) problems.push(QUESTION_MESSAGES.funCoefficient);
   if (row.type === "choice") {
     // The database guarantees the malus of a wrong answer of a choice question.
-    const shape = shapeOf("choice", null, optionLabels, row.wrongAnswerMalus);
+    const shape = shapeOf("choice", null, optionLabels, row.wrongAnswerMalus, null);
     if (!shape.ok) problems.push(shape.message);
   }
   return problems;
@@ -184,12 +186,23 @@ const sameMinute = (a: Date | null, b: Date | null) =>
   (a === null ? null : Math.floor(a.getTime() / MINUTE_MS)) === (b === null ? null : Math.floor(b.getTime() / MINUTE_MS));
 const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((item, i) => item === b[i]);
 
+/**
+ * The coefficient of the resulting question: a fun question keeps ×1, the malus per place being its
+ * weight (v1.7). The form does not send it for a fun question; another value sent is refused.
+ */
+function coefficientOf(shape: QuestionShape, sent: number | undefined, current: number): number | Failure {
+  if (shape.placeMalus === null) return sent ?? current;
+  if (sent !== undefined && sent !== 1) return fail("INVALID_INPUT", undefined, { coefficient: QUESTION_MESSAGES.funCoefficient });
+  return 1;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Create and update
 
 /**
- * New draft: category, kind, title and source are required, and the malus of a wrong answer for a
- * choice (v1.2); dates are optional (§5.11).
+ * New draft: category, kind, title and source are required, the malus of a wrong answer for a choice
+ * (v1.2), and the malus per place for a fun question, which keeps the coefficient ×1 (v1.7); dates
+ * are optional (§5.11).
  */
 export async function createQuestion(
   db: Database,
@@ -203,8 +216,10 @@ export async function createQuestion(
   if (!parsed.success) return fail("INVALID_INPUT", undefined, fieldErrorsOf(parsed.error.issues));
   const data = parsed.data;
 
-  const shaped = shapeOf(data.kind, data.unit, data.options, data.wrongAnswerMalus);
+  const shaped = shapeOf(data.kind, data.unit, data.options, data.wrongAnswerMalus, data.placeMalus);
   if (!shaped.ok) return fail("INVALID_INPUT", undefined, { [shaped.field]: shaped.message });
+  const coefficient = coefficientOf(shaped.shape, data.coefficient, 1);
+  if (isFailure(coefficient)) return coefficient;
   const dates = { opensAt: data.opensAt ?? null, closesAt: data.closesAt ?? null, expectedResultAt: data.expectedResultAt ?? null };
   const errors = dateErrors(dates);
   if (Object.keys(errors).length > 0) return fail("INVALID_INPUT", undefined, errors);
@@ -213,7 +228,7 @@ export async function createQuestion(
     const seasons = await seasonsForQuestions(tx);
     const problem = await categoryProblem(tx, data.categoryId);
     if (problem) return problem;
-    const { type, unit, options, wrongAnswerMalus } = shaped.shape;
+    const { type, unit, options, wrongAnswerMalus, placeMalus } = shaped.shape;
     const [row] = await tx
       .insert(question)
       .values({
@@ -222,6 +237,7 @@ export async function createQuestion(
         categoryId: data.categoryId,
         type,
         wrongAnswerMalus,
+        placeMalus,
         title: data.title,
         description: data.description ?? null,
         unit,
@@ -230,7 +246,7 @@ export async function createQuestion(
         helpLastYear: data.helpLastYear ?? null,
         helpHint: data.helpHint ?? null,
         ...dates,
-        coefficient: data.coefficient ?? 1,
+        coefficient,
         status: "draft",
         createdBy: me.id,
         createdAt: now,
@@ -274,18 +290,29 @@ export async function updateQuestion(
       unit: current.unit,
       options: currentOptions,
       wrongAnswerMalus: current.wrongAnswerMalus,
+      placeMalus: current.placeMalus,
     };
-    if (patch.kind !== undefined || patch.options !== undefined || patch.unit !== undefined || patch.wrongAnswerMalus !== undefined) {
-      // A number switched to a choice needs the malus of a wrong answer; a choice switched to a number loses it.
+    if (
+      patch.kind !== undefined ||
+      patch.options !== undefined ||
+      patch.unit !== undefined ||
+      patch.wrongAnswerMalus !== undefined ||
+      patch.placeMalus !== undefined
+    ) {
+      // A question switched to a choice needs the malus of a wrong answer, to a fun question the malus
+      // per place; switching away clears them.
       const shaped = shapeOf(
         patch.kind ?? kindOf(current, currentOptions),
         patch.unit !== undefined ? patch.unit : current.unit,
         patch.options ?? currentOptions,
         patch.wrongAnswerMalus !== undefined ? patch.wrongAnswerMalus : current.wrongAnswerMalus,
+        patch.placeMalus !== undefined ? patch.placeMalus : current.placeMalus,
       );
       if (!shaped.ok) return fail("INVALID_INPUT", undefined, { [shaped.field]: shaped.message });
       shape = shaped.shape;
     }
+    const coefficient = coefficientOf(shape, patch.coefficient, current.coefficient);
+    if (isFailure(coefficient)) return coefficient;
     const pick = <K extends keyof typeof patch & keyof QuestionRow>(key: K) =>
       (patch[key] !== undefined ? patch[key] : current[key]) as QuestionRow[K];
     // A date sent back in the same minute keeps its exact stored value.
@@ -297,11 +324,12 @@ export async function updateQuestion(
       categoryId: pick("categoryId"),
       type: shape.type,
       wrongAnswerMalus: shape.wrongAnswerMalus,
+      placeMalus: shape.placeMalus,
       title: pick("title"),
       description: pick("description"),
       unit: shape.unit,
       source: pick("source"),
-      coefficient: pick("coefficient"),
+      coefficient,
       helpBiUrl: pick("helpBiUrl"),
       helpLastYear: pick("helpLastYear"),
       helpHint: pick("helpHint"),
@@ -312,7 +340,7 @@ export async function updateQuestion(
 
     const optionsChanged = !sameList(shape.options, currentOptions);
     const answersMoved = optionsChanged && optionsMoved(shape.options, currentOptions);
-    const structureChanged = (["type", "wrongAnswerMalus", "coefficient"] as const).some((key) => next[key] !== current[key]);
+    const structureChanged = (["type", "wrongAnswerMalus", "placeMalus", "coefficient"] as const).some((key) => next[key] !== current[key]);
     const contentChanged = structureChanged || answersMoved;
     const otherChanged =
       (optionsChanged && !answersMoved) ||
@@ -520,7 +548,7 @@ function formattedResult(row: QuestionRow, options: { id: number; label: string 
 
 /**
  * Copy in draft, without dates (§5.11): same category, kind, title, description, unit, source,
- * help, coefficient, answers and malus of a wrong answer; not the extensions. When the original is
+ * help, coefficient, answers, malus of a wrong answer and malus per place; not the extensions. When the original is
  * resolved, its result becomes "last year's value".
  */
 export async function duplicateQuestion(
@@ -545,6 +573,7 @@ export async function duplicateQuestion(
         categoryId: original.categoryId,
         type: original.type,
         wrongAnswerMalus: original.wrongAnswerMalus,
+        placeMalus: original.placeMalus,
         title: original.title,
         description: original.description,
         unit: original.unit,

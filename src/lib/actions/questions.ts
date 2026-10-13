@@ -30,6 +30,7 @@ const FIELDS = [
   "description",
   "unit",
   "wrongAnswerMalus",
+  "placeMalus",
   "source",
   "coefficient",
   "helpBiUrl",

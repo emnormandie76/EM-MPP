@@ -3,7 +3,9 @@ import { BULLSEYE_PERCENT, JOKER_DIVISOR } from "./constants";
 // Malus of each prediction on a resolved question (architecture §5.5, v1.2): the raw gap to the real
 // value, without any cap; the fewest malus wins. Computed on every read, never stored. Predictions,
 // real values and malus of a wrong answer have at most 2 decimals: everything is computed in exact
-// integer hundredths, and the malus stay in hundredths until they are displayed.
+// integer hundredths, and the malus stay in hundredths until they are displayed. A fun question
+// (v1.7) is a number question scored by its order of closeness only: the closest takes 0, then each
+// place behind costs the malus per place, however wild the gaps.
 
 export type QuestionType = "number" | "choice";
 
@@ -14,6 +16,8 @@ export type ScoringQuestion = {
   resultOptionId: number | null;
   /** Malus of a wrong answer, for a choice question. */
   wrongAnswerMalus: number | null;
+  /** Malus per place of a fun question (v1.7); null for any other question. */
+  placeMalus: number | null;
 };
 
 export type ScoringPrediction = {
@@ -24,8 +28,13 @@ export type ScoringPrediction = {
 
 export type PredictionScore<P extends ScoringPrediction = ScoringPrediction> = {
   prediction: P;
-  /** Gap (number) or malus of a wrong answer (choice), in hundredths, before coefficient and joker. */
+  /**
+   * Malus before coefficient and joker, in hundredths: the gap (number), (place − 1) × the malus per
+   * place (fun question, v1.7), or the malus of a wrong answer (choice).
+   */
   baseMalus: number;
+  /** |prediction − real| in hundredths, for a number question (fun included); else null. */
+  gap: number | null;
   /** Malus of the question, in hundredths: base × coefficient, halved with a joker. */
   total: number;
   /** Relative error of 1 % or less (number question). It does not change the malus. */
@@ -40,8 +49,8 @@ export type QuestionScores<P extends ScoringPrediction = ScoringPrediction> = {
   scores: PredictionScore<P>[];
   /**
    * Malus of a player of the standings without a prediction (decision of 02/10/2026): the worst
-   * prediction's, in hundredths. Largest gap × coefficient (number), malus of a wrong answer ×
-   * coefficient (choice), 0 when nobody predicted.
+   * prediction's, in hundredths. Largest gap × coefficient (number), malus of the last place (fun
+   * question), malus of a wrong answer × coefficient (choice), 0 when nobody predicted.
    */
   absentMalus: number;
 };
@@ -76,6 +85,7 @@ function scoreChoice<P extends ScoringPrediction>(question: ScoringQuestion, pre
     return {
       prediction,
       baseMalus,
+      gap: null,
       total: total(baseMalus, question.coefficient, prediction.joker),
       bullseye: false,
       relativeError: null,
@@ -90,22 +100,30 @@ function scoreNumber<P extends ScoringPrediction>(question: ScoringQuestion, pre
   const real = toHundredths(question.resultNumber);
   const gaps = predictions.map(({ valueNumber }) => (valueNumber === null ? null : Math.abs(toHundredths(valueNumber) - real)));
   const known = gaps.filter((gap) => gap !== null);
-  const absentMalus = known.length === 0 ? 0 : Math.max(...known) * question.coefficient;
+  /** 1 + the number of predictions strictly closer: ties share their place (1, 1, 3). */
+  const placeOf = (gap: number) => 1 + known.filter((other) => other < gap).length;
+  // A fun question (v1.7) only reads the order: each place behind the closest costs the malus per place.
+  const step = question.placeMalus === null ? null : toHundredths(question.placeMalus);
+  const baseOf = (gap: number) => (step === null ? gap : (placeOf(gap) - 1) * step);
+  // The worst prediction is the farthest one, whose place is the last.
+  const absentMalus = known.length === 0 ? 0 : baseOf(Math.max(...known)) * question.coefficient;
 
   const scores = predictions.map((prediction, index) => {
     const gap = gaps[index];
     // A prediction without a value (impossible through the services) is treated as an absence.
     if (gap === null) {
-      return { prediction, baseMalus: absentMalus, total: absentMalus, bullseye: false, relativeError: null, podiumRank: null };
+      return { prediction, baseMalus: absentMalus, gap: null, total: absentMalus, bullseye: false, relativeError: null, podiumRank: null };
     }
+    const baseMalus = baseOf(gap);
     return {
       prediction,
-      baseMalus: gap,
-      total: total(gap, question.coefficient, prediction.joker),
+      baseMalus,
+      gap,
+      total: total(baseMalus, question.coefficient, prediction.joker),
       // Real value 0: only 0 is a Dans le mille.
       bullseye: gap * 100 <= BULLSEYE_PERCENT * Math.abs(real),
       relativeError: real === 0 ? (gap === 0 ? 0 : Number.POSITIVE_INFINITY) : gap / Math.abs(real),
-      podiumRank: 1 + known.filter((other) => other < gap).length,
+      podiumRank: placeOf(gap),
     };
   });
   return { scores, absentMalus };

@@ -115,6 +115,7 @@ async function resultTexts(db: Database, questionIds: number[]): Promise<Map<num
       resultNumber: question.resultNumber,
       resultOptionId: question.resultOptionId,
       wrongAnswerMalus: question.wrongAnswerMalus,
+      placeMalus: question.placeMalus,
       correctedAt: question.correctedAt,
       rightAnswer: questionOption.label,
     })

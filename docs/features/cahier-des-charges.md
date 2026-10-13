@@ -1,6 +1,8 @@
 # Cahier des charges — Les petits pronos de la promo
 
-> **Version 1.6 du 13/10/2026.** Toutes les décisions sont prises. La section 8 liste les précisions ajoutées en rédigeant ; elles restent contestables.
+> **Version 1.7 du 13/10/2026.** Toutes les décisions sont prises. La section 8 liste les précisions ajoutées en rédigeant ; elles restent contestables.
+>
+> **Changement de la v1.7** (demandé par l'utilisateur le 13/10/2026, à l'étape É8h) : l'admin peut créer des **questions fun**, des questions à nombre où les réponses peuvent varier énormément, notées **à la place** : le prono le plus proche prend 0, puis chaque place derrière lui coûte le **malus par place** fixé par l'admin. Le coefficient reste ×1. Une erreur énorme ne coûte qu'une place : une question fun ne peut pas décider seule du classement. Sections concernées : 3, 4.3, 4.9, 5.4 à 5.7, 5.9 (nouvelle), 6, 7, 8, 11.
 >
 > **Changement de la v1.6** (demandé par l'utilisateur le 13/10/2026, **livré avant le lancement**, à l'étape É8g) : l'admin peut **corriger les textes** d'une question publiée même quand elle a des pronos, et même après sa clôture : énoncé, description, unité, source et libellé des réponses (renommées sur place, dans le même ordre). Le type, le nombre et l'ordre des réponses, le malus d'une mauvaise réponse et le coefficient restent figés dès le premier prono ; les règles des dates ne changent pas. Sections concernées : 4.9, 5.7, 8, 11.
 >
@@ -58,11 +60,12 @@ Usage : une semaine intense à la mi-octobre, puis des visites ponctuelles pour 
 - **Saison** : une période créée par l'admin, avec un nom (par exemple « 2026-2027 ») et une date de début, choisie selon la rentrée. Une saison se termine quand la suivante commence : la bascule est automatique à la date de début de la nouvelle saison, que l'admin crée à l'avance. Tant que la saison suivante n'est pas créée, la saison en cours continue. La première saison est 2026-2027, créée avant le lancement du 14 octobre 2026. Chaque saison a son classement et ses lots. L'admin choisit aussi si les jokers sont autorisés pendant la saison (v1.2), et, depuis la v1.3, les autres **règles de la saison** (5.8).
 - **Règles de la saison** (v1.3) : barème, plafond, nombre et effet des jokers, malus d'un absent, seuil du « Dans le mille ». Réglées par l'admin, figées dès le premier résultat de la saison. Par défaut, ce sont celles de la v1.2, décrites aux sections 5.1 à 5.7.
 - **Catégorie** : un thème créé par l'admin (JPO, Candidatures, Intégration…) pour ranger les questions. Il n'y a pas de classement par catégorie.
-- **Question** : ce qu'il faut pronostiquer. Deux types :
+- **Question** : ce qu'il faut pronostiquer. Deux types, et une variante de la question à nombre :
   - **Nombre** : le joueur saisit une valeur (« combien de participants à la JPO du 15 novembre ? »). Son malus est l'écart avec la valeur réelle.
   - **Choix** : le joueur choisit une réponse parmi celles définies par l'admin (« quel programme aura le plus de candidatures ? »). Le oui/non est un choix à deux réponses. L'admin fixe le malus d'une mauvaise réponse.
+  - **Fun** (v1.7) : une question à nombre pour le plaisir, où les réponses peuvent aller du simple au centuple (« combien de cafés servis au distributeur du campus de Caen en novembre ? »). Elle se note à la place (5.9) : seul l'ordre des pronos compte. L'admin fixe le malus par place.
 
-  Une question contient : type, énoncé, catégorie, unité (pour un nombre), réponses possibles et malus d'une mauvaise réponse (pour un choix), source de la valeur réelle, date d'ouverture, date de clôture, date de résultat prévue, coefficient, bloc d'aide, puis la valeur réelle ou la bonne réponse.
+  Une question contient : type, énoncé, catégorie, unité (pour un nombre), réponses possibles et malus d'une mauvaise réponse (pour un choix), malus par place (pour une question fun), source de la valeur réelle, date d'ouverture, date de clôture, date de résultat prévue, coefficient, bloc d'aide, puis la valeur réelle ou la bonne réponse.
 - **Bloc « Pour t'aider »** : champs facultatifs remplis par l'admin sur chaque question : lien vers le tableau BI utile, valeur de l'an dernier, indice.
 - **Prono** : la réponse d'un joueur à une question. Il a deux états :
   - **enregistré** : modifiable à volonté ;
@@ -99,7 +102,7 @@ Une prolongation rouvre une question pour un seul joueur, qu'elle soit encore ou
 - Les annonces de l'admin, la plus récente en premier.
 
 ### 4.3 Pronostiquer
-- Une page liste toutes les questions ouvertes, chacune avec son champ de saisie (nombre ou choix), pour remplir la campagne d'octobre d'une traite. Chaque question a aussi sa page détaillée : énoncé complet, unité, dates, coefficient, malus d'une mauvaise réponse (choix), bloc « Pour t'aider ».
+- Une page liste toutes les questions ouvertes, chacune avec son champ de saisie (nombre ou choix), pour remplir la campagne d'octobre d'une traite. Chaque question a aussi sa page détaillée : énoncé complet, unité, dates, coefficient, malus d'une mauvaise réponse (choix) ou malus par place (question fun), bloc « Pour t'aider ».
 - **Enregistrer** garde le prono modifiable. **Valider** le rend définitif. La validation se fait question par question.
 - Avant la validation, un écran de confirmation affiche la valeur formatée (« 2 500 candidatures ») : une faute de frappe (25 000 au lieu de 2 500) serait sinon irréparable, et coûterait cher en malus.
 - À la clôture, tout prono enregistré est validé automatiquement et compte.
@@ -150,7 +153,7 @@ Une prolongation rouvre une question pour un seul joueur, qu'elle soit encore ou
 - Les données des saisons passées sont conservées. La liste blanche, les comptes et les catégories passent d'une saison à l'autre.
 
 ### 4.9 Back-office admin
-- **Questions** : créer (nombre, choix, oui/non ; pour un choix, avec le malus d'une mauvaise réponse), publier, modifier (les textes restent corrigeables après les premiers pronos, v1.6, voir 5.7), annuler, supprimer définitivement, une par une ou plusieurs à la fois (v1.4, voir 5.7) ; créer en série pour la campagne d'octobre (mêmes dates pour un lot de questions) ; dupliquer une question d'une saison passée ; saisir puis corriger la valeur réelle, avec recalcul automatique.
+- **Questions** : créer (nombre, choix, oui/non, fun ; pour un choix, avec le malus d'une mauvaise réponse ; pour une question fun, avec le malus par place, v1.7), publier, modifier (les textes restent corrigeables après les premiers pronos, v1.6, voir 5.7), annuler, supprimer définitivement, une par une ou plusieurs à la fois (v1.4, voir 5.7) ; créer en série pour la campagne d'octobre (mêmes dates pour un lot de questions) ; dupliquer une question d'une saison passée ; saisir puis corriger la valeur réelle, avec recalcul automatique.
 - **Suivi** : pour chaque question ouverte, l'état de chaque joueur (à faire, enregistré, validé), sans les valeurs. L'admin relance les retardataires par ses propres moyens (Teams, à l'oral). Depuis ce suivi, il prolonge une question pour un joueur absent (4.10).
 - **Pronos** : déverrouiller un prono validé avant la clôture.
 - **Joueurs** : gérer la liste blanche, désactiver un compte, attribuer un mot de passe provisoire, donner le rôle admin.
@@ -197,7 +200,7 @@ Ce choix est assumé (décision du 02/10/2026) : une question sur un grand nombr
 Bonne réponse : 0. Mauvaise réponse : le malus fixé par l'admin sur la question, affiché aux joueurs avec la question. L'admin le choisit en le comparant aux écarts attendus sur les questions à nombre de la saison.
 
 ### 5.4 Coefficient et joker
-- **Coefficient** : l'admin applique ×1, ×2 ou ×3 à chaque question, ce qui multiplie le malus.
+- **Coefficient** : l'admin applique ×1, ×2 ou ×3 à chaque question, ce qui multiplie le malus. Une question fun reste à ×1 (5.9).
 - **Joker** : divise le malus de la question par deux. 2 jokers par saison, si la saison les autorise.
 
 **Malus d'une question** = malus × coefficient ÷ 2 si joker.
@@ -207,6 +210,7 @@ Bonne réponse : 0. Mauvaise réponse : le malus fixé par l'admin sur la questi
 ### 5.5 Pas de prono
 Un joueur qui n'a pas de prono sur une question résolue prend le malus du **pire prono** de la question :
 - question à nombre : l'écart le plus grand parmi les pronos de l'équipe, multiplié par le coefficient ;
+- question fun : le malus de la dernière place (5.9) ;
 - question à choix : le malus d'une mauvaise réponse, multiplié par le coefficient ;
 - si personne n'a pronostiqué la question, 0 pour tout le monde.
 
@@ -215,7 +219,7 @@ Sans cette règle, ne pas répondre serait la meilleure stratégie. La prolongat
 ### 5.6 Départage au classement
 1. Le moins de malus.
 2. Puis le plus grand nombre de « Dans le mille ».
-3. Puis l'écart relatif moyen le plus faible (|prono − réel| / réel), sur les questions à nombre que le joueur a pronostiquées.
+3. Puis l'écart relatif moyen le plus faible (|prono − réel| / réel), sur les questions à nombre que le joueur a pronostiquées, questions fun exceptées (v1.7).
 4. Sinon, ex æquo.
 
 ### 5.7 Cas particuliers
@@ -226,7 +230,7 @@ Sans cette règle, ne pas répondre serait la meilleure stratégie. La prolongat
 - Question supprimée (v1.4) : elle disparaît comme si elle n'avait jamais existé, avec ses pronos, ses jokers (rendus), son historique, ses prolongations et son message de résultat dans le chat. C'est définitif. La suppression sert aux questions de test et aux erreurs de saisie ; pour une vraie question dont on ne connaîtra pas la valeur, l'admin l'annule plutôt, et les joueurs la voient annulée. Une question d'une saison proclamée ne se supprime pas : le palmarès est figé, et les profils doivent rester d'accord avec lui.
 - Joueur arrivé en cours de saison : il joue les questions encore ouvertes. Sur les questions déjà résolues, il prend le malus d'absence, sinon il serait premier. Pour une question clôturée sans résultat, l'admin peut lui accorder une prolongation.
 - Joueur parti : compte désactivé, historique conservé. S'il n'a aucun prono dans une saison, il n'apparaît pas dans son classement.
-- Une fois des pronos reçus, l'admin peut modifier l'aide et repousser la clôture, et corriger les textes (v1.6) : énoncé, description, unité, source et libellé des réponses. Il ne peut pas changer le type, le nombre ni l'ordre des réponses, le malus d'une mauvaise réponse ni le coefficient, ni avancer la clôture. Pour cela, il annule la question et en crée une nouvelle.
+- Une fois des pronos reçus, l'admin peut modifier l'aide et repousser la clôture, et corriger les textes (v1.6) : énoncé, description, unité, source et libellé des réponses. Il ne peut pas changer le type, le nombre ni l'ordre des réponses, le malus d'une mauvaise réponse ou par place ni le coefficient, ni avancer la clôture. Pour cela, il annule la question et en crée une nouvelle.
 - Après la clôture, et même après le résultat, les textes se corrigent encore (v1.6), comme la catégorie, l'aide et la date de résultat prévue. Une réponse renommée garde ses pronos et, si c'est la bonne, le résultat.
 - Toutes les dates et heures sont celles de Paris.
 
@@ -265,6 +269,26 @@ Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.
 
 **Question supprimée** (v1.4). Une question supprimée ne fige plus rien : si c'était le seul résultat de la saison, ses règles redeviennent modifiables ; si elle portait les seuls jokers, leur nombre et leur effet aussi.
 
+**Question fun** (v1.7). Le barème, le plafond et le malus d'un absent de la saison ne s'appliquent pas à une question fun, notée à la place (5.9). Le nombre et l'effet des jokers, et le seuil du « Dans le mille », s'y appliquent.
+
+### 5.9 Question fun (v1.7)
+
+Sur une question où les réponses peuvent varier énormément (« combien de cafés servis au distributeur du campus de Caen en novembre ? »), l'écart brut (5.2) donnerait des malus démesurés : une seule question déciderait du classement. Un coefficient réduit n'y changerait rien, l'écart restant énorme. Une question fun se note donc **à la place** :
+
+> malus = (place − 1) × malus par place
+
+- **Place** : 1 + le nombre de pronos strictement plus proches de la valeur réelle. Les ex æquo partagent leur place (1, 1, 3).
+- **Malus par place** : fixé par l'admin sur la question, nombre entier supérieur à 0 (décision de l'utilisateur du 13/10/2026), affiché aux joueurs avec elle. Le plus proche prend 0.
+- **Coefficient** : toujours ×1. Le malus par place fait le poids de la question.
+- **Joker** : il divise le malus par deux, comme ailleurs.
+- **Pas de prono** : le malus de la dernière place, c'est-à-dire celui du pire prono (5.5) ; 0 si personne n'a pronostiqué.
+- **« Dans le mille » et badges** : ils comptent comme sur toute question à nombre.
+- **Départage** : une question fun n'entre pas dans l'écart relatif moyen (5.6), qu'une seule question extrême fausserait.
+
+*Exemple : valeur réelle 4 200 cafés, 5 de malus par place. Julien 4 000 (0), Léa 5 000 (5), Sarah 2 500 (10), Hugo 900 (15), Mehdi 8 000 (20), Camille 20 000 (25). Un joueur sans prono prend 25. Avec l'écart brut et un coefficient de 0,5, Camille aurait pris 7 900.*
+
+Le poids reste borné : avec 20 joueurs et 5 de malus par place, le dernier prend 95, quelle que soit l'ampleur de son erreur.
+
 ## 6. Décisions prises
 
 | Sujet | Décision |
@@ -297,11 +321,14 @@ Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.
 | Aide (P6) | Bloc « Pour t'aider » rempli par l'admin |
 | Lancement | 14 octobre 2026, tout le périmètre livré (sauf la v1.3, après le lancement) |
 | Affichage | Pensé d'abord pour ordinateur |
+| Questions fun (v1.7, 13/10/2026) | Variante de la question à nombre, notée à la place : (place − 1) × malus par place fixé par l'admin ; coefficient ×1 ; un absent prend le malus de la dernière place ; hors écart relatif moyen du départage. Option écartée : un coefficient de 0,5, qui ne borne pas un écart énorme |
 | Règles réglables (v1.3, 12/10/2026) | Par saison, dans le back-office : barème (écart brut ou en %), plafond, nombre et effet des jokers, malus d'un absent, seuil du « Dans le mille ». Valeurs par défaut = v1.2. Figées au premier résultat de la saison (jokers : au premier joker posé). Livrées après le lancement (É10), avant le premier résultat |
 
 ## 7. Idées
 
-**Retenues.** I02 coefficient · I03 jokers (autorisés par saison depuis la v1.2) · I05 questions à choix et oui/non · I07 bloc « Pour t'aider » · I10 sagesse de la foule · I11 graphique des pronos · I15 flèches d'évolution · I18 profil joueur · I19 badges · I20 palmarès · I22 avatar · I27 duplication de questions · I28 historique horodaté des pronos · I31 annonces · I34 liste blanche · I36 pastille « Nouveau » · I37 chat général (v1.2) · I38 message de résultat dans le chat (v1.2) · I39 prolongation pour un absent (v1.2) · I40 règles réglables par saison (v1.3) · I41 historique des changements de règles (v1.3) · I42 règles reprises de la saison précédente (v1.3).
+**Retenues.** I02 coefficient · I03 jokers (autorisés par saison depuis la v1.2) · I05 questions à choix et oui/non · I07 bloc « Pour t'aider » · I10 sagesse de la foule · I11 graphique des pronos · I15 flèches d'évolution · I18 profil joueur · I19 badges · I20 palmarès · I22 avatar · I27 duplication de questions · I28 historique horodaté des pronos · I31 annonces · I34 liste blanche · I36 pastille « Nouveau » · I37 chat général (v1.2) · I38 message de résultat dans le chat (v1.2) · I39 prolongation pour un absent (v1.2) · I40 règles réglables par saison (v1.3) · I41 historique des changements de règles (v1.3) · I42 règles reprises de la saison précédente (v1.3) · I48 questions fun notées à la place (v1.7).
+
+**Écartées en v1.7** (13/10/2026). I49 coefficient réduit (×0,5) pour les questions fun : un écart de 15 800 donnerait encore 7 900 de malus · I50 questions fun hors classement : sans enjeu, personne ne cherche · I51 écart en % plafonné sur une question fun : presque tout le monde atteindrait le plafond.
 
 **Écartées en v1.3** (12/10/2026). I43 préréglages de règles et aperçu en direct des exemples · I44 annonce automatique d'un changement de règles (chat, mention sur le règlement) · I45 encadré de texte libre en tête du règlement · I46 éditeur de formules écrit par l'admin (impossible à tester, une erreur fausserait tout le classement) · I47 validation d'un changement de règles par le second admin.
 
@@ -359,6 +386,16 @@ Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.
 - **Réponses renommées sur place** : chaque prono garde sa réponse, sous son nouveau libellé. Échanger deux libellés reviendrait à donner à chacun la réponse de l'autre : c'est refusé, comme ajouter, retirer ou déplacer une réponse.
 - **Aucune trace de la correction** : ni historique, ni mention pour les joueurs. Le formulaire conseille à l'admin de prévenir l'équipe dans le chat si la correction change le sens de la question ; avant la clôture, il peut aussi déverrouiller les pronos validés.
 
+**v1.7** (l'idée est une décision de l'utilisateur du 13/10/2026 ; les précisions suivantes ont été proposées par l'agent, puis appliquées sans objection de sa part)
+- **Coefficient ×1** : le malus par place fait le poids de la question ; deux réglages seraient de trop.
+- **Joker autorisé**, qui divise le malus par deux comme ailleurs.
+- **Hors écart relatif moyen** du départage ; les « Dans le mille » et les badges comptent.
+- **Absent** : le malus de la dernière place, comme le pire prono. Avec un seul prono, ce prono est premier et les absents prennent 0, comme sur une question à nombre où le seul prono est exact.
+- **La place se calcule sur l'écart brut**. Option écartée : un écart en rapport (« ×3 » plutôt que « 2 000 »), plus juste pour une estimation à la louche, mais plus difficile à expliquer.
+- **Malus par place obligatoire, sans valeur par défaut**, comme le malus d'une mauvaise réponse.
+- **Figé dès le premier prono**, comme le coefficient : la nature fun de la question et son malus par place ne changent plus. Les textes restent corrigeables (v1.6).
+- **Seulement sur une question à nombre** : une question à choix a déjà un malus borné, que l'admin peut choisir petit.
+
 ## 9. Contraintes non fonctionnelles
 
 - **Coût** : 0 €.
@@ -392,5 +429,5 @@ Les sections 5.1 à 5.7 décrivent les règles **par défaut**, celles de la v1.
 
 1. **Design** : fait. Style B5 « Jour de match », maquette dans [docs/design/maquette-b5/](../design/maquette-b5/). La couleur principale a changé en v1.2 (#0036B3).
 2. **Architecture et plan de construction** : [docs/architecture/architecture.md](../architecture/architecture.md), suivi dans [avancement.md](../architecture/avancement.md).
-3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur), É8d (chat), É8e (suppression des questions, règlement réservé aux admins, v1.4), É8f (suppression sans trace des messages du chat, v1.5) et É8g (correction des textes d'une question publiée, v1.6), puis recette avec deux ou trois collègues avant le 14 octobre. Après le lancement : É10 (règles réglables par saison, v1.3), avant le premier résultat.
+3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur), É8d (chat), É8e (suppression des questions, règlement réservé aux admins, v1.4), É8f (suppression sans trace des messages du chat, v1.5), É8g (correction des textes d'une question publiée, v1.6) et É8h (questions fun, v1.7), puis recette avec deux ou trois collègues avant le 14 octobre. Après le lancement : É10 (règles réglables par saison, v1.3), avant le premier résultat.
 4. **Contenu** : l'admin rédige les questions de la campagne d'octobre (énoncés, sources, liens BI, valeurs de l'an dernier, malus des questions à choix) avec le gabarit de l'architecture (annexe B), et les saisit avant le lancement.

@@ -17,7 +17,7 @@ import { TableScroll } from "@/components/ui/TableScroll";
 import { adminMetadata, requireAdmin } from "@/lib/auth/session";
 import { type AdminQuestion, getAdminQuestion, getQuestionHistory, type HistoryEvent, type HistoryEventType, type TrackingRow } from "@/lib/data/admin";
 import { getDb } from "@/lib/db/client";
-import { formatCount, formatDateTime, formatNumber, malusText } from "@/lib/format";
+import { formatCount, formatDateTime, formatNumber, malusText, placeMalusText } from "@/lib/format";
 import { toHundredths } from "@/lib/game/scoring";
 import { ERROR_MESSAGES } from "@/lib/services/result";
 import { NO_SEASON_YET } from "@/lib/validation/question";
@@ -317,6 +317,7 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
           <Chip>{q.categoryName}</Chip>
           <Chip tone="outline">Coef ×{q.coefficient}</Chip>
           {q.wrongAnswerMalus !== null ? <Chip tone="outline">Mauvaise réponse : {malusText(toHundredths(q.wrongAnswerMalus))}</Chip> : null}
+          {q.placeMalus !== null ? <Chip tone="outline">Fun : {placeMalusText(toHundredths(q.placeMalus))}</Chip> : null}
         </div>
         <h1 className="font-display text-[32px] font-extrabold uppercase leading-tight">{q.title}</h1>
         <p className="text-[15px] text-muted">
@@ -392,7 +393,9 @@ export default async function QuestionAdminPage({ params, searchParams }: PagePr
           description: q.description ?? "",
           unit: q.unit ?? "",
           options: options.map(({ label }) => label),
-          wrongAnswerMalus: q.wrongAnswerMalus === null ? "" : formatNumber(q.wrongAnswerMalus),
+          // Number fields: a plain value, which a French format (« 1 200,5 ») would leave empty.
+          wrongAnswerMalus: q.wrongAnswerMalus === null ? "" : String(q.wrongAnswerMalus),
+          placeMalus: q.placeMalus === null ? "" : String(q.placeMalus),
           source: q.source,
           coefficient: q.coefficient,
           helpBiUrl: q.helpBiUrl ?? "",

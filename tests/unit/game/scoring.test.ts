@@ -2,14 +2,15 @@ import { describe, expect, it } from "vitest";
 import { JOKER_DIVISOR } from "@/lib/game/constants";
 import { halveForJoker, scoreQuestion, type ScoringPrediction, type ScoringQuestion, toHundredths } from "@/lib/game/scoring";
 
-// Malus (architecture §5.5, v1.2): the raw gap, without any cap; the malus are in hundredths.
+// Malus (architecture §5.5, v1.2): the raw gap, without any cap; the malus are in hundredths. A fun
+// question (v1.7) is scored by its order of closeness: (place − 1) × the malus per place.
 
 function numberQuestion(resultNumber: number | null, overrides: Partial<ScoringQuestion> = {}): ScoringQuestion {
-  return { type: "number", coefficient: 1, resultNumber, resultOptionId: null, wrongAnswerMalus: null, ...overrides };
+  return { type: "number", coefficient: 1, resultNumber, resultOptionId: null, wrongAnswerMalus: null, placeMalus: null, ...overrides };
 }
 
 function choiceQuestion(resultOptionId: number | null, wrongAnswerMalus: number, overrides: Partial<ScoringQuestion> = {}): ScoringQuestion {
-  return { type: "choice", coefficient: 1, resultNumber: null, resultOptionId, wrongAnswerMalus, ...overrides };
+  return { type: "choice", coefficient: 1, resultNumber: null, resultOptionId, wrongAnswerMalus, placeMalus: null, ...overrides };
 }
 
 function guess(id: string, valueNumber: number, joker = false): ScoringPrediction & { id: string } {
@@ -176,6 +177,66 @@ describe("scoreQuestion: malus of an absence", () => {
   it("X6: an empty list of predictions raises no error", () => {
     expect(scoreQuestion(numberQuestion(250), [])).toEqual({ scores: [], absentMalus: 0 });
     expect(scoreQuestion(choiceQuestion(1, 50), [])).toEqual({ scores: [], absentMalus: 0 });
+  });
+});
+
+describe("scoreQuestion: fun question (v1.7, malus per place 5)", () => {
+  const fun = (resultNumber: number, placeMalus = 5) => numberQuestion(resultNumber, { placeMalus });
+
+  it("FU1: real 4 200, six predictions: 0, 5, 10, 15, 20, 25 by place, whatever the gaps; an absence takes the last place's", () => {
+    const predictions = [guess("Julien", 4000), guess("Léa", 5000), guess("Sarah", 2500), guess("Hugo", 900), guess("Mehdi", 8000), guess("Camille", 20000)];
+    const { scores, absentMalus } = scoreQuestion(fun(4200), predictions);
+    expect(scores.map(({ prediction, podiumRank, total }) => [prediction.id, podiumRank, total])).toEqual([
+      ["Julien", 1, 0],
+      ["Léa", 2, 500],
+      ["Sarah", 3, 1_000],
+      ["Hugo", 4, 1_500],
+      ["Mehdi", 5, 2_000],
+      ["Camille", 6, 2_500],
+    ]);
+    expect(absentMalus).toBe(2_500);
+  });
+
+  it("FU1: the gap stays the raw gap, apart from the malus", () => {
+    const scores = scoresOf(fun(4200), [guess("Julien", 4000), guess("Camille", 20000)]);
+    expect(scores.Camille).toMatchObject({ gap: 1_580_000, baseMalus: 500, total: 500 });
+    expect(scores.Julien).toMatchObject({ gap: 20_000, baseMalus: 0, total: 0 });
+  });
+
+  it("FU2: tied predictions share their place, the next place is skipped", () => {
+    const { scores, absentMalus } = scoreQuestion(fun(250), [guess("A", 240), guess("B", 260), guess("C", 300)]);
+    expect(scores.map(({ podiumRank, total }) => [podiumRank, total])).toEqual([
+      [1, 0],
+      [1, 0],
+      [3, 1_000],
+    ]);
+    expect(absentMalus).toBe(1_000);
+  });
+
+  it("FU3: a joker divides the malus of the place; the malus per place keeps its decimals", () => {
+    const scores = scoresOf(fun(250), [guess("A", 250), guess("B", 260), guess("C", 300, true)]);
+    expect(scores.C.total).toBe(500);
+    const decimal = scoresOf(fun(250, 2.5), [guess("A", 250), guess("B", 260, true)]);
+    expect(decimal.B).toMatchObject({ baseMalus: 250, total: 125 });
+  });
+
+  it("FU4: a single prediction is the closest: 0, and 0 for an absence", () => {
+    expect(scoreQuestion(fun(1000), [guess("A", 3000)])).toMatchObject({ scores: [{ total: 0 }], absentMalus: 0 });
+  });
+
+  it("FU5: Dans le mille and the relative error are computed as on any number question", () => {
+    const scores = scoresOf(fun(1000), [guess("A", 1005), guess("B", 2000)]);
+    expect(scores.A).toMatchObject({ bullseye: true, relativeError: 0.005, total: 0 });
+    expect(scores.B).toMatchObject({ bullseye: false, relativeError: 1, total: 500 });
+  });
+
+  it("FU6: no prediction at all: 0 for an absence", () => {
+    expect(scoreQuestion(fun(1000), []).absentMalus).toBe(0);
+  });
+
+  it("FU7: a typing mistake costs one place, not its gap", () => {
+    const scores = scoresOf(fun(100), [guess("A", 101), guess("B", 1_000_000)]);
+    expect(scores.B).toMatchObject({ gap: 99_990_000, total: 500 });
   });
 });
 

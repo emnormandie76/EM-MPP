@@ -19,7 +19,7 @@ import { seasonStartFromLocalDate } from "@/lib/game/time";
 const day = (n: number) => new Date(Date.UTC(2026, 10, n, 10));
 
 function numberQuestion(id: number, resultNumber: number, resolvedAt: Date, overrides: Partial<StandingsQuestion> = {}): StandingsQuestion {
-  return { id, type: "number", coefficient: 1, resultNumber, resultOptionId: null, wrongAnswerMalus: null, resolvedAt, ...overrides };
+  return { id, type: "number", coefficient: 1, resultNumber, resultOptionId: null, wrongAnswerMalus: null, placeMalus: null, resolvedAt, ...overrides };
 }
 
 function choiceQuestion(
@@ -29,7 +29,7 @@ function choiceQuestion(
   resolvedAt: Date,
   overrides: Partial<StandingsQuestion> = {},
 ): StandingsQuestion {
-  return { id, type: "choice", coefficient: 1, resultNumber: null, resultOptionId, wrongAnswerMalus, resolvedAt, ...overrides };
+  return { id, type: "choice", coefficient: 1, resultNumber: null, resultOptionId, wrongAnswerMalus, placeMalus: null, resolvedAt, ...overrides };
 }
 
 function guess(questionId: number, userId: string, valueNumber: number, joker = false): StandingsPrediction {
@@ -181,6 +181,33 @@ describe("computeStandings: totals per player", () => {
     expect(rows.A.meanError).toBeCloseTo(0.1, 12);
     expect(rows.B.meanError).toBeNull();
     expect(rows.B.questionsPlayed).toBe(1);
+  });
+
+  it("C10: a fun question (v1.7) adds the malus of the places, but stays out of the mean error; its Dans le mille count", () => {
+    const rows = byId(
+      computeStandings({
+        questions: [numberQuestion(1, 100, day(1)), numberQuestion(2, 4200, day(2), { placeMalus: 5 })],
+        predictions: [guess(1, "A", 90), guess(2, "A", 20000), guess(1, "B", 80), guess(2, "B", 4210), guess(1, "C", 100)],
+        players: [player("A"), player("B"), player("C")],
+      }),
+    );
+    // Question 2: B is the closest (0), A second (5); C, absent, takes the last place's malus (5).
+    expect([rows.A.malus, rows.B.malus, rows.C.malus]).toEqual([1_000 + 500, 2_000 + 0, 0 + 500]);
+    expect(rows.A.meanError).toBeCloseTo(0.1, 12);
+    expect(rows.B.meanError).toBeCloseTo(0.2, 12);
+    expect(rows.B.bullseyes).toBe(1);
+    expect(rows.A.questionsPlayed).toBe(2);
+  });
+
+  it("C10: a player whose only number predictions are on fun questions has no mean error", () => {
+    const rows = byId(
+      computeStandings({
+        questions: [numberQuestion(1, 4200, day(1), { placeMalus: 5 })],
+        predictions: [guess(1, "A", 4000)],
+        players: [player("A")],
+      }),
+    );
+    expect(rows.A.meanError).toBeNull();
   });
 
   it("C6: an active player without any prediction takes the malus of the worst predictions", () => {

@@ -27,7 +27,10 @@ export type StandingTotals = {
   /** Malus of the predictions, plus the malus of each absence, in hundredths. */
   malus: number;
   bullseyes: number;
-  /** Mean of the finite relative errors of the number questions played (absences excluded), or null. */
+  /**
+   * Mean of the finite relative errors of the number questions played (absences and fun questions
+   * excluded), or null.
+   */
   meanError: number | null;
   questionsPlayed: number;
 };
@@ -97,7 +100,8 @@ export function computeStandings({ questions, predictions, players }: StandingsI
       row.malus += score.total;
       row.questionsPlayed += 1;
       if (score.bullseye) row.bullseyes += 1;
-      if (score.relativeError !== null && Number.isFinite(score.relativeError)) row.errors.push(score.relativeError);
+      // A fun question (v1.7) stays out of the mean error: one wild question would outweigh the others.
+      if (question.placeMalus === null && score.relativeError !== null && Number.isFinite(score.relativeError)) row.errors.push(score.relativeError);
     }
     // No prediction: the malus of the worst prediction (decision of 02/10/2026), even for a player
     // who arrived after the result; otherwise not answering would be the best strategy.

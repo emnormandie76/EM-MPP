@@ -20,14 +20,18 @@ export const QUESTION_LIMITS = {
   optionsMax: 10,
 } as const;
 
-/** The kinds of the form: a number, a choice, or the yes/no template. The Juste Prix is gone (v1.2). */
-export const QUESTION_KINDS = ["number", "choice", "yesNo"] as const;
+/**
+ * The kinds of the form: a number, a choice, the yes/no template, or a fun question (v1.7): a number
+ * scored by its order of closeness. The Juste Prix is gone (v1.2).
+ */
+export const QUESTION_KINDS = ["number", "choice", "yesNo", "fun"] as const;
 export type QuestionKind = (typeof QUESTION_KINDS)[number];
 
 export const QUESTION_KIND_LABELS: Record<QuestionKind, string> = {
   number: "Nombre",
   choice: "Choix",
   yesNo: "Oui/Non",
+  fun: "Fun",
 };
 
 /** Answers created by the yes/no template (§5.11). */
@@ -69,6 +73,9 @@ export const QUESTION_MESSAGES = {
   closesInPast: "La clôture doit être dans le futur.",
   wrongAnswerMalus: "Indique le malus d'une mauvaise réponse.",
   wrongAnswerMalusZero: "Le malus doit être supérieur à 0.",
+  placeMalus: "Indique le malus par place.",
+  placeMalusInteger: "Le malus par place est un nombre entier.",
+  funCoefficient: "Une question fun garde le coefficient ×1 : le malus par place fait son poids.",
 } as const;
 
 const M = QUESTION_MESSAGES;
@@ -100,26 +107,38 @@ export const localDateTimeSchema = z
 const HTTP_URL = /^https?:\/\/[^\s]+$/i;
 
 /**
- * Malus of a wrong answer (v1.2, §5.11), typed like a prediction (§5.3), strictly positive, with no
- * default value; empty means null (required for a choice, checked by `shapeOf`).
+ * A malus set by the admin, typed like a prediction (§5.3), strictly positive, with no default value;
+ * empty means null (required by its kind, checked by `shapeOf`). `integer`: a whole number only.
  */
-export const wrongAnswerMalusSchema = z
-  .string(M.wrongAnswerMalus)
-  .nullable()
-  .transform((value, ctx) => {
-    const text = value?.trim() ?? "";
-    if (text === "") return null;
-    const parsed = parseNumberInput(text);
-    if (!parsed.ok) {
-      ctx.addIssue({ code: "custom", message: parsed.message });
-      return z.NEVER;
-    }
-    if (parsed.value === 0) {
-      ctx.addIssue({ code: "custom", message: M.wrongAnswerMalusZero });
-      return z.NEVER;
-    }
-    return parsed.value;
-  });
+function malusSchema(message: string, { integer = false } = {}) {
+  return z
+    .string(message)
+    .nullable()
+    .transform((value, ctx) => {
+      const text = value?.trim() ?? "";
+      if (text === "") return null;
+      const parsed = parseNumberInput(text);
+      if (!parsed.ok) {
+        ctx.addIssue({ code: "custom", message: parsed.message });
+        return z.NEVER;
+      }
+      if (parsed.value === 0) {
+        ctx.addIssue({ code: "custom", message: M.wrongAnswerMalusZero });
+        return z.NEVER;
+      }
+      if (integer && !Number.isInteger(parsed.value)) {
+        ctx.addIssue({ code: "custom", message: M.placeMalusInteger });
+        return z.NEVER;
+      }
+      return parsed.value;
+    });
+}
+
+/** Malus of a wrong answer (v1.2, §5.11): required for a choice. */
+export const wrongAnswerMalusSchema = malusSchema(M.wrongAnswerMalus);
+
+/** Malus per place (v1.7, §5.11): required for a fun question, a whole number (decision of 13/10/2026). */
+export const placeMalusSchema = malusSchema(M.placeMalus, { integer: true });
 
 /** Every field of the question form, each one optional: an update only sends what it changes. */
 export const questionFieldsSchema = z.object({
@@ -130,6 +149,7 @@ export const questionFieldsSchema = z.object({
   unit: optionalText(L.unitMax, M.unit),
   options: z.array(z.string(M.optionEmpty).trim(), M.optionsCount).max(L.optionsMax, M.optionsCount),
   wrongAnswerMalus: wrongAnswerMalusSchema,
+  placeMalus: placeMalusSchema,
   source: z.string(M.source).trim().min(1, M.source).max(L.sourceMax, M.sourceLength),
   coefficient: z.coerce
     .number(M.coefficient)
@@ -159,22 +179,30 @@ export type QuestionShape = {
   options: string[];
   /** Malus of a wrong answer: set for a choice, null for a number (v1.2). */
   wrongAnswerMalus: number | null;
+  /** Malus per place: set for a fun question, null otherwise (v1.7). */
+  placeMalus: number | null;
 };
 
-export type ShapeError = { ok: false; field: "options" | "wrongAnswerMalus"; message: string };
+export type ShapeError = { ok: false; field: "options" | "wrongAnswerMalus" | "placeMalus"; message: string };
 
 /**
- * Type, unit, answers and malus of a wrong answer of a kind (§4.5, §5.11): a number has a unit, no
- * answers and no such malus (switching to a number clears it); a choice has 2 to 10 answers,
- * non-empty and unique whatever the case, no unit, and a malus of a wrong answer.
+ * Type, unit, answers and malus of a kind (§4.5, §5.11): a number has a unit, no answers and no
+ * malus to set (switching to a number clears them); a fun question is a number with a malus per
+ * place (v1.7); a choice has 2 to 10 answers, non-empty and unique whatever the case, no unit, and a
+ * malus of a wrong answer.
  */
 export function shapeOf(
   kind: QuestionKind,
   unit: string | null | undefined,
   options: readonly string[] | undefined,
   wrongAnswerMalus: number | null | undefined,
+  placeMalus: number | null | undefined,
 ): { ok: true; shape: QuestionShape } | ShapeError {
-  if (kind === "number") return { ok: true, shape: { type: "number", unit: unit ?? null, options: [], wrongAnswerMalus: null } };
+  if (kind === "number") return { ok: true, shape: { type: "number", unit: unit ?? null, options: [], wrongAnswerMalus: null, placeMalus: null } };
+  if (kind === "fun") {
+    if (placeMalus === null || placeMalus === undefined) return { ok: false, field: "placeMalus", message: M.placeMalus };
+    return { ok: true, shape: { type: "number", unit: unit ?? null, options: [], wrongAnswerMalus: null, placeMalus } };
+  }
   const labels = kind === "yesNo" ? [...YES_NO_OPTIONS] : (options ?? []).map((label) => label.trim());
   const optionsError = (message: string): ShapeError => ({ ok: false, field: "options", message });
   if (labels.length < L.optionsMin || labels.length > L.optionsMax) return optionsError(M.optionsCount);
@@ -183,12 +211,15 @@ export function shapeOf(
   const keys = new Set(labels.map((label) => label.toLocaleLowerCase("fr")));
   if (keys.size !== labels.length) return optionsError(M.optionsDuplicate);
   if (wrongAnswerMalus === null || wrongAnswerMalus === undefined) return { ok: false, field: "wrongAnswerMalus", message: M.wrongAnswerMalus };
-  return { ok: true, shape: { type: "choice", unit: null, options: labels, wrongAnswerMalus } };
+  return { ok: true, shape: { type: "choice", unit: null, options: labels, wrongAnswerMalus, placeMalus: null } };
 }
 
-/** Kind shown in the form for a stored question: a choice answered "Oui", "Non" reads as yes/no. */
-export function kindOf(question: { type: "number" | "choice" }, optionLabels: readonly string[]): QuestionKind {
-  if (question.type === "number") return "number";
+/**
+ * Kind shown for a stored question: a number with a malus per place is a fun question (v1.7), a
+ * choice answered "Oui", "Non" reads as yes/no.
+ */
+export function kindOf(question: { type: "number" | "choice"; placeMalus: number | null }, optionLabels: readonly string[]): QuestionKind {
+  if (question.type === "number") return question.placeMalus === null ? "number" : "fun";
   const yesNo = optionLabels.length === 2 && optionLabels[0] === YES_NO_OPTIONS[0] && optionLabels[1] === YES_NO_OPTIONS[1];
   return yesNo ? "yesNo" : "choice";
 }

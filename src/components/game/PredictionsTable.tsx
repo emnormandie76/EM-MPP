@@ -4,13 +4,13 @@ import type { AvatarKey } from "@/lib/avatars";
 import { TableScroll } from "@/components/ui/TableScroll";
 import type { QuestionDetail } from "@/lib/data/questions";
 import type { AbsentRow, ResultRow } from "@/lib/data/results";
-import { formatMalus, formatNumber, formatPercent } from "@/lib/format";
+import { formatMalus, formatNumber, formatPercent, rankSuffix } from "@/lib/format";
 import { JOKER_DIVISOR } from "@/lib/game/constants";
 
 // The predictions of a closed question the viewer may see (§6.6, §8.3): player, prediction, joker.
 // Once resolved, the raw gap and the malus of each player, sorted from the smallest malus to the
 // largest, then the players of the standings without a prediction, with the malus of their
-// absence (v1.2).
+// absence (v1.2). A fun question also shows the place of each prediction (v1.7).
 
 const TH = "px-3 py-2 font-display text-[13px] font-bold uppercase tracking-[0.08em] text-muted whitespace-nowrap";
 const TD = "px-3 py-2.5 align-middle";
@@ -31,9 +31,9 @@ function answerText(q: QuestionDetail, row: ResultRow): string {
 /** "10 (4 %)": the raw gap, with the relative error. */
 function gapText(row: ResultRow): string {
   const score = row.score;
-  if (!score) return "—";
+  if (!score || score.gap === null) return "—";
   const relative = score.relativeError === null || !Number.isFinite(score.relativeError) ? "" : ` (${formatPercent(score.relativeError)})`;
-  return `${formatMalus(score.baseMalus)}${relative}`;
+  return `${formatMalus(score.gap)}${relative}`;
 }
 
 function Player({ userId, name, avatar, isViewer, inactive }: { userId: string; name: string; avatar: AvatarKey; isViewer: boolean; inactive: boolean }) {
@@ -52,6 +52,7 @@ function Player({ userId, name, avatar, isViewer, inactive }: { userId: string; 
 export function PredictionsTable({ question: q, rows, absents = [] }: { question: QuestionDetail; rows: ResultRow[]; absents?: AbsentRow[] }) {
   const scored = q.status === "resolved";
   const number = q.type === "number";
+  const fun = q.placeMalus !== null;
   return (
     <TableScroll label="Pronos de tous les joueurs">
       <table className="w-full min-w-120 text-left text-[15px]">
@@ -62,6 +63,7 @@ export function PredictionsTable({ question: q, rows, absents = [] }: { question
             <th scope="col" className={TH}>Prono</th>
             <th scope="col" className={TH}>Joker</th>
             {scored && number ? <th scope="col" className={`${TH} text-right`}>Écart</th> : null}
+            {scored && fun ? <th scope="col" className={`${TH} text-right`}>Place</th> : null}
             {scored ? <th scope="col" className={`${TH} text-right`}>Malus</th> : null}
           </tr>
         </thead>
@@ -80,6 +82,11 @@ export function PredictionsTable({ question: q, rows, absents = [] }: { question
                 )}
               </td>
               {scored && number ? <td className={`${NUM} whitespace-nowrap`}>{gapText(row)}</td> : null}
+              {scored && fun ? (
+                <td className={NUM}>
+                  {row.score?.podiumRank ? `${row.score.podiumRank}${rankSuffix(row.score.podiumRank)}` : "—"}
+                </td>
+              ) : null}
               {scored ? <td className={`${NUM} font-display text-xl font-bold`}>{formatMalus(row.score?.total ?? 0)}</td> : null}
             </tr>
           ))}
@@ -92,6 +99,7 @@ export function PredictionsTable({ question: q, rows, absents = [] }: { question
                   <td className={`${TD} text-muted`}>Pas de prono</td>
                   <td className={TD}>{NONE}</td>
                   {number ? <td className={NUM}>—</td> : null}
+                  {fun ? <td className={NUM}>—</td> : null}
                   <td className={`${NUM} font-display text-xl font-bold`}>{formatMalus(row.malus)}</td>
                 </tr>
               ))

@@ -117,6 +117,13 @@ describe("database schema", () => {
       expect(await refusal(createQuestion(db, { type: "choice", wrongAnswerMalus: 0 }))).toContain("question_wrong_answer_malus_positive");
     });
 
+    it("keeps a fun question a number question at ×1, with a malus per place above 0 (v1.7)", async () => {
+      expect((await createQuestion(db, { placeMalus: 2.5 })).placeMalus).toBe(2.5);
+      expect(await refusal(createQuestion(db, { type: "choice", placeMalus: 5 }))).toContain("question_place_malus_number");
+      expect(await refusal(createQuestion(db, { placeMalus: 5, coefficient: 2 }))).toContain("question_place_malus_coefficient");
+      expect(await refusal(createQuestion(db, { placeMalus: 0 }))).toContain("question_place_malus_positive");
+    });
+
     it("refuses a title shorter than 5 or longer than 200 characters", async () => {
       expect(await refusal(createQuestion(db, { title: "Qui" }))).toContain("question_title_length");
       expect(await refusal(createQuestion(db, { title: "x".repeat(201) }))).toContain("question_title_length");

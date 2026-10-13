@@ -2,7 +2,7 @@ import Link from "next/link";
 import { buttonClasses } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import type { PlayerQuestion } from "@/lib/data/questions";
-import { malusText } from "@/lib/format";
+import { malusText, placeMalusText } from "@/lib/format";
 import type { PredictionState } from "@/lib/game/prediction-state";
 import { toHundredths } from "@/lib/game/scoring";
 import { QUESTION_KIND_LABELS } from "@/lib/validation/question";
@@ -38,7 +38,8 @@ export function QuestionCard({ question: q, serverNow, headingLevel = 3 }: { que
           {q.title}
         </Heading>
         <p className="text-sm text-muted">
-          {QUESTION_KIND_LABELS[q.kind]} · coef. ×{q.coefficient}
+          {QUESTION_KIND_LABELS[q.kind]} ·{" "}
+          {q.placeMalus !== null ? placeMalusText(toHundredths(q.placeMalus)) : `coef. ×${q.coefficient}`}
           {q.wrongAnswerMalus !== null ? ` · mauvaise réponse : ${malusText(toHundredths(q.wrongAnswerMalus))}` : ""}
         </p>
       </div>

@@ -12,7 +12,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { requireUser } from "@/lib/auth/session";
 import { getOpenQuestionsForViewer, type PlayerQuestion } from "@/lib/data/questions";
 import { getDb } from "@/lib/db/client";
-import { malusText } from "@/lib/format";
+import { malusText, placeMalusText } from "@/lib/format";
 import type { PredictionState } from "@/lib/game/prediction-state";
 import { toHundredths } from "@/lib/game/scoring";
 import { QUESTION_KIND_LABELS } from "@/lib/validation/question";
@@ -50,6 +50,7 @@ function QuestionRow({ question: q, serverNow }: { question: PlayerQuestion; ser
         </h2>
         <p className="text-sm text-muted">
           {QUESTION_KIND_LABELS[q.kind]}
+          {q.placeMalus !== null ? ` · ${placeMalusText(toHundredths(q.placeMalus))}` : ""}
           {q.wrongAnswerMalus !== null ? ` · mauvaise réponse : ${malusText(toHundredths(q.wrongAnswerMalus))}` : ""}
         </p>
         {/* Until the viewer's own deadline while their extension runs (v1.2). */}

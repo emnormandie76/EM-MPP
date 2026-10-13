@@ -231,6 +231,8 @@ export type PlayerQuestion = {
   unit: string | null;
   /** Malus of a wrong answer, for a choice (v1.2); null for a number. */
   wrongAnswerMalus: number | null;
+  /** Malus per place, for a fun question (v1.7); null otherwise. */
+  placeMalus: number | null;
   source: string;
   coefficient: number;
   opensAt: Date;
@@ -381,6 +383,7 @@ function toPlayerQuestion(
     type: q.type,
     unit: q.unit,
     wrongAnswerMalus: q.wrongAnswerMalus,
+    placeMalus: q.placeMalus,
     source: q.source,
     coefficient: q.coefficient,
     // Visible questions are published: they always have both dates.
@@ -443,6 +446,8 @@ export type QuestionListItem = {
   categoryName: string;
   kind: QuestionKind;
   coefficient: number;
+  /** Malus per place, for a fun question (v1.7); null otherwise. */
+  placeMalus: number | null;
   status: QuestionListTab;
   closesAt: Date;
   /** The viewer's deadline while their extension runs, else null. */
@@ -497,6 +502,7 @@ export async function getQuestionsList(db: Database, viewer: ViewerRole, tab: Qu
       categoryName,
       kind: kindOf(q, options.map(({ label }) => label)),
       coefficient: q.coefficient,
+      placeMalus: q.placeMalus,
       status,
       closesAt: q.closesAt!,
       extendedUntil: status === "open" && extension !== null && extension > q.closesAt! ? extension : null,

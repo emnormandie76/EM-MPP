@@ -9,7 +9,8 @@ import { Tabs } from "@/components/ui/Tabs";
 import { requireUser } from "@/lib/auth/session";
 import { getQuestionsList, type QuestionListItem, type QuestionListTab } from "@/lib/data/questions";
 import { getDb } from "@/lib/db/client";
-import { formatDateTime, formatMalus } from "@/lib/format";
+import { formatDateTime, formatMalus, placeMalusText } from "@/lib/format";
+import { toHundredths } from "@/lib/game/scoring";
 import { QUESTION_KIND_LABELS } from "@/lib/validation/question";
 
 export const metadata: Metadata = { title: "Questions" };
@@ -55,7 +56,9 @@ function QuestionItem({ item, now }: { item: QuestionListItem; now: Date }) {
           </Link>
         </h2>
         <p className="text-sm text-muted">
-          {QUESTION_KIND_LABELS[item.kind]} · coef. ×{item.coefficient} · <Dates item={item} now={now} />
+          {QUESTION_KIND_LABELS[item.kind]} ·{" "}
+          {item.placeMalus !== null ? placeMalusText(toHundredths(item.placeMalus)) : `coef. ×${item.coefficient}`} ·{" "}
+          <Dates item={item} now={now} />
         </p>
       </div>
       {item.status === "resolved" ? (

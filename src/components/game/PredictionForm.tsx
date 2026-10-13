@@ -25,6 +25,8 @@ export type PredictionFormProps = {
   unit: string | null;
   /** Malus of a wrong answer, recalled for a choice (v1.2). */
   wrongAnswerMalus: number | null;
+  /** Malus per place, recalled for a fun question (v1.7). */
+  placeMalus: number | null;
   options: { id: number; label: string }[];
   state: PredictionState;
   mine: { optionId: number | null; joker: boolean; validatedAt: Date | null; savedAt: Date } | null;
@@ -41,7 +43,7 @@ const BIG_TILE =
   "flex min-h-16 cursor-pointer items-center justify-center gap-2.5 rounded-field border border-line-strong bg-surface px-3.5 font-display text-2xl font-extrabold uppercase tracking-[0.04em] has-checked:border-2 has-checked:border-accent has-checked:bg-accent-soft has-disabled:cursor-default";
 
 export function PredictionForm(props: PredictionFormProps) {
-  const { questionId, type, kind, unit, wrongAnswerMalus, options, state, mine, initialValue, jokersLeft } = props;
+  const { questionId, type, kind, unit, wrongAnswerMalus, placeMalus, options, state, mine, initialValue, jokersLeft } = props;
   const id = useId();
   const inputId = `${id}-valeur`;
   const labelId = `${id}-libelle`;
@@ -182,6 +184,12 @@ export function PredictionForm(props: PredictionFormProps) {
       {value}
       {type === "choice" && wrongAnswerMalus !== null ? (
         <p className="text-sm text-ink-2">Mauvaise réponse : {formatNumber(wrongAnswerMalus)} de malus</p>
+      ) : null}
+      {placeMalus !== null ? (
+        <p className="text-sm text-ink-2">
+          Question fun : seul l&apos;ordre compte. Le prono le plus proche prend 0, puis chaque place derrière lui coûte{" "}
+          {formatNumber(placeMalus)} de malus.
+        </p>
       ) : null}
       {fieldError ? (
         <p id={errorId} className="text-sm font-medium text-hot">

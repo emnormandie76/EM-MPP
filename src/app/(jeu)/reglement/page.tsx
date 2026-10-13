@@ -8,7 +8,7 @@ import { canSeeRulesPage, RULES_PAGE_FOR_PLAYERS } from "@/lib/app";
 import { requireUser, type Viewer } from "@/lib/auth/session";
 import { getCurrentSeason } from "@/lib/data/content";
 import { getDb } from "@/lib/db/client";
-import { formatMalus } from "@/lib/format";
+import { formatMalus, formatNumber } from "@/lib/format";
 import { BULLSEYE_PERCENT, COEFFICIENTS, JOKER_DIVISOR, JOKERS_PER_SEASON } from "@/lib/game/constants";
 import { scoreQuestion } from "@/lib/game/scoring";
 
@@ -50,16 +50,22 @@ function Section({ id, title, children }: { id: string; title: string; children:
 
 const LIST = "flex list-disc flex-col gap-1.5 pl-5";
 const coefficients = COEFFICIENTS.map((c) => `×${c}`).join(", ").replace(/, (?=[^,]*$)/, " ou ");
+/** "a, b et c". */
+const andList = (items: readonly string[]) => items.join(", ").replace(/, (?=[^,]*$)/, " et ");
 const guess = (valueNumber: number, joker = false) => ({ valueNumber, optionId: null, joker });
-const numberQuestion = (resultNumber: number, coefficient = 1) => ({
+const numberQuestion = (resultNumber: number, coefficient = 1, placeMalus: number | null = null) => ({
   type: "number" as const,
   coefficient,
   resultNumber,
   resultOptionId: null,
   wrongAnswerMalus: null,
+  placeMalus,
 });
 
-/** The examples of the rules (cahier des charges §5.2, §5.4, §5.5), scored by the rules themselves. */
+/** The fun question of the rules (v1.7): real value 4 200, 5 of malus per place. */
+const FUN_EXAMPLE = { real: 4200, placeMalus: 5, values: [4000, 5000, 2500, 20000] } as const;
+
+/** The examples of the rules (cahier des charges §5.2, §5.4, §5.5, §5.9), scored by the rules themselves. */
 function examples() {
   const malusOf = (resultNumber: number, value: number, { joker = false, coefficient = 1 } = {}) =>
     formatMalus(scoreQuestion(numberQuestion(resultNumber, coefficient), [guess(value, joker)]).scores[0].total);
@@ -75,6 +81,11 @@ function examples() {
     jpoCoefficient: malusOf(250, 300, { coefficient: 3 }),
     // The worst of 240 and 300: the malus of an absent player.
     absent: formatMalus(scoreQuestion(numberQuestion(250), [guess(240), guess(300)]).absentMalus),
+    // A fun question: the malus of each place, then of an absence (the last place's).
+    fun: scoreQuestion(
+      numberQuestion(FUN_EXAMPLE.real, 1, FUN_EXAMPLE.placeMalus),
+      FUN_EXAMPLE.values.map((value) => guess(value)),
+    ),
   };
 }
 
@@ -115,6 +126,10 @@ export default async function RulesPage() {
           </li>
           <li>
             <strong>Oui/non</strong> : un choix à deux réponses.
+          </li>
+          <li>
+            <strong>Fun</strong> : une question à nombre pour le plaisir, où les réponses peuvent aller du simple au centuple.
+            Elle se note à la place (voir plus bas).
           </li>
         </ul>
       </Section>
@@ -167,8 +182,30 @@ export default async function RulesPage() {
         </p>
       </Section>
 
+      <Section id="fun" title="Questions fun">
+        <p>
+          Sur une question fun, seul l&apos;<strong>ordre</strong> compte : le prono le plus proche de la valeur réelle prend 0,
+          puis chaque place derrière lui coûte le <strong>malus par place</strong>, fixé par l&apos;admin et affiché avec la
+          question. Les ex æquo partagent leur place. Un écart énorme ne coûte donc qu&apos;une place : une question fun ne peut
+          pas décider seule du classement.
+        </p>
+        <p>
+          <em>Exemple</em> : valeur réelle {formatNumber(FUN_EXAMPLE.real)}, {formatNumber(FUN_EXAMPLE.placeMalus)} de malus par
+          place. Des pronos de {andList(FUN_EXAMPLE.values.map(formatNumber))} prennent, dans cet ordre,{" "}
+          {andList(e.fun.scores.map(({ total }) => formatMalus(total)))} de malus : le prono à {formatMalus(e.fun.scores[3].gap ?? 0)} de la
+          réalité ne coûte qu&apos;une place de plus. Un joueur sans prono prend le malus de la dernière place, {formatMalus(e.fun.absentMalus)}.
+        </p>
+        <p>
+          Une question fun garde le coefficient ×1. Le joker y divise le malus par {JOKER_DIVISOR}, comme ailleurs. Elle compte
+          pour les « Dans le mille » et les badges, mais pas pour l&apos;écart relatif moyen du départage.
+        </p>
+      </Section>
+
       <Section id="coefficient" title="Coefficient">
-        <p>L&apos;admin applique un coefficient {coefficients} à chaque question, affiché sur la question : il multiplie le malus.</p>
+        <p>
+          L&apos;admin applique un coefficient {coefficients} à chaque question, affiché sur la question : il multiplie le malus.
+          Une question fun reste à ×1.
+        </p>
         <p>
           <strong>Malus d&apos;une question</strong> = malus × coefficient, ÷ {JOKER_DIVISOR} avec un joker.
         </p>
@@ -199,8 +236,9 @@ export default async function RulesPage() {
       <Section id="pas-de-prono" title="Pas de prono">
         <p>
           Sans prono sur une question résolue, tu prends le malus du <strong>pire prono</strong> de la question : l&apos;écart le
-          plus grand de l&apos;équipe (question à nombre), ou le malus d&apos;une mauvaise réponse (question à choix), multiplié
-          par le coefficient. Si personne n&apos;a pronostiqué, personne ne prend de malus.
+          plus grand de l&apos;équipe (question à nombre), le malus de la dernière place (question fun) ou le malus d&apos;une
+          mauvaise réponse (question à choix), multiplié par le coefficient. Si personne n&apos;a pronostiqué, personne ne prend
+          de malus.
         </p>
         <p>
           <em>Exemple</em> : dans l&apos;exemple de la JPO, avec des pronos de 240 et de 300, un joueur sans prono prend {e.absent}{" "}
@@ -231,7 +269,10 @@ export default async function RulesPage() {
         <ol className="flex list-decimal flex-col gap-1.5 pl-5">
           <li>le moins de malus ;</li>
           <li>puis le plus grand nombre de « Dans le mille » ;</li>
-          <li>puis l&apos;écart relatif moyen le plus faible (|prono − réel| / réel), sur les questions à nombre que tu as pronostiquées ;</li>
+          <li>
+            puis l&apos;écart relatif moyen le plus faible (|prono − réel| / réel), sur les questions à nombre que tu as
+            pronostiquées, questions fun exceptées ;
+          </li>
           <li>sinon, ex æquo.</li>
         </ol>
       </Section>
@@ -248,8 +289,9 @@ export default async function RulesPage() {
           </li>
           <li>Départ de l&apos;équipe : le compte est désactivé, son historique est conservé.</li>
           <li>
-            Une fois des pronos reçus, l&apos;admin peut encore modifier l&apos;aide et repousser la clôture, mais pas changer
-            l&apos;énoncé, les réponses possibles ni le malus d&apos;une mauvaise réponse, ni avancer la clôture.
+            Une fois des pronos reçus, l&apos;admin peut encore modifier l&apos;aide, corriger les textes (énoncé, unité, libellé
+            des réponses…) et repousser la clôture, mais pas changer le type, les réponses possibles, le coefficient ni le malus
+            d&apos;une mauvaise réponse ou par place, ni avancer la clôture.
           </li>
           <li>Toutes les dates et heures sont celles de Paris.</li>
         </ul>

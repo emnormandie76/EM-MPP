@@ -36,6 +36,11 @@ export function malusText(hundredths: number): string {
   return `${formatMalus(hundredths)} de malus`;
 }
 
+/** "5 de malus par place": the weight of a fun question (v1.7), in hundredths. */
+export function placeMalusText(hundredths: number): string {
+  return `${formatMalus(hundredths)} de malus par place`;
+}
+
 /** The first letter in lower case: a reason after a colon (« pas publiée : la clôture… », R-06). */
 export function lowerFirst(text: string): string {
   return text.charAt(0).toLocaleLowerCase("fr-FR") + text.slice(1);

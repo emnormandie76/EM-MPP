@@ -163,7 +163,7 @@ export async function getPlayerProfile(
       answer: score ? answerOf(score.prediction.valueNumber, score.prediction.optionId) : null,
       real: answerOf(resultNumber, resultOptionId),
       joker: score?.prediction.joker ?? false,
-      gap: score && type === "number" ? score.baseMalus : null,
+      gap: score && type === "number" ? score.gap : null,
       relativeError: score?.relativeError ?? null,
       malus,
     })),

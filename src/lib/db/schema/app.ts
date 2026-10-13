@@ -115,6 +115,11 @@ export const question = pgTable(
     priceIsRight: boolean("price_is_right").notNull().default(false),
     /** Malus of a wrong answer, set on each choice question (v1.2, §5.5); null for a number. */
     wrongAnswerMalus: typedNumber("wrong_answer_malus"),
+    /**
+     * Malus per place of a fun question (v1.7, §5.5): a number question scored by its order of
+     * closeness, the closest taking 0; null for any other question.
+     */
+    placeMalus: typedNumber("place_malus"),
     title: text("title").notNull(),
     description: text("description"),
     unit: text("unit"),
@@ -154,6 +159,10 @@ export const question = pgTable(
     check("question_price_is_right_removed", sql`not ${t.priceIsRight}`),
     check("question_wrong_answer_malus", sql`(${t.type} = 'choice') = (${t.wrongAnswerMalus} is not null)`),
     check("question_wrong_answer_malus_positive", sql`${t.wrongAnswerMalus} > 0`),
+    // A fun question is a number question, with the coefficient ×1 (v1.7).
+    check("question_place_malus_number", sql`${t.placeMalus} is null or ${t.type} = 'number'`),
+    check("question_place_malus_coefficient", sql`${t.placeMalus} is null or ${t.coefficient} = 1`),
+    check("question_place_malus_positive", sql`${t.placeMalus} > 0`),
     check("question_help_bi_url_http", sql`${t.helpBiUrl} ~ '^https?://'`),
     check("question_result_positive", sql`${t.resultNumber} >= 0`),
     // The right answer is one of the question's own options (§4.5).

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { QuestionDetail } from "@/lib/data/questions";
 import type { QuestionResults, ResultRow } from "@/lib/data/results";
-import { formatMalus, formatNumber, formatPercent } from "@/lib/format";
+import { formatMalus, formatNumber, formatPercent, rankSuffix } from "@/lib/format";
 import { badgeName } from "@/lib/game/badges";
 import { JOKER_DIVISOR } from "@/lib/game/constants";
 import { BadgeList } from "./BadgeList";
@@ -34,12 +34,21 @@ function answerText(q: QuestionDetail, answer: { valueNumber: number | null; opt
   return q.options.find(({ id }) => id === answer.optionId)?.label ?? "—";
 }
 
-/** "Écart 12 × 3 (coef) ÷ 2 (joker)", or "Mauvaise réponse : 100 × 2 (coef)". */
+/**
+ * "Écart 12 × 3 (coef) ÷ 2 (joker)", "Mauvaise réponse : 100 × 2 (coef)", or, on a fun question
+ * (v1.7), "Question fun : 3e plus proche, 2 places × 5 ÷ 2 (joker)".
+ */
 function malusDetail(q: QuestionDetail, mine: ResultRow): string {
   const score = mine.score!;
   const operations = [q.coefficient > 1 ? ` × ${q.coefficient} (coef)` : "", mine.answer.joker ? ` ÷ ${JOKER_DIVISOR} (joker)` : ""].join("");
   if (q.type === "choice") return score.baseMalus === 0 ? "Bonne réponse : 0 de malus" : `Mauvaise réponse : ${formatMalus(score.baseMalus)}${operations}`;
-  return `Écart ${formatMalus(score.baseMalus)}${q.unit ? ` ${q.unit}` : ""}${operations}`;
+  if (q.placeMalus !== null && score.podiumRank !== null) {
+    const behind = score.podiumRank - 1;
+    if (behind === 0) return "Question fun : le plus proche, 0 de malus";
+    const places = behind === 1 ? "1 place" : `${behind} places`;
+    return `Question fun : ${score.podiumRank}${rankSuffix(score.podiumRank)} plus proche, ${places} × ${formatNumber(q.placeMalus)}${operations}`;
+  }
+  return `Écart ${formatMalus(score.gap ?? score.baseMalus)}${q.unit ? ` ${q.unit}` : ""}${operations}`;
 }
 
 /** "Ton prono : 240 · écart 10 (4 %)". */
@@ -49,7 +58,7 @@ function scoreHeadline(q: QuestionDetail, mine: ResultRow): string {
   if (q.type === "choice") parts.push(score.baseMalus === 0 ? "bonne réponse" : "mauvaise réponse");
   else {
     const relative = score.relativeError !== null && Number.isFinite(score.relativeError) ? ` (${formatPercent(score.relativeError)})` : "";
-    parts.push(`écart ${formatMalus(score.baseMalus)}${relative}`);
+    parts.push(`écart ${formatMalus(score.gap ?? score.baseMalus)}${relative}`);
   }
   if (score.bullseye) parts.push("Dans le mille");
   return parts.join(" · ");

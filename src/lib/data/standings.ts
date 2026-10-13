@@ -81,6 +81,7 @@ export async function getStandings(
       type: question.type,
       coefficient: question.coefficient,
       wrongAnswerMalus: question.wrongAnswerMalus,
+      placeMalus: question.placeMalus,
       resultNumber: question.resultNumber,
       resultOptionId: question.resultOptionId,
       resolvedAt: question.resolvedAt,

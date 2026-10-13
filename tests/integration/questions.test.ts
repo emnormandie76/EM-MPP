@@ -195,6 +195,40 @@ describe("creation (§5.11)", () => {
     expect(await created({ kind: "number", wrongAnswerMalus: "200" })).toMatchObject({ type: "number", wrongAnswerMalus: null });
   });
 
+  it("creates a fun question (v1.7): a number question with a unit, a malus per place and the coefficient ×1", async () => {
+    const q = await created({ kind: "fun", unit: "cafés", placeMalus: "5", wrongAnswerMalus: "200" });
+    expect(q).toMatchObject({ type: "number", unit: "cafés", placeMalus: 5, wrongAnswerMalus: null, coefficient: 1, options: [] });
+  });
+
+  it("a fun question needs a malus per place, typed like a prediction, a whole number above 0 (v1.7)", async () => {
+    const refused = async (placeMalus: string | undefined) =>
+      (await createQuestion(db, admin, base({ kind: "fun", placeMalus }), now)) as { fieldErrors?: Record<string, string> };
+    expect((await refused(undefined)).fieldErrors).toEqual({ placeMalus: "Indique le malus par place." });
+    expect((await refused("  ")).fieldErrors).toEqual({ placeMalus: "Indique le malus par place." });
+    expect((await refused("0")).fieldErrors).toEqual({ placeMalus: "Le malus doit être supérieur à 0." });
+    expect((await refused("2.450")).fieldErrors).toEqual({ placeMalus: (parseNumberInput("2.450") as { message: string }).message });
+    // A whole number only (13/10/2026); "5,0" is 5.
+    expect((await refused("2,5")).fieldErrors).toEqual({ placeMalus: "Le malus par place est un nombre entier." });
+    expect((await refused("2.5")).fieldErrors).toEqual({ placeMalus: "Le malus par place est un nombre entier." });
+    expect(await db.select().from(question)).toEqual([]);
+    expect(await created({ kind: "fun", placeMalus: "5,0" })).toMatchObject({ placeMalus: 5 });
+  });
+
+  it("a fun question keeps the coefficient ×1: another one sent is refused (v1.7)", async () => {
+    const result = await createQuestion(db, admin, base({ kind: "fun", placeMalus: "5", coefficient: "3" }), now);
+    expect(result).toMatchObject({
+      ok: false,
+      code: "INVALID_INPUT",
+      fieldErrors: { coefficient: "Une question fun garde le coefficient ×1 : le malus par place fait son poids." },
+    });
+    expect(await created({ kind: "fun", placeMalus: "5", coefficient: "1" })).toMatchObject({ coefficient: 1, placeMalus: 5 });
+  });
+
+  it("only a fun question keeps a malus per place, even when one is sent", async () => {
+    expect(await created({ kind: "number", placeMalus: "5" })).toMatchObject({ type: "number", placeMalus: null });
+    expect(await created({ kind: "choice", options: ["A", "B"], wrongAnswerMalus: "50", placeMalus: "5" })).toMatchObject({ type: "choice", placeMalus: null });
+  });
+
   it("a choice question needs at least 2 answers, non-empty and unique whatever the case", async () => {
     for (const options of [["Seule"], [], ["BBA", "bba"], ["BBA", "  "]]) {
       const result = await createQuestion(db, admin, base({ kind: "choice", options }), now);
@@ -318,7 +352,7 @@ describe("publication (§5.11)", () => {
   });
 
   it("is refused when the opening is not before the closing (the database already forbids storing it)", () => {
-    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: 1, wrongAnswerMalus: null };
+    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: 1, wrongAnswerMalus: null, placeMalus: null };
     expect(publicationProblems({ ...rules, opensAt: clock.at("+2d"), closesAt: clock.at("+2d") }, [], now)).toEqual([
       "La clôture doit être après l'ouverture.",
     ]);
@@ -336,7 +370,7 @@ describe("publication (§5.11)", () => {
   });
 
   it("is refused while no season covers the closing date (v1.1)", () => {
-    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: null, wrongAnswerMalus: null };
+    const rules = { type: "number" as const, expectedResultAt: null, coefficient: 1, seasonId: null, wrongAnswerMalus: null, placeMalus: null };
     expect(publicationProblems({ ...rules, opensAt: clock.at("+1d"), closesAt: clock.at("+2d") }, [], now)).toEqual([
       "Aucune saison ne couvre cette date de clôture : crée d'abord la saison dans Saisons et lots.",
     ]);
@@ -475,6 +509,35 @@ describe("editing locks (§5.11)", () => {
     });
     expect(await updateQuestion(db, admin, { questionId: q.id, kind: "yesNo", wrongAnswerMalus: "40" }, now)).toMatchObject({ ok: true });
     expect(await load(q.id)).toMatchObject({ type: "choice", wrongAnswerMalus: 40, options: ["Oui", "Non"] });
+  });
+
+  it("a draft switches to a fun question and back: the coefficient goes to ×1, the malus per place comes and goes (v1.7)", async () => {
+    const q = await created({ coefficient: "3" });
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "fun" }, now)).toMatchObject({
+      ok: false,
+      fieldErrors: { placeMalus: "Indique le malus par place." },
+    });
+    // The form does not send the coefficient of a fun question.
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "fun", placeMalus: "5" }, now)).toMatchObject({ ok: true });
+    expect(await load(q.id)).toMatchObject({ type: "number", placeMalus: 5, coefficient: 1 });
+    expect(await updateQuestion(db, admin, { questionId: q.id, coefficient: 2 }, now)).toMatchObject({
+      ok: false,
+      fieldErrors: { coefficient: "Une question fun garde le coefficient ×1 : le malus par place fait son poids." },
+    });
+    expect(await updateQuestion(db, admin, { questionId: q.id, placeMalus: "10" }, now)).toMatchObject({ ok: true });
+    expect(await load(q.id)).toMatchObject({ placeMalus: 10 });
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "number", coefficient: 2 }, now)).toMatchObject({ ok: true });
+    expect(await load(q.id)).toMatchObject({ type: "number", placeMalus: null, coefficient: 2 });
+  });
+
+  it("with a prediction, a fun question keeps its kind and its malus per place; its wording still changes (v1.7)", async () => {
+    const q = await openQuestionWithPrediction({ placeMalus: 5 });
+    expect(await updateQuestion(db, admin, { questionId: q.id, placeMalus: "8" }, now)).toMatchObject({ ok: false, code: "QUESTION_LOCKED" });
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "number" }, now)).toMatchObject({ ok: false, code: "QUESTION_LOCKED" });
+    expect(await updateQuestion(db, admin, { questionId: q.id, kind: "fun", placeMalus: "5", title: "Combien de cafés au campus de Caen ?" }, now)).toMatchObject({
+      ok: true,
+    });
+    expect(await load(q.id)).toMatchObject({ placeMalus: 5, coefficient: 1, title: "Combien de cafés au campus de Caen ?" });
   });
 
   it("with a prediction, the malus of a wrong answer is locked; sent unchanged, it is accepted (v1.2)", async () => {
@@ -694,6 +757,13 @@ describe("editing locks (§5.11)", () => {
 });
 
 describe("duplication (§5.11)", () => {
+  it("copies a fun question with its malus per place (v1.7)", async () => {
+    const original = await insertQuestion(db, { categoryId, placeMalus: 5 });
+    const result = await duplicateQuestion(db, admin, { questionId: original.id }, now);
+    expect(result.ok).toBe(true);
+    expect(await load(result.ok ? result.data.id : 0)).toMatchObject({ type: "number", placeMalus: 5, coefficient: 1 });
+  });
+
   it("copies the question and its answers as a draft without dates", async () => {
     const original = await insertQuestion(db, {
       categoryId,
