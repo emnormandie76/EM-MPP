@@ -2,6 +2,8 @@
 
 > **Version 1.7 du 13/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
+> - **Chantier en cours depuis le 30/10/2026 : connexion par le Portail admission**, selon le **contrat portail v1** (précisé le 2026-10-29), voir [branchement-portail.md](../features/branchement-portail.md). Les sections §3.1, §6, §9.4, §9.6 et §12 décrivent encore la connexion par mot de passe ; elles seront réécrites en v1.8 au début de l'étape B1, avant le code.
+>
 > - **Changement de la v1.7** (demandé par l'utilisateur le 13/10/2026, cahier des charges v1.7, **étape É8h**) : questions fun, des questions à nombre notées à la place, `(place − 1) × malus par place`, au coefficient ×1 (§5.5). Sections touchées : §4.3, §5.5, §5.6, §5.11, §5.16, §8.2, §8.3, §11 (É8h, É9, É10), annexes A et B. Migration `0005_fun_questions` (ajouts seulement) ; celle de l'É10 devient `0006_season_rules`.
 > - **Changement de la v1.6** (demandé par l'utilisateur le 13/10/2026, cahier des charges v1.6, **étape É8g avant le lancement**) : les textes d'une question (énoncé, description, unité, source, libellé des réponses) restent modifiables avec des pronos et après la clôture ; les réponses sont renommées sur place (§5.11). Sections touchées : §5.11, §8.3, §11 (É8g, É9). Aucune migration.
 > - **Changement de la v1.5** (demandé par l'utilisateur le 12/10/2026, cahier des charges v1.5, **étape É8f avant le lancement**) : un message supprimé du chat, par son auteur ou par un admin, disparaît du fil pour tout le monde, sans laisser « Message supprimé. » (§5.15). Sections touchées : §5.15, §8.2, §8.3, §11 (É8f). Aucune migration.

@@ -58,4 +58,5 @@ Comptes du seed (mot de passe `Test-1234!`) : `admin@example.test` (admin), `jou
 - [Cahier des charges](docs/features/cahier-des-charges.md) : les règles du jeu (le **quoi**).
 - [Architecture et plan de construction](docs/architecture/architecture.md) : la référence technique (le **comment**).
 - [Avancement](docs/architecture/avancement.md) : l'étape en cours et le journal des décisions.
+- [Chantier « Connexion par le portail »](docs/features/branchement-portail.md) : passage de la connexion par mot de passe à la connexion par le Portail admission (contrat portail v1), étapes B0 à B4. Jusqu'à la bascule (B3), la connexion, le port 3000 et les comptes du seed décrits ci-dessus restent valables.
 - [Maquette B5 « Jour de match »](docs/design/maquette-b5/) : l'apparence de référence.

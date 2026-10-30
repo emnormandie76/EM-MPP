@@ -10,10 +10,13 @@ Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plu
 | [docs/architecture/architecture.md](docs/architecture/architecture.md) | Référence technique et plan de construction par étapes : le **comment** |
 | [docs/architecture/avancement.md](docs/architecture/avancement.md) | Étape en cours, interventions humaines faites, journal des décisions |
 | [docs/design/maquette-b5/](docs/design/maquette-b5/) | Maquette visuelle retenue (style B5 « Jour de match ») ; la couleur principale est #0036B3 depuis la v1.2 (architecture §8.1) |
+| [docs/features/branchement-portail.md](docs/features/branchement-portail.md) | Chantier de la connexion par le Portail admission (prompt guidé P-03 du portail, **contrat portail v1**) : décisions G du portail et D de MPPlike, étapes B0 à B4, journal |
 
 ## Phase en cours
 
 Construction, étape par étape (architecture §11). **Avant de commencer l'étape 1, obtenir le feu vert de l'utilisateur sur le document d'architecture (intervention H-02).** L'étape en cours est indiquée dans `avancement.md`.
+
+**Depuis le 30/10/2026 : chantier « Connexion par le portail »** ([branchement-portail.md](docs/features/branchement-portail.md)), étapes B0 à B4, à faire avant l'É10 (décision D10). Le site ne gérera plus de comptes : on s'y connectera par le Portail admission (OIDC), seule source des accès. Ses décisions G (du portail) ne se rediscutent pas ; le portail lit ce dépôt et n'y écrit jamais, et l'agent de MPPlike ne travaille jamais dans l'administration du portail.
 
 ## Règles pour tout agent
 
