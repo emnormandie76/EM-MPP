@@ -22,7 +22,7 @@ npx playwright install chromium
 
 | Commande | Rôle |
 |---|---|
-| `npm run dev` | serveur de développement (http://localhost:3000) |
+| `npm run dev` | serveur de développement (http://localhost:3003) |
 | `npm run build` / `npm start` | build de production et démarrage |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | génération des types de routes Next.js, puis TypeScript |
@@ -40,7 +40,7 @@ npx playwright install chromium
 
 La liste complète se trouve dans l'[architecture, §3.2](docs/architecture/architecture.md#32-scripts-npm).
 
-Comptes du seed (mot de passe `Test-1234!`) : `admin@example.test` (admin), `joueur1@example.test` à `joueur8@example.test`, `desactive@example.test` (compte désactivé). `nouveau1@example.test` est sur la liste blanche, sans compte : il peut s'inscrire sur `/inscription`.
+Comptes du seed, sans mot de passe : `admin@example.test` (admin), `joueur1@example.test` à `joueur8@example.test`, `desactive@example.test` (compte désactivé). Ils n'entrent pas par le portail : pour se connecter, il faut un compte du portail (`docs/features/branchement-portail.md`).
 
 ## Schéma de la base
 

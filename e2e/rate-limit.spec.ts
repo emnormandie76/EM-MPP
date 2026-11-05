@@ -1,19 +1,17 @@
-import { ACCOUNTS, expect, test } from "./fixtures";
+import { expect, test } from "./fixtures";
 
-// Attempt limit (architecture §6.1): 5 sign-in attempts per minute and per address.
+// Attempt limit (architecture §6.1): the whole school goes out through one address, so several
+// sign-ins at once must not block each other. The limit itself is in portail-sign-in.test.ts.
 
-test("the 6th failed attempt within a minute shows « Trop de tentatives »", async ({ page }) => {
-  await page.goto("/connexion");
+test("a team signing in together from one address is not blocked", async ({ request }) => {
+  const origin = test.info().project.use.baseURL!;
   const statuses: number[] = [];
   for (let attempt = 1; attempt <= 6; attempt += 1) {
-    await page.getByLabel("Email").fill(ACCOUNTS.julien);
-    await page.getByLabel("Mot de passe").fill(`Mauvais-${attempt}!`);
-    const response = page.waitForResponse((r) => r.url().endsWith("/api/auth/sign-in/email"));
-    await page.getByRole("button", { name: "Se connecter" }).click();
-    statuses.push((await response).status());
-    await expect(page.getByRole("button", { name: "Se connecter" })).toBeEnabled();
+    const response = await request.post("/api/auth/sign-in/social", {
+      headers: { origin },
+      data: { provider: "portail", callbackURL: "/" },
+    });
+    statuses.push(response.status());
   }
-  expect(statuses).toEqual([401, 401, 401, 401, 401, 429]);
-  await expect(page.getByText("Trop de tentatives. Réessaie dans une minute.")).toBeVisible();
-  await expect(page).toHaveURL("/connexion");
+  expect(statuses).toEqual([200, 200, 200, 200, 200, 200]);
 });

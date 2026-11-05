@@ -6,6 +6,7 @@ import { cache } from "react";
 import { isAvatarKey, type AvatarKey } from "@/lib/avatars";
 import type { Actor, Role } from "@/lib/services/result";
 import { getAuth } from "./auth";
+import { SIGN_IN_AUTO_PATH } from "./portail";
 
 // Session reading and route protection (architecture §6.4).
 
@@ -38,10 +39,10 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
   };
 });
 
-/** Game pages: without a valid session (or with a disabled account), back to /connexion. */
+/** Game pages: without a valid session (or with a disabled account), back to the sign-in. */
 export async function requireUser(): Promise<Viewer> {
   const viewer = await getViewer();
-  if (!viewer || viewer.banned) redirect("/connexion");
+  if (!viewer || viewer.banned) redirect(SIGN_IN_AUTO_PATH);
   return viewer;
 }
 

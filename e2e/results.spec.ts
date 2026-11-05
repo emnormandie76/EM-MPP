@@ -29,8 +29,8 @@ test("a resolved question shows the real value, everyone's malus, the absent pla
   await expect(result.getByRole("list", { name: "Badges gagnés sur cette question" })).toContainText("Tireur d'élite");
 
   // Vector P1, in malus: 262 with a joker (12 ÷ 2 = 6), 240 (10), both 235 (15), 300 (50, the worst);
-  // the players without a prediction take 50. They include Nina and Noé, who signed up during
-  // e2e/auth.spec.ts: the current season has no end, so they are part of its standings (§5.6, C8).
+  // the players without a prediction take 50. They include Nina, Noé and Yann, who first signed in
+  // during e2e/auth.spec.ts: the current season has no end, so they are part of its standings (§5.6, C8).
   const table = page.getByRole("table", { name: "Pronos de tous les joueurs, avec leur malus" });
   const row = (name: string) => table.getByRole("row").filter({ has: page.getByRole("rowheader", { name: new RegExp(name) }) });
   await expect(row("Julien")).toContainText(/262 participants.*Joker ÷2.*12 \(4,8\s%\).*6$/);
@@ -40,7 +40,7 @@ test("a resolved question shows the real value, everyone's malus, the absent pla
   await expect(row("Thomas")).toContainText(/300 participants.*50 \(20\s%\).*50$/);
   await expect(row("Hugo")).toContainText(/Pas de prono.*50$/);
   // From the smallest malus to the largest, then the absent players, by name.
-  await expect(table.getByRole("rowheader")).toHaveText([/Julien/, /Sarah/, /Camille/, /Inès/, /Thomas/, /Admin/, /Hugo/, /Léa/, /Mehdi/, /Nina/, /Noé/, /Nora/]);
+  await expect(table.getByRole("rowheader")).toHaveText([/Julien/, /Sarah/, /Camille/, /Inès/, /Thomas/, /Admin/, /Hugo/, /Léa/, /Mehdi/, /Nina/, /Noé/, /Nora/, /Yann/]);
 });
 
 test("without a prediction on a resolved question, « Ton prono » shows the malus of the worst prediction", async ({ page }) => {

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getAccounts, getAllowedEmails } from "@/lib/data/players";
+import { getAccounts } from "@/lib/data/players";
 import type { Database } from "@/lib/db/client";
-import { allowedEmail } from "@/lib/db/schema";
 import { anonymizeUser } from "@/lib/services/players";
 import { createTestDb } from "../helpers/db";
 import { createUser } from "../helpers/factories";
@@ -17,24 +16,6 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await close();
-});
-
-describe("getAllowedEmails", () => {
-  it("lists the addresses with whether an account uses them", async () => {
-    const admin = await createUser(db, { role: "admin", email: "admin@example.test" });
-    await db.insert(allowedEmail).values([{ email: "zoe@example.test" }, { email: "ines@example.test" }]);
-    await createUser(db, { email: "ines@example.test" });
-
-    expect(await getAllowedEmails(db, { id: admin.id, role: "admin" })).toEqual([
-      { email: "ines@example.test", hasAccount: true },
-      { email: "zoe@example.test", hasAccount: false },
-    ]);
-  });
-
-  it("is refused to a player", async () => {
-    const player = await createUser(db);
-    await expect(getAllowedEmails(db, { id: player.id, role: "player" })).rejects.toThrow("FORBIDDEN");
-  });
 });
 
 describe("getAccounts", () => {

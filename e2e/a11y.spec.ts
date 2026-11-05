@@ -11,7 +11,7 @@ async function blockingViolations(page: Page): Promise<string[]> {
     .map((violation) => `${violation.id}: ${violation.help} (${violation.nodes.map((node) => node.target.join(" ")).join(", ")})`);
 }
 
-for (const url of ["/connexion", "/inscription"]) {
+for (const url of ["/connexion", "/connexion?error=access_denied"]) {
   test(`${url} has no serious or critical accessibility violation`, async ({ page }) => {
     await page.goto(url);
     expect(await blockingViolations(page)).toEqual([]);

@@ -1,11 +1,8 @@
 import { generateId } from "better-auth";
-import { hashPassword } from "better-auth/crypto";
 import { eq, sql } from "drizzle-orm";
 import { defaultAvatarFor } from "../../src/lib/avatars";
 import type { Database } from "../../src/lib/db/client";
 import {
-  account,
-  allowedEmail,
   announcement,
   category,
   chatMessage,
@@ -42,7 +39,6 @@ import { seedSeasons } from "./seed-seasons";
 // without a prediction (§9.6). Step 8d: a chat over two days, with emojis, a deleted message, the
 // result message of a resolved question, and a few accounts that read part of it.
 
-export const SEED_PASSWORD = "Test-1234!";
 /** Value of another player's prediction on an open question: must never reach the page (§9.3). */
 export const WITNESS_VALUE = 987654;
 /**
@@ -83,13 +79,8 @@ const PEOPLE = {
 
 type Person = keyof typeof PEOPLE;
 
-/** On the allow list without an account: for the sign-up test. nouveau2@example.test is left out:
- * the admin adds it in e2e/auth.spec.ts (decision of 30/09/2026). */
-const NEW_EMAILS = ["nouveau1@example.test"];
-
 export type SeedSummary = {
   users: number;
-  allowedEmails: number;
   categories: number;
   seasons: { older: string; previous: string; current: string };
   questions: number;
@@ -182,12 +173,11 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
 
   const calendar = seedCalendar(now);
   const { shift, daysAgo, daysAhead, previousSeasonDay, olderSeasonDay } = calendar;
-  const passwordHash = await hashPassword(SEED_PASSWORD);
 
   return db.transaction(async (tx) => {
     await clearDatabase(tx);
 
-    // Accounts: the same password for everyone, hashed the way Better Auth does.
+    // Accounts: no password, the sign-in goes through the portal (§9.6).
     const ids = Object.fromEntries(Object.keys(PEOPLE).map((person) => [person, generateId()])) as Record<Person, string>;
     await tx.insert(user).values(
       (Object.entries(PEOPLE) as [Person, (typeof PEOPLE)[Person]][]).map(([person, data]) => ({
@@ -204,24 +194,6 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
         lastSeenAt: person === "camille" ? shift(-2 * HOUR) : null,
       })),
     );
-    await tx.insert(account).values(
-      Object.values(ids).map((userId) => ({
-        id: generateId(),
-        accountId: userId,
-        providerId: "credential",
-        userId,
-        password: passwordHash,
-        updatedAt: now,
-      })),
-    );
-    const allowed = [
-      ...Object.values(PEOPLE)
-        .filter((data) => !("role" in data))
-        .map(({ email }) => email),
-      ...NEW_EMAILS,
-    ];
-    await tx.insert(allowedEmail).values(allowed.map((email) => ({ email, createdBy: ids.admin })));
-
     const categories = await tx
       .insert(category)
       .values([
@@ -736,7 +708,6 @@ export async function seedDatabase(db: Database, { now, env }: { now: Date; env:
 
     return {
       users: Object.keys(PEOPLE).length,
-      allowedEmails: allowed.length,
       categories: categories.length,
       seasons: { older: calendar.older.label, previous: calendar.previous.label, current: calendar.current.label },
       questions: questionCount,

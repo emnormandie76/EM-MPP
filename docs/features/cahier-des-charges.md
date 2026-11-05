@@ -1,6 +1,8 @@
 # Cahier des charges — Les petits pronos de la promo
 
-> **Version 1.7 du 13/10/2026.** Toutes les décisions sont prises. La section 8 liste les précisions ajoutées en rédigeant ; elles restent contestables.
+> **Version 1.8 du 05/11/2026.** Toutes les décisions sont prises. La section 8 liste les précisions ajoutées en rédigeant ; elles restent contestables.
+>
+> **Changement de la v1.8** (chantier « Connexion par le portail », [branchement-portail.md](branchement-portail.md), **étapes B1 à B4**) : on se connecte par le **Portail admission**, seule source des accès. Le site ne gère plus de comptes : plus de mot de passe, d'inscription, de liste blanche, de désactivation ni de changement de rôle sur le site. Une session dure 8 heures. Le nom affiché reste propre au jeu, et l'anonymisation reste une action de l'admin. Tout le jeu reste tel quel. Sections concernées : 2, 4.1, 4.6, 4.8, 4.9, 5.7, 6, 8, 9, 10. **Tant que la bascule (B3) n'a pas eu lieu, la production suit la v1.7.**
 >
 > **Changement de la v1.7** (demandé par l'utilisateur le 13/10/2026, à l'étape É8h) : l'admin peut créer des **questions fun**, des questions à nombre où les réponses peuvent varier énormément, notées **à la place** : le prono le plus proche prend 0, puis chaque place derrière lui coûte le **malus par place** fixé par l'admin. Le coefficient reste ×1. Une erreur énorme ne coûte qu'une place : une question fun ne peut pas décider seule du classement. Sections concernées : 3, 4.3, 4.9, 5.4 à 5.7, 5.9 (nouvelle), 6, 7, 8, 11.
 >
@@ -40,7 +42,7 @@
 
 **Objectif secondaire.** Émulation et cohésion d'équipe.
 
-**Lancement : 14 octobre 2026**, avec la campagne principale : la majorité des questions de la saison ouvre ce jour-là, pour une semaine. Tout le périmètre décrit ici est livré pour cette date, sauf les règles réglables par saison (v1.3), livrées après le lancement et avant le premier résultat. Quelques questions pourront s'ajouter en cours d'année, à la marge. Premier résultat attendu en novembre.
+**Lancement : 14 octobre 2026**, avec la campagne principale : la majorité des questions de la saison ouvre ce jour-là, pour une semaine. Tout le périmètre décrit ici est livré pour cette date, sauf les règles réglables par saison (v1.3), livrées l'année prochaine (décision du 05/11/2026, D23 du chantier du portail). Quelques questions pourront s'ajouter en cours d'année, à la marge. Premier résultat attendu en novembre.
 
 **Comment saura-t-on que ça marche ?**
 - Au moins 80 % des joueurs valident tous leurs pronos de la campagne d'octobre.
@@ -51,7 +53,7 @@
 | Rôle | Qui | Ce qu'il fait |
 |---|---|---|
 | Joueur | uniquement les membres de l'équipe (20 au plus) | pronostique, consulte les résultats, le classement et le palmarès, discute dans le chat |
-| Admin | toi (et éventuellement une deuxième personne) ; l'admin joue aussi | gère saisons et leurs règles (v1.3), catégories, questions, résultats, prolongations, joueurs, lots et annonces ; modère le chat |
+| Admin | les personnes à qui le portail donne le rôle admin ; l'admin joue aussi | gère saisons et leurs règles (v1.3), catégories, questions, résultats, prolongations, lots et annonces ; consulte les joueurs et les anonymise ; modère le chat |
 
 Usage : une semaine intense à la mi-octobre, puis des visites ponctuelles pour suivre les résultats et le classement.
 
@@ -89,10 +91,14 @@ Une prolongation rouvre une question pour un seul joueur, qu'elle soit encore ou
 ## 4. Fonctionnalités
 
 ### 4.1 Comptes et connexion
-- **Le site n'envoie aucun email.** On se connecte avec son adresse email et un mot de passe.
-- L'admin tient une liste blanche d'adresses. Le joueur crée lui-même son compte (adresse, mot de passe, nom affiché), à condition que son adresse figure dans la liste blanche. L'adresse n'est pas vérifiée.
-- Session sans expiration : on reste connecté tant qu'on ne se déconnecte pas.
-- Mot de passe oublié : l'admin attribue un mot de passe provisoire depuis le back-office et le transmet au joueur, qui le change ensuite dans son profil.
+- **Le site n'envoie aucun email.** On se connecte par le **Portail admission** (v1.8) : le site n'a plus de mot de passe ni d'inscription.
+- **Le portail est la seule source des accès** : il décide qui entre et avec quel rôle (joueur ou admin). Le site reprend ce rôle et l'adresse à chaque connexion. Un accès retiré au portail prend effet à la connexion suivante.
+- Sans session, on arrive directement sur le portail. Si on y est déjà connecté, on revient sur le site sans rien faire, et une tuile du portail mène droit au jeu.
+- Une session dure **8 heures** depuis la connexion, sans être prolongée. Après, le site repasse par le portail.
+- À sa première connexion, un joueur sans compte sur le site en reçoit un : son nom affiché part du nom du portail, et il le change ensuite dans son profil.
+- Si la connexion échoue, le site affiche un message neutre avec un lien vers le portail.
+- Se déconnecter du site déconnecte aussi du portail.
+- Mot de passe oublié : il se règle sur le portail.
 
 ### 4.2 Accueil
 - En tête : les questions ouvertes pour moi, triées par clôture la plus proche. Elles comprennent celles que l'admin m'a prolongées. Chacune a un compte à rebours qui défile en direct, pour que personne ne rate une clôture.
@@ -125,7 +131,7 @@ Une prolongation rouvre une question pour un seul joueur, qu'elle soit encore ou
 
 ### 4.6 Profil joueur
 - Page publique de chaque joueur : avatar, nom, rang, malus, écart moyen, nombre de « Dans le mille », nombre de pronos joués, badges, historique des questions résolues (y compris celles qu'il n'a pas pronostiquées, avec le malus pris).
-- Mon profil : changer mon nom affiché, mon avatar et mon mot de passe.
+- Mon profil : changer mon nom affiché et mon avatar. Le mot de passe se change sur le portail (v1.8).
 - **Avatar** : choisi dans une galerie d'illustrations prédéfinies (pas d'envoi de photo).
 - **Badges**, attribués automatiquement :
 
@@ -150,13 +156,13 @@ Une prolongation rouvre une question pour un seul joueur, qu'elle soit encore ou
 - **Règles de la saison** (v1.3) : l'admin règle le barème, le plafond, les jokers, le malus d'un absent et le seuil du « Dans le mille » de chaque saison (5.8). Une nouvelle saison reprend les règles de la saison précédente, qu'il peut ajuster. Les règles se figent au premier résultat de la saison ; chaque changement est gardé dans un historique.
 - Une question appartient à la saison de sa **date de clôture**. Le classement final d'une saison est proclamé par l'admin quand toutes ses questions sont résolues, même si certains résultats tombent après la bascule.
 - **Palmarès** : une page, visible par tous, affiche le classement final de chaque saison passée.
-- Les données des saisons passées sont conservées. La liste blanche, les comptes et les catégories passent d'une saison à l'autre.
+- Les données des saisons passées sont conservées. Les comptes et les catégories passent d'une saison à l'autre.
 
 ### 4.9 Back-office admin
 - **Questions** : créer (nombre, choix, oui/non, fun ; pour un choix, avec le malus d'une mauvaise réponse ; pour une question fun, avec le malus par place, v1.7), publier, modifier (les textes restent corrigeables après les premiers pronos, v1.6, voir 5.7), annuler, supprimer définitivement, une par une ou plusieurs à la fois (v1.4, voir 5.7) ; créer en série pour la campagne d'octobre (mêmes dates pour un lot de questions) ; dupliquer une question d'une saison passée ; saisir puis corriger la valeur réelle, avec recalcul automatique.
 - **Suivi** : pour chaque question ouverte, l'état de chaque joueur (à faire, enregistré, validé), sans les valeurs. L'admin relance les retardataires par ses propres moyens (Teams, à l'oral). Depuis ce suivi, il prolonge une question pour un joueur absent (4.10).
 - **Pronos** : déverrouiller un prono validé avant la clôture.
-- **Joueurs** : gérer la liste blanche, désactiver un compte, attribuer un mot de passe provisoire, donner le rôle admin.
+- **Joueurs** (v1.8) : voir la liste des comptes (nom, adresse, rôle, dernière visite) et anonymiser un compte. Les accès et les rôles se gèrent sur le portail, par son super-admin : un lien y mène.
 - **Catégories** : créer, renommer, archiver.
 - **Saisons** : créer (nom, date de début, jokers autorisés ou non), renommer, changer la date de début, autoriser ou retirer les jokers, supprimer une saison sans question, saisir les lots, proclamer le classement final. Depuis la v1.3 : régler les règles de la saison (5.8) et consulter l'historique de leurs changements.
 - **Annonces** : publier, modifier, supprimer un message affiché sur l'accueil.
@@ -229,7 +235,7 @@ Sans cette règle, ne pas répondre serait la meilleure stratégie. La prolongat
 - Question annulée : aucun malus pour personne, et le joker éventuellement posé est rendu au joueur.
 - Question supprimée (v1.4) : elle disparaît comme si elle n'avait jamais existé, avec ses pronos, ses jokers (rendus), son historique, ses prolongations et son message de résultat dans le chat. C'est définitif. La suppression sert aux questions de test et aux erreurs de saisie ; pour une vraie question dont on ne connaîtra pas la valeur, l'admin l'annule plutôt, et les joueurs la voient annulée. Une question d'une saison proclamée ne se supprime pas : le palmarès est figé, et les profils doivent rester d'accord avec lui.
 - Joueur arrivé en cours de saison : il joue les questions encore ouvertes. Sur les questions déjà résolues, il prend le malus d'absence, sinon il serait premier. Pour une question clôturée sans résultat, l'admin peut lui accorder une prolongation.
-- Joueur parti : compte désactivé, historique conservé. S'il n'a aucun prono dans une saison, il n'apparaît pas dans son classement.
+- Joueur parti : son accès est retiré sur le portail (v1.8), son historique est conservé. S'il n'a aucun prono dans une saison, il n'apparaît pas dans son classement.
 - Une fois des pronos reçus, l'admin peut modifier l'aide et repousser la clôture, et corriger les textes (v1.6) : énoncé, description, unité, source et libellé des réponses. Il ne peut pas changer le type, le nombre ni l'ordre des réponses, le malus d'une mauvaise réponse ou par place ni le coefficient, ni avancer la clôture. Pour cela, il annule la question et en crée une nouvelle.
 - Après la clôture, et même après le résultat, les textes se corrigent encore (v1.6), comme la catégorie, l'aide et la date de résultat prévue. Une réponse renommée garde ses pronos et, si c'est la bonne, le résultat.
 - Toutes les dates et heures sont celles de Paris.
@@ -304,9 +310,9 @@ Le poids reste borné : avec 20 joueurs et 5 de malus par place, le dernier pren
 | Asymétrie d'information (C3) | Acceptée : ça fait partie du jeu |
 | Classement (C4) | Tout le monde est visible |
 | Saisons (C5) | Créées par l'admin (nom, date de début) ; bascule automatique à la date de début de la saison suivante ; une question appartient à la saison de sa clôture (v1.1, 30/09/2026) |
-| Emails (C6, C9) | Aucun email : ni notification, ni code ; connexion par mot de passe sans vérification |
-| Accès (C7) | Liste blanche |
-| Confidentialité (C8) | Accès réservé à la liste blanche : validé |
+| Emails (C6, C9) | Aucun email : ni notification, ni code ; connexion par le portail (v1.8) |
+| Accès (C7) | Le Portail admission, seule source des accès (v1.8 ; liste blanche jusque-là) |
+| Confidentialité (C8) | Accès réservé aux personnes autorisées sur le portail (v1.8) : validé |
 | Nom et vocabulaire (C10) | « Les petits pronos de la promo » (changé le 02/10/2026, étape É8b) ; on parle de pronostics, de points de malus, jamais de paris |
 | Couleur principale | #0036B3 (v1.2, remplace le bleu #1F5BFF de la maquette) |
 | Chat | Chat général avec emojis, messages conservés, message automatique au résultat (v1.2 ; il était hors périmètre en v1.0) |
@@ -316,7 +322,7 @@ Le poids reste borné : avec 20 joueurs et 5 de malus par place, le dernier pren
 | Valeur réelle (Q5) | Saisie par l'admin |
 | Validation (P1, P2) | Question par question ; tout prono enregistré est validé automatiquement à la clôture |
 | Déverrouillage (P3) | Possible par l'admin, avant la clôture, tracé |
-| Création des comptes (P4) | Par le joueur lui-même, si son adresse est dans la liste blanche |
+| Création des comptes (P4) | À la première connexion par le portail (v1.8) |
 | Saisons passées (P5) | Données conservées, palmarès des classements finaux visible par tous |
 | Aide (P6) | Bloc « Pour t'aider » rempli par l'admin |
 | Lancement | 14 octobre 2026, tout le périmètre livré (sauf la v1.3, après le lancement) |
@@ -337,7 +343,7 @@ Le poids reste borné : avec 20 joueurs et 5 de malus par place, le dernier pren
 ## 8. Précisions ajoutées en rédigeant (contestables)
 
 **v1.0**
-- **Mot de passe oublié** : l'admin attribue un mot de passe provisoire. Sans cela, un joueur qui perd son mot de passe ne pourrait plus jamais jouer, puisqu'il n'y a pas d'email.
+- **Mot de passe oublié** : l'admin attribuait un mot de passe provisoire. Depuis la v1.8, c'est le portail qui s'en occupe.
 - **Avatar** : galerie d'illustrations prédéfinies plutôt qu'envoi de photo. C'est plus simple, et il n'y a aucun fichier à stocker.
 - **Badges** : la liste de la section 4.6, uniquement des badges positifs. Ils ne changent pas avec la v1.2 : le « plus proche » se calcule toujours, même sans bonus podium.
 - **Joker** : il se pose avant la validation et il est rendu si la question est annulée.
@@ -404,21 +410,21 @@ Le poids reste borné : avec 20 joueurs et 5 de malus par place, le dernier pren
 - **Localisation** : français uniquement, heure de Paris, nombres au format français (1 234).
 - **Sécurité** :
   - tout le site est derrière la connexion ;
-  - les mots de passe ne sont jamais stockés en clair (hachés) ;
-  - le nombre de tentatives de connexion est limité ;
+  - le site ne connaît aucun mot de passe : la connexion passe par le portail (v1.8) ;
+  - une session dure 8 heures au plus ;
   - le back-office est réservé aux admins et contrôlé côté serveur ;
   - les pronos des autres ne sont jamais envoyés au navigateur avant la clôture, ni avant le résultat à un joueur qui n'a pas pronostiqué ;
   - les messages du chat sont affichés comme du texte, jamais interprétés.
 - **Données personnelles** : le strict minimum (email professionnel, nom affiché, messages du chat) ; hébergement en Europe si possible ; suppression sur demande.
-- **Autonomie de l'admin** : tout se gère depuis le back-office, sans toucher au code ni à la base de données. C'est la condition pour que le site serve d'une année sur l'autre.
-- **Aucune dépendance extérieure au code de l'application** : ni service d'email, ni service de messagerie pour le chat, ni Power Automate, ni outil à faire tourner à côté.
+- **Autonomie de l'admin** : tout le jeu se gère depuis le back-office, sans toucher au code ni à la base de données. C'est la condition pour que le site serve d'une année sur l'autre. Les accès, eux, se gèrent sur le portail (v1.8).
+- **Aucune dépendance extérieure au code de l'application** : ni service d'email, ni service de messagerie pour le chat, ni Power Automate, ni outil à faire tourner à côté. Seule exception, depuis la v1.8 : le Portail admission, outil de l'équipe, pour la connexion. S'il est indisponible, aucune nouvelle session ne s'ouvre, et les sessions déjà ouvertes continuent.
 - **Accessibilité de base** : contrastes suffisants, navigation au clavier, libellés sur les champs de formulaire.
 
 ## 10. Hors périmètre
 
 - Argent, mises, paris réels.
 - Tout envoi d'email (notifications, codes, mot de passe oublié) et toute intégration Teams ou Power Automate.
-- Connexion Microsoft (SSO) et import automatique depuis le BI.
+- Connexion Microsoft (SSO) directe et import automatique depuis le BI. (La connexion passe par le Portail admission depuis la v1.8.)
 - Classements par catégorie ou par mois, commentaires sur les questions, réactions aux messages du chat.
 - Chat instantané, messages privés, plusieurs salons de discussion.
 - Questions Juste Prix (retirées en v1.2).
@@ -429,5 +435,5 @@ Le poids reste borné : avec 20 joueurs et 5 de malus par place, le dernier pren
 
 1. **Design** : fait. Style B5 « Jour de match », maquette dans [docs/design/maquette-b5/](../design/maquette-b5/). La couleur principale a changé en v1.2 (#0036B3).
 2. **Architecture et plan de construction** : [docs/architecture/architecture.md](../architecture/architecture.md), suivi dans [avancement.md](../architecture/avancement.md).
-3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur), É8d (chat), É8e (suppression des questions, règlement réservé aux admins, v1.4), É8f (suppression sans trace des messages du chat, v1.5), É8g (correction des textes d'une question publiée, v1.6) et É8h (questions fun, v1.7), puis recette avec deux ou trois collègues avant le 14 octobre. Après le lancement : É10 (règles réglables par saison, v1.3), avant le premier résultat.
+3. **Développement** en 9 étapes, plus les étapes insérées É5b (saisons), É8b (nom du site), É8c (malus, jokers par saison, prolongations, couleur), É8d (chat), É8e (suppression des questions, règlement réservé aux admins, v1.4), É8f (suppression sans trace des messages du chat, v1.5), É8g (correction des textes d'une question publiée, v1.6) et É8h (questions fun, v1.7), puis recette avec deux ou trois collègues avant le 14 octobre. Après le lancement : le chantier du portail (B1 à B4, v1.8), puis É10 (règles réglables par saison, v1.3), avant le premier résultat.
 4. **Contenu** : l'admin rédige les questions de la campagne d'octobre (énoncés, sources, liens BI, valeurs de l'an dernier, malus des questions à choix) avec le gabarit de l'architecture (annexe B), et les saisit avant le lancement.

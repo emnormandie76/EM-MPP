@@ -12,17 +12,17 @@ test("/api/health answers ok: the database is reachable", async ({ request }) =>
   expect(await response.json()).toEqual({ ok: true });
 });
 
-test("/connexion shows the sign-in form under the site's name, without indexing", async ({ page }) => {
+test("/connexion shows the portal's button under the site's name, without indexing", async ({ page }) => {
   const response = await page.goto("/connexion");
   expect(response?.status()).toBe(200);
   expect(response?.headers()["x-robots-tag"]).toBe("noindex, nofollow");
   await expect(page).toHaveTitle(`Connexion · ${APP_NAME}`);
   await expect(page.getByText(APP_NAME, { exact: true })).toBeAttached();
-  await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Se connecter" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Se connecter avec le portail" })).toBeVisible();
 });
 
-test("an anonymous visitor is sent to /connexion", async ({ page }) => {
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/connexion$/);
+test("an anonymous visitor is sent to the sign-in, which starts the flow by itself", async ({ request }) => {
+  const response = await request.get("/", { maxRedirects: 0 });
+  expect(response.status()).toBe(307);
+  expect(response.headers().location).toBe("/connexion?auto=1");
 });

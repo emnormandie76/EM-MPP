@@ -18,8 +18,6 @@ export const ERROR_MESSAGES = {
   NAME_TAKEN: "Ce nom est déjà pris.",
   SELF_TARGET: "Tu ne peux pas faire cette action sur ton propre compte.",
   LAST_ADMIN: "Il doit toujours rester au moins un admin.",
-  EMAIL_HAS_ACCOUNT: "Un compte existe avec cette adresse : désactive le compte plutôt que de retirer l'adresse.",
-  EMAIL_NOT_LISTED: "Cette adresse n'est pas sur la liste.",
   ANONYMIZED: "Ce compte est anonymisé : il ne peut plus être modifié.",
   // Back office (§5.11, step 5).
   CATEGORY_NAME_TAKEN: "Cette catégorie existe déjà.",

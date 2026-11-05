@@ -16,8 +16,8 @@ function expectSecurityHeaders(headers: Record<string, string>, url: string): vo
 }
 
 test("public routes, the API and static files carry the security headers", async ({ request }) => {
-  // Without a session, a game page redirects to /connexion: the redirect carries them too.
-  for (const url of ["/connexion", "/inscription", "/api/health", "/api/chat", "/robots.txt", "/"]) {
+  // Without a session, a game page redirects to the sign-in: the redirect carries them too.
+  for (const url of ["/connexion", "/api/health", "/api/chat", "/robots.txt", "/"]) {
     const response = await request.get(url, { maxRedirects: 0 });
     expectSecurityHeaders(response.headers(), url);
   }

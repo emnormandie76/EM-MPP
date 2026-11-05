@@ -5,8 +5,10 @@ const VALID = {
   DATABASE_URL: "postgresql://user:s3cr3t-pooled@ep-test-pooler.example.test/db?sslmode=require",
   DATABASE_URL_UNPOOLED: "postgresql://user:s3cr3t-direct@ep-test.example.test/db?sslmode=require",
   BETTER_AUTH_SECRET: "0123456789abcdefghijklmnopqrstuvwxyz",
-  BETTER_AUTH_URL: "http://localhost:3000",
-  ADMIN_EMAILS: "admin@example.test, second.admin@example.test",
+  BETTER_AUTH_URL: "http://localhost:3003",
+  PORTAIL_ISSUER: "https://portail.example.test/api/auth",
+  PORTAIL_CLIENT_ID: "client-id-du-poste",
+  PORTAIL_CLIENT_SECRET: "s3cr3t-du-client",
 };
 
 function statuses(env: Record<string, string | undefined>) {
@@ -19,9 +21,9 @@ describe("checkEnv (scripts/check-env.ts)", () => {
   });
 
   it("reports missing and blank variables", () => {
-    const result = statuses({ ...VALID, BETTER_AUTH_URL: undefined, ADMIN_EMAILS: "  " });
+    const result = statuses({ ...VALID, BETTER_AUTH_URL: undefined, PORTAIL_CLIENT_SECRET: "  " });
     expect(result.BETTER_AUTH_URL).toBe("MANQUANTE");
-    expect(result.ADMIN_EMAILS).toBe("MANQUANTE");
+    expect(result.PORTAIL_CLIENT_SECRET).toBe("MANQUANTE");
     expect(result.DATABASE_URL).toBe("OK");
   });
 
@@ -30,21 +32,33 @@ describe("checkEnv (scripts/check-env.ts)", () => {
       DATABASE_URL: "mysql://user:pw@host/db",
       DATABASE_URL_UNPOOLED: "not a url",
       BETTER_AUTH_SECRET: "too-short",
-      BETTER_AUTH_URL: "localhost:3000",
-      ADMIN_EMAILS: "admin@example.test,nope,also nope",
+      BETTER_AUTH_URL: "localhost:3003",
+      PORTAIL_ISSUER: "https://portail.example.test/api/auth/",
+      PORTAIL_CLIENT_ID: "client",
+      PORTAIL_CLIENT_SECRET: "secret",
     });
     expect(result).toEqual([
       { name: "DATABASE_URL", status: "INVALIDE", hint: "URL PostgreSQL attendue" },
       { name: "DATABASE_URL_UNPOOLED", status: "INVALIDE", hint: "URL PostgreSQL attendue" },
       { name: "BETTER_AUTH_SECRET", status: "INVALIDE", hint: "au moins 32 caractères" },
       { name: "BETTER_AUTH_URL", status: "INVALIDE", hint: "URL http(s) attendue" },
-      { name: "ADMIN_EMAILS", status: "INVALIDE", hint: "2 adresses invalides" },
+      { name: "PORTAIL_ISSUER", status: "INVALIDE", hint: "sans barre finale" },
+      { name: "PORTAIL_CLIENT_ID", status: "OK" },
+      { name: "PORTAIL_CLIENT_SECRET", status: "OK" },
     ]);
+  });
+
+  it("does not ask for ADMIN_EMAILS any more", () => {
+    expect(checkEnv(VALID).map(({ name }) => name)).not.toContain("ADMIN_EMAILS");
+  });
+
+  it("refuses an issuer that is not a web address", () => {
+    expect(statuses({ ...VALID, PORTAIL_ISSUER: "portail" }).PORTAIL_ISSUER).toBe("INVALIDE");
   });
 
   it("never returns a value", () => {
     const output = JSON.stringify([checkEnv(VALID), checkEnv({ ...VALID, BETTER_AUTH_SECRET: "short-secret" })]);
-    for (const value of ["s3cr3t", "0123456789abcdef", "short-secret", "admin@example.test", "localhost"]) {
+    for (const value of ["s3cr3t", "0123456789abcdef", "short-secret", "client-id-du-poste", "portail.example.test", "localhost"]) {
       expect(output).not.toContain(value);
     }
   });

@@ -1,4 +1,3 @@
-import { verifyPassword } from "better-auth/crypto";
 import { and, eq, isNotNull, ne } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -23,7 +22,7 @@ import { seasonAt, seasonStartFromLocalDate } from "@/lib/game/time";
 import { isNew, newReference } from "@/lib/game/visits";
 import { getChatMessages, getUnreadChatCount } from "@/lib/data/chat";
 import { markAsProduction, openPglite, type ScriptDb } from "../../scripts/lib/db";
-import { CLOSED_WITNESS_VALUE, SEED_PASSWORD, SeedRefusedError, seedDatabase, WITNESS_VALUE } from "../../scripts/lib/seed";
+import { CLOSED_WITNESS_VALUE, SeedRefusedError, seedDatabase, WITNESS_VALUE } from "../../scripts/lib/seed";
 
 const MID_SEASON = new Date("2026-11-20T10:00:00Z");
 
@@ -58,7 +57,6 @@ describe("seed (scripts/seed.ts)", () => {
 
     expect(summary).toMatchObject({
       users: 10,
-      allowedEmails: 10,
       categories: 4,
       seasons: { older: "2024-2025", previous: "2025-2026", current: "2026-2027" },
       questions: 15,
@@ -80,13 +78,6 @@ describe("seed (scripts/seed.ts)", () => {
     expect(users.filter(({ role }) => role === "admin").map(({ name }) => name)).toEqual(["Admin"]);
     expect(users.filter(({ banned }) => banned).map(({ email }) => email)).toEqual(["desactive@example.test"]);
     expect(users.map(({ name }) => name)).toEqual(expect.arrayContaining(["Sarah", "Julien", "Inès", "Camille", "Thomas", "Mehdi", "Léa", "Hugo"]));
-
-    const allowed = (await db.select().from(allowedEmail)).map(({ email }) => email);
-    expect(allowed).toHaveLength(10);
-    expect(allowed).toEqual(expect.arrayContaining(["nouveau1@example.test", "desactive@example.test"]));
-    // Added by the admin in e2e/auth.spec.ts.
-    expect(allowed).not.toContain("nouveau2@example.test");
-    expect(allowed).not.toContain("admin@example.test");
 
     const categories = await db.select().from(category);
     expect(categories.map(({ name }) => name).sort()).toEqual(["Archivée", "Candidatures", "Intégration", "JPO"]);
@@ -290,16 +281,13 @@ describe("seed (scripts/seed.ts)", () => {
     expect(await getUnreadChatCount(db, { id: hugo.id, role: "player" })).toBe(9);
   });
 
-  it("gives every account the password Test-1234!, hashed the Better Auth way", async () => {
+  it("gives no account a password or an allow list entry: the sign-in goes through the portal", async () => {
     target = await migratedDb();
     const { db } = target;
     await seedDatabase(db, { now: MID_SEASON, env: {} });
 
-    const accounts = await db.select().from(account).where(isNotNull(account.password));
-    expect(accounts).toHaveLength(10);
-    expect(accounts.every(({ providerId, accountId, userId }) => providerId === "credential" && accountId === userId)).toBe(true);
-    expect(await verifyPassword({ hash: accounts[0].password!, password: SEED_PASSWORD })).toBe(true);
-    expect(await verifyPassword({ hash: accounts[0].password!, password: "wrong-password" })).toBe(false);
+    expect(await db.select().from(account)).toEqual([]);
+    expect(await db.select().from(allowedEmail)).toEqual([]);
   });
 
   it("erases everything and starts again: same content, identifiers from 1", async () => {

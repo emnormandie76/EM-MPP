@@ -1,14 +1,14 @@
 # Chantier — Connexion par le portail
 
-> **Source** : prompt guidé P-03 du portail (`../portail/docs/prompts/P-03-MPPlike-connexion-portail.md`, émis le 2026-10-30), **contrat portail v1** (précisé le 2026-10-29).
-> **Ouvert le** 30/10/2026. **B0 validée le 30/10/2026** ; **prochaine étape** : B1 (le branchement, sur le poste).
+> **Source** : prompt guidé P-03 du portail (`../portail/docs/prompts/P-03-MPPlike-connexion-portail.md`, émis le 2026-10-30), **contrat portail v1** (précisé le 2026-10-29). Corrigé par le prompt guidé P-04 du portail (`../portail/docs/prompts/P-04-MPPlike-rattachement-production.md`, émis le 2026-11-05), contrat v1 inchangé.
+> **Ouvert le** 30/10/2026. **B0 validée le 30/10/2026** ; **étape en cours depuis le 05/11/2026** : B1 (le branchement, sur le poste et sur la branche de recette, D12).
 > Le portail est le fournisseur de connexion des applications de l'équipe ; il lit ce dépôt et n'y écrit jamais (G7). Ce fichier porte les décisions du chantier, ses étapes à cocher et son journal. Le suivi général reste dans [avancement.md](../architecture/avancement.md) (étapes B0 à B4).
 
 ## 1. Objet
 
 MPPlike ne gère plus de comptes : on s'y connecte par le **Portail admission** (<https://portail-admission.vercel.app>), fournisseur d'identité OIDC et seule source des accès. Disparaissent : la connexion par adresse et mot de passe, l'inscription, la liste des adresses autorisées, `ADMIN_EMAILS`, le changement de mot de passe, et la gestion des comptes de `/admin/joueurs` (rôle, désactivation, mot de passe provisoire). Le portail transmet l'identité (`sub`, adresse, nom) et le rôle (`player` ou `admin`) ; le sens des rôles et leurs gardes restent dans MPPlike (`requireUser`, `requireAdmin`, contrôles des services). Tout le jeu reste tel quel.
 
-MPPlike est déjà en ligne : le branchement est une **bascule en trois temps** (G19) : le code sur le poste avec le client `dev`, puis l'import des comptes dans le portail, puis le client `production` et le déploiement dans une même séance avec le propriétaire.
+MPPlike est déjà en ligne : le branchement est une **bascule en trois temps** (G19) : le code sur le poste avec le client `dev`, puis l'import des comptes dans le portail, puis le client `production` et le déploiement dans une même séance avec le propriétaire. Depuis le 05/11/2026 (D12, G21), le premier temps tourne aussi sur une branche de recette, sur la base Neon `dev`, reliée au portail de production : rien n'arrive dans la production de MPPlike avant B3.
 
 ## 2. Point de départ (B0, relevé du 30/10/2026)
 
@@ -34,7 +34,7 @@ MPPlike est déjà en ligne : le branchement est une **bascule en trois temps** 
 
 ## 3. Décisions du propriétaire, à ne pas rediscuter (portail)
 
-Décisions du propriétaire, **à ne pas rediscuter**, copiées telles quelles du plan du portail par P-03 §2. Les renvois (« piège 1 », « D13 ») désignent le plan du portail. Ne concernent pas MPPlike : portail D26, D28, D30, D32.
+Décisions du propriétaire, **à ne pas rediscuter**, copiées telles quelles du plan du portail par P-03 §2 (G21 : par P-04 §2). Les renvois (« piège 1 », « D13 ») désignent le plan du portail. Ne concernent pas MPPlike : portail D26, D28, D30, D32.
 
 | N° | Source | Décision |
 |---|---|---|
@@ -58,6 +58,8 @@ Décisions du propriétaire, **à ne pas rediscuter**, copiées telles quelles d
 | G18 | portail D29 | **L'agent d'une application ne travaille jamais dans l'administration du portail**, même dans la session du propriétaire : quand un réglage du portail doit changer pendant son chantier (annuaire, grille, client), il prévient le propriétaire, qui le fait lui-même ou le confie à l'agent du portail. |
 | G19 | portail D31 | **Une application déjà en ligne se branche par une bascule en trois temps** : (1) le code sur le poste, avec le seul client `dev` ; (2) l'import de ses comptes dans le portail **avant** la bascule, pour que chacun choisisse son mot de passe du portail (D5) pendant que l'ancienne connexion marche encore ; (3) le client `production`, les variables et le déploiement dans une même séance avec le propriétaire. Pas de connexion locale gardée « en secours » : le contrat l'interdit (G9). Écarté : tout dans une séance (chacun découvrirait sa première connexion au portail au moment même où l'application change). |
 | G20 | portail D33 | **MPPlike est déclarée « restreinte »**, avec l'import de ses comptes : seules les personnes de sa liste actuelle (ses comptes et les adresses autorisées) y entrent, avec leur rôle (`player`, `admin`) ; le super-admin ajoute les suivantes dans la grille. Écarté : « ouverte » avec `player` par défaut (plus large que la liste d'aujourd'hui). |
+| G21 | portail D45 (P-04 §2) | **MPPlike se rattache au portail de production, pendant tout son branchement.** Seule MPPlike travaille sur une branche à part (`etape-b1-oidc`), déployée en Preview sur sa base Neon `dev`. `mpplike` se déclare dans le portail de production, restreinte, avec un client `recette` (l'adresse fixe de cette branche, D10) et un client `dev` (`http://localhost:3003`) ; `PORTAIL_ISSUER` reste celui de la production partout (contrat §9). Le portail ne change pas : ni branche, ni projet, ni code. Seule écriture en production : cette déclaration, dans l'administration. Ni `main`, ni migration, ni variable de Production, ni client `production` avant la bascule. Les essais s'y font avec le propriétaire, connecté lui-même (aucun compte de test en production). Écarté : un portail de développement déployé ; un portail sur une branche du projet. |
+
 ## 4. Contrat appliqué
 
 **Contrat portail v1**, précisé le 2026-10-29. Source : `../portail/docs/architecture/contrat-apps.md` ; copie figée au §3 de P-03. Il ne se discute pas dans ce dépôt : un point qui ne convient pas se signale au propriétaire, et le portail émet un prompt correctif ou une nouvelle version. L'essentiel pour MPPlike :
@@ -90,6 +92,23 @@ Tranchées par le propriétaire le 30/10/2026, en questions à cocher ; chaque f
 | D10 | **Ordre avec l'É9 et l'É10**, numéros de migration | **Le chantier d'abord** (B1 à B4), puis l'É10. Raisons : aucune question publiée ni aucun résultat en production (les règles de 2026-2027 ne sont pas figées), et 15 des 17 invités n'ont pas encore de compte, donc plus la bascule vient tôt, moins de mots de passe sont créés pour rien. Jamais deux étapes à la fois. Les migrations du chantier prennent les premiers numéros libres (`0006` pour la bascule, puis celle de B4) ; l'É10 se renumérote ensuite, comme à l'É8h. La bascule ne croise pas le premier résultat de la saison. Écartés : l'É10 d'abord ; B1, puis l'É10, puis B2 à B4. |
 | D11 | **Base du relevé et de l'export** | La production, en **lecture seule** (requêtes `SELECT` par l'outil Neon, branche `main`) : c'est la seule base avec les vrais joueurs. Seuls des nombres vont dans les documents, jamais d'adresse. Ajoutée par l'agent : P-03 demande de choisir cette base avec le propriétaire. Écarté : relever les nombres seulement à l'étape B2. |
 
+Consignes du propriétaire pour mener B1, données le 05/11/2026 (D12 à D19). Elles précisent la conduite de l'étape et ne changent ni G1 à G20 ni D1 à D11, qui restent valables. D20 à D22 répondent aux questions à cocher du même jour ; chaque fois, il a retenu la recommandation. D12, D16, D17 et D18 sont corrigées par P-04 (G21). D23 est une décision du propriétaire du même jour.
+
+| N° | Sujet | Décision |
+|---|---|---|
+| D12 | **Où tourne B1** | Le code de B1 tourne **sur le poste et sur la branche de recette** : un déploiement Vercel de la branche de travail (pas la production), branché sur la branche Neon `dev` et connecté au **portail de production** (G21 ; corrigé par P-04 : il n'y a pas de portail `dev`). **Rien dans la production de MPPlike** : ni `main`, ni migration sur la base Neon de production, ni variable de l'environnement Production de Vercel. B2 et B3 restent pour plus tard, inchangées. Complète D7 : le client `recette`, laissé « pour plus tard », arrive ici (G12). Complète D1 : pendant B1, l'adresse d'accueil est l'adresse fixe de la branche (§6). |
+| D13 | **Git** | Travail sur la branche `etape-b1-oidc`, créée depuis `main`, jamais sur `main`. Commit sur cette branche autorisé (05/11) ; **aucun push sans demande du propriétaire**. |
+| D14 | **Adresse de la recette** | L'adresse **fixe de la branche**, jamais celle d'un déploiement précis (elle change à chaque fois) : `https://les-petits-pronos-de-la-promo-git-etape-b1-oidc-em-normandie1.vercel.app`, nom validé par le propriétaire le 05/11 avant de la déclarer au portail (client `recette`, G12). Vercel limite ce nom d'hôte à 63 caractères et coupe au-delà, en ajoutant un hachage (constaté sur `etape-08h-questions-fun`, devenue `…-git-etape-08-4c142a-em-normandie1…`) : il reste 15 caractères pour la branche, d'où `etape-b1-oidc` (13). Écarté : `etape-b1-portail` (16 caractères, adresse connue seulement après le premier déploiement). |
+| D15 | **Variables avant le premier push** | Le build lance les migrations (§3.4 de l'architecture) : une erreur ici migrerait la production. **Avant le premier push**, l'agent vérifie avec le propriétaire que les variables Preview, limitées à cette branche, visent Neon `dev` et non la production. L'agent ne lit que les **noms** (MCP ou CLI), jamais les valeurs. L'environnement Production reste intact. |
+| D16 | **Variables de la branche** | Posées **par le propriétaire seul** : `DATABASE_URL` et `DATABASE_URL_UNPOOLED` (Neon `dev` ; la seconde, ajoutée le 05/11 sur question de l'agent, est celle que lisent les migrations), `BETTER_AUTH_URL` (l'adresse fixe exacte de D14), `BETTER_AUTH_SECRET` (propre à cette branche), `PORTAIL_ISSUER` (celui de la production, `https://portail-admission.vercel.app/api/auth`, le même partout : G14, G21), `PORTAIL_CLIENT_ID` et `PORTAIL_CLIENT_SECRET` (client `recette` déclaré au portail de production). `PORTAIL_ISSUER` reste une variable : rien en dur dans le code. `.env.example` et `npm run check:env` sont tenus à jour. Aucune valeur dans Git. |
+| D17 | **Le portail pendant B1** | L'agent ne fait aucun travail dans le portail (G18). Il écrit et teste le code sans lui. L'essai de bout en bout attend la déclaration de `mpplike` au portail de production et le code. Il se fait **sur l'adresse fixe et sur le poste**, le propriétaire se connectant lui-même (corrigé par P-04 : il n'est plus facultatif sur le poste). |
+| D18 | **Protection Vercel** | *Sans objet depuis P-04* : le domaine du portail de production est public, et le portail n'appelle jamais le serveur de MPPlike. Une réponse 302 ou 401 du portail serait une panne à signaler au propriétaire, pas une protection à contourner. L'aperçu de la branche reste protégé par la connexion Vercel, sans effet sur la connexion : le navigateur du propriétaire, connecté à Vercel, passe. |
+| D19 | **Plan, journal et fin d'étape** | B1 s'ajuste en « sur le poste **et** sur la branche de recette » ; les questions se posent à cocher. Fin d'étape : tests, types et lint verts, puis compte rendu avec le commit, la branche, l'adresse fixe, les **noms** des variables posées, les migrations jouées sur `dev` seulement et les écarts ; arrêt jusqu'à la validation. |
+| D20 | **Arrivée sans session** (point ouvert 1 du §10) | **Connexion silencieuse** : sans session, le proxy et les gardes envoient vers `/connexion?auto=1`, et la page lance seule le flux ; la tuile mène droit au jeu (G17, contrat §3.2). Une déconnexion mène à `/connexion` et une erreur à `/connexion?error=…` : le flux n'y part jamais seul, donc aucune boucle. Écarté : le bouton seul (un clic de plus à chaque tuile et toutes les 8 h). |
+| D21 | **Garde-fou des migrations** | Hors de l'environnement Production de Vercel, `scripts/migrate.ts` refuse de migrer une base marquée « production » et fait échouer le build : une erreur de variable ne peut plus migrer la production. Ajout à l'architecture §3.4, proposé par l'agent. Écarté : compter sur la seule vérification de D15. |
+| D22 | **Migration `0006`** | Jouée sur la branche Neon `dev`, et seulement là, au build de l'aperçu (accord du 05/11, demandé par le §8 ci-dessous). Elle atteindra la production avec la bascule (D6). |
+| D23 | **L'É10 attend l'année prochaine** | Décision du propriétaire, à ne pas rediscuter : l'É10 (règles réglables par saison) se développera l'année prochaine, bien après le chantier du portail. Le chantier passe d'abord (D10 tient). Les résultats de 2026-2027 se saisissent sans l'attendre : les règles de cette saison restent celles du code. Écarté : faire passer l'É10 avant le premier résultat. |
+
 ## 6. Déclaration au portail (à transmettre)
 
 Saisie par le super-admin du portail, avec l'agent du portail (G3, G18) ; l'agent de MPPlike ne la fait pas.
@@ -99,12 +118,12 @@ Saisie par le super-admin du portail, avec l'agent du portail (G3, G18) ; l'agen
 | Identifiant | `mpplike` |
 | Nom | Les petits pronos de la promo |
 | Description | Pronostics entre collègues sur les chiffres de l'école, avec un classement par saison. |
-| Adresse d'accueil | `http://localhost:3003/` pendant B1 ; `https://les-petits-pronos-de-la-promo.vercel.app/` à la bascule (B3) |
+| Adresse d'accueil | Pendant B1 (D12, G21) : `https://les-petits-pronos-de-la-promo-git-etape-b1-oidc-em-normandie1.vercel.app/` ; `https://les-petits-pronos-de-la-promo.vercel.app/` à la bascule (B3) |
 | Rôles | `player` (« Joueur »), `admin` (« Admin ») |
 | Mode | restreinte |
 | Client `dev` (B1) | retour `http://localhost:3003/api/auth/callback/portail` ; déconnexion `http://localhost:3003/connexion` |
 | Client `production` (B3) | retour `https://les-petits-pronos-de-la-promo.vercel.app/api/auth/callback/portail` ; déconnexion `https://les-petits-pronos-de-la-promo.vercel.app/connexion` |
-| Client `recette` | aucun (D7) |
+| Client `recette` (B1, D14, G21) | retour `https://les-petits-pronos-de-la-promo-git-etape-b1-oidc-em-normandie1.vercel.app/api/auth/callback/portail` ; déconnexion `https://les-petits-pronos-de-la-promo-git-etape-b1-oidc-em-normandie1.vercel.app/connexion` |
 | Annuaire | non (MPPlike ne cherche pas de collègue) |
 
 ## 7. Relevé de P-03 §4, revérifié le 30/10/2026
@@ -126,6 +145,13 @@ Revérifié sur `dcedd21`, dans le code et dans `node_modules/better-auth` 1.7.6
 8. **Les comptes (§1 et §4.2)** : « ses joueurs s'y connectent aujourd'hui » est à nuancer. En production, 4 comptes, tous `admin`, aucun `player`, aucune question publiée (§2 ci-dessus). G13 se vérifie : aucune adresse hors domaine.
 9. **Le plan (§4.3)** : la saison 2026-2027 commence le 02/10/2026 en production (`avancement.md` disait le 30/09) ; sans effet sur le chantier.
 
+Complété le 05/11/2026, au début de B1, dans `node_modules/better-auth` 1.7.6 :
+
+10. **Le crochet de refus (D2)** : `user.validateUserInfo` voit les champs du jeton avant toute écriture, à la création, à la liaison et à la connexion, et son refus revient en `?error=…`. C'est lui qui porte les refus (rôle, émetteur, adresse réattribuée, adresse déjà prise).
+11. **Le rôle et l'adresse (D3)** : il n'existe aucun crochet qui reçoive le jeton **et** l'identifiant du compte à sa création. La recopie se fait dans un crochet `session.create.before`, en relisant `account.id_token`, écrit dans la même requête et déjà vérifié. Better Auth exécute d'abord les crochets des plugins, dans leur ordre, et ceux des options en dernier : ce crochet est donc porté par un petit plugin, `portailIdentity`, placé avant `admin`, pour lever une désactivation avant que `admin` ne la refuse (D4). Vu par un test : dans les options, le crochet passait trop tard.
+12. **Un jeton absent n'est pas vérifié** : si la réponse du portail ne porte pas de `id_token`, `getUserInfo` passe à la route userinfo sans vérification. Comparer `iss` à `PORTAIL_ISSUER` dans `validateUserInfo` ferme ce cas, et compare l'émetteur exactement, comme le demande le contrat : le plugin, lui, le compare à celui de la découverte.
+13. **La découverte bloque au démarrage** : les pages lisent la session par la même instance, donc attendent la découverte à chaque démarrage à froid. Si elle échoue vite, les sessions ouvertes continuent (contrat §3.1) ; le plugin n'a pas de délai d'attente, un portail qui ne répond pas retarde donc le premier appel.
+
 ## 8. Étapes
 
 Une étape à la fois, sur sa branche (`etape-bN-…`), avec la porte habituelle (`npm run verify`, `npm run test:e2e`) et la validation H-08. Découpage de P-03 §5, repris avec les décisions ci-dessus ; un seul changement : la remise d'accord du cahier des charges et de l'architecture ouvre B1 (avant le code qui l'applique, règle 4 du `CLAUDE.md`) au lieu d'attendre B4, qui garde la remise d'accord finale.
@@ -139,15 +165,20 @@ Une étape à la fois, sur sa branche (`etape-bN-…`), avec la porte habituelle
 - [x] Compte rendu avec les éléments de P-03 §8.
 - [x] Validation du propriétaire (H-08), le 30/10/2026.
 
-### B1 — Le branchement, sur le poste (G19, temps 1)
+### B1 — Le branchement, sur le poste et sur la branche de recette (G19, temps 1 ; D12)
 
 - [ ] Cahier des charges v1.8 et architecture v1.8 (§3.1, §6, §9.4, §9.6, §12 ; « contrat portail v1 ») écrits avant le code, et soumis au propriétaire.
-- [ ] H-18 : le propriétaire déclare MPPlike dans le portail (avec l'agent du portail, G18), selon le §6, avec son client `dev` ; puis H-19 : il pose `PORTAIL_ISSUER`, `PORTAIL_CLIENT_ID`, `PORTAIL_CLIENT_SECRET` et `BETTER_AUTH_URL=http://localhost:3003` dans `.env.local`. L'agent ne les demande pas et ne les lit pas ; `npm run check:env` vérifie leur présence.
-- [ ] Tests d'abord : rapprochement par `sub`, puis par l'adresse (comptes locaux à `email_verified = false` compris), puis création ; refus d'une adresse déjà liée à un autre `sub` (consigné) ; rôle recopié à chaque connexion, rôle inconnu refusé ; adresse recopiée ; pseudo de départ coupé et rendu unique, jamais réécrit (D3) ; désactivation d'avant levée, compte anonymisé jamais rouvert (D4) ; session refusée après 8 h depuis la connexion, même relue entre-temps ; `/sign-in/social` qui ne bloque pas une IP partagée.
-- [ ] Fournisseur « portail » (`genericOAuth`) : découverte, vérification du jeton exigée (`requireIdTokenVerification`), PKCE S256, `state`, `nonce`, `client_secret_basic`, scopes `openid profile email` ; découverte en échec traitée ; session de 8 h fixes ; préfixe `mpplike` (proxy compris) ; déconnexion par le portail ; `/connexion` (bouton du portail) et erreurs sans boucle (`onAPIError.errorURL`) ; chemins ouverts et publics ; règle de débit propre à `/sign-in/social` ; port 3003.
-- [ ] Retrait de ce qui disparaît (P-03 §4.5), et mise à jour des tests, un par un, avec leur raison au journal ; tests de bout en bout selon D8.
-- [ ] La migration `0006` qui vide `session` (D6) : jouée sur `dev` avec l'accord du propriétaire ; **pas sur la production** à ce stade (elle y partirait avec un déploiement).
-- [ ] Essai sur le poste avec le portail de production, **le propriétaire se connectant lui-même** (aucun compte de test en production) : connexion, refus (sans accès), retrait d'accès (refus à la connexion suivante), déconnexion.
+- [ ] H-18 : le propriétaire déclare `mpplike` au portail de production (avec l'agent du portail, G18, G21), selon le §6, avec ses clients `recette` et `dev` ; puis H-19 : il pose les variables de la branche (D16) sur Vercel, limitées à `etape-b1-oidc`, et celles de `.env.local` (`BETTER_AUTH_URL=http://localhost:3003`, `PORTAIL_ISSUER` et le client `dev`). L'agent ne les demande pas et ne lit que les noms ; `npm run check:env` vérifie leur présence sur le poste.
+- [ ] Avant le premier push (D15) : variables de la branche relues avec le propriétaire, par leurs noms ; il confirme qu'elles visent Neon `dev`.
+- [x] Tests d'abord : rapprochement par `sub`, puis par l'adresse (comptes locaux à `email_verified = false` compris), puis création ; refus d'une adresse déjà liée à un autre `sub` (consigné) ; rôle recopié à chaque connexion, rôle inconnu refusé ; adresse recopiée ; pseudo de départ coupé et rendu unique, jamais réécrit (D3) ; désactivation d'avant levée, compte anonymisé jamais rouvert (D4) ; session refusée après 8 h depuis la connexion, même relue entre-temps ; `/sign-in/social` qui ne bloque pas une IP partagée.
+- [x] Fournisseur « portail » (`genericOAuth`) : découverte, vérification du jeton exigée (`requireIdTokenVerification`), PKCE S256, `state`, `nonce`, `client_secret_basic`, scopes `openid profile email` ; découverte en échec traitée ; session de 8 h fixes ; préfixe `mpplike` (proxy compris) ; déconnexion par le portail ; `/connexion` (bouton du portail) et erreurs sans boucle (`onAPIError.errorURL`) ; chemins ouverts et publics ; règle de débit propre à `/sign-in/social` ; port 3003.
+- [x] Retrait de ce qui disparaît (P-03 §4.5), et mise à jour des tests, un par un, avec leur raison au journal ; tests de bout en bout selon D8.
+- [ ] La migration `0006` qui vide `session` (D6) : jouée sur `dev` avec l'accord du propriétaire (D22) ; **pas sur la production** à ce stade (elle y partirait avec un déploiement).
+- [x] Garde-fou des migrations (D21), en place avant le premier push.
+- [ ] Branche poussée à la demande du propriétaire ; déploiement prêt à l'adresse fixe, sur `dev` (D14).
+- [ ] Essai de bout en bout **sur l'adresse fixe et sur le poste**, contre le portail de production (D17, G21), **le propriétaire se connectant lui-même** (aucun compte de test en production) : connexion, refus (sans accès), retrait d'accès (refus à la connexion suivante), déconnexion.
+
+**Ordre avec le propriétaire** (P-04 §5) : l'agent confirme l'adresse fixe de la branche ; le propriétaire déclare `mpplike` au portail de production avec l'agent du portail ; il pose les valeurs ; l'agent relit avec lui les noms des variables (D15) ; il demande le premier push.
 
 ### B2 — L'export des comptes (G11, G19 temps 2)
 
@@ -171,18 +202,21 @@ Une étape à la fois, sur sa branche (`etape-bN-…`), avec la porte habituelle
 
 | ID | Intitulé | Étape |
 |---|---|---|
-| H-18 | Déclaration de MPPlike au portail et client `dev` (super-admin, avec l'agent du portail) | B1 |
-| H-19 | Variables du portail et `BETTER_AUTH_URL` du poste dans `.env.local` | B1 |
+| H-18 | Déclaration de `mpplike` au portail de production, avec ses clients `recette` et `dev` (super-admin, avec l'agent du portail) | B1 |
+| H-19 | Variables de la branche `etape-b1-oidc` sur Vercel (D16) et `.env.local` du poste | B1 |
 | H-20 | Remise du fichier d'export à l'agent du portail et import | B2 |
 | H-21 | Message aux joueurs : choisir son mot de passe sur le portail | B2 |
 | H-22 | Bascule : client `production`, variables de Production, déploiement | B3 |
 
 ## 10. Points ouverts
 
-1. **Arrivée par la tuile** (G17) : la tuile mène à `/`, que le proxy renvoie vers `/connexion`. Avec un simple bouton, il faut un clic de plus ; pour une connexion vraiment silencieuse, `/connexion` lancerait le flux d'elle-même quand l'adresse ne porte pas `error` (sans boucle, contrat §3.6). À trancher au début de B1, avec deux options et une recommandation.
-2. **Quatre comptes `admin`** : l'export les déclarera `admin` (D5). Si certains doivent être `player`, le propriétaire le dit avant B2, ou corrige la case dans la grille du portail (G15).
+1. *(Réglé le 05/11/2026 : D20, connexion silencieuse.)*
+2. **Six comptes `admin`** (quatre au 30/10, relevé du 05/11) : l'export les déclarera `admin` (D5). Si certains doivent être `player`, le propriétaire le dit avant B2, ou corrige la case dans la grille du portail (G15).
 3. **`BETTER_AUTH_URL` en Development sur Vercel** (H-06) : elle vaut probablement `http://localhost:3000` ; à remettre à 3003 si le propriétaire tire encore `.env.local` par `vercel env pull`.
 4. **L'É9** : le propriétaire dira s'il la considère comme close (H-12 et H-13 non signalées, campagne en brouillon).
+5. *(Sans objet depuis P-04 : l'émetteur est le même partout, G21.)*
+6. **Branche inconnue de GitHub** : Vercel accepte-t-il une variable limitée à une branche qui n'existe pas encore sur GitHub ? La documentation ne le dit pas, et l'agent ne pose pas de variable. Si Vercel refuse, le propriétaire le signale avant tout push : le premier push ferait construire la branche avec les variables générales de Preview. Le point revient à MPPlike (P-04 §4), et le garde-fou D21 protège déjà la production dans ce cas.
+7. **Comptes du seed sur la recette** : ils sont en `@example.test` et n'entrent pas par le portail. Sur l'adresse fixe et sur le poste, le propriétaire se connecte avec son compte du portail de production ; une adresse absente de la base `dev` y crée un compte, avec le rôle reçu du portail.
 
 ## 11. Journal
 
@@ -196,3 +230,13 @@ Une étape à la fois, sur sa branche (`etape-bN-…`), avec la porte habituelle
 | 30/10/2026 | **Redécoupage, contestable** : la remise d'accord du cahier des charges et de l'architecture (v1.8) ouvre B1, avant le code, au lieu d'attendre B4 (règle 4 du `CLAUDE.md`) ; B4 garde la remise d'accord finale et le ménage | agent |
 | 30/10/2026 | **Précisions de l'agent, contestables** : interventions numérotées H-18 à H-22, à la suite de celles de l'architecture ; la migration qui vide `session` prend `0006` (D10) ; « contrat portail v1 » noté dans l'en-tête de l'architecture dès B0, la section complète venant avec la v1.8 | agent |
 | 30/10/2026 | B0 validée par le propriétaire (« ok le plan me va »), commitée sur `etape-b0-branchement-portail` à sa demande, non poussée ; lien vers ce chantier ajouté au README | propriétaire |
+| 05/11/2026 | Consignes de conduite de B1 notées en D12 à D19 : recette sur une branche Vercel, base Neon `dev`, portail `dev` (corrigé le même jour par P-04), rien en production. G1 à G20 et D1 à D11 inchangées | propriétaire |
+| 05/11/2026 | Quatre questions à cocher, chaque fois sur la recommandation : branche `etape-b1-oidc` (D14), connexion silencieuse (D20), `DATABASE_URL_UNPOOLED` ajoutée aux variables de la branche (D16), garde-fou des migrations (D21), `0006` sur `dev` (D22), commit sur la branche (D13) | propriétaire |
+| 05/11/2026 | **Précision de l'agent, contestable** : le relevé de Better Auth est complété par quatre points (§7, 10 à 13), dont le choix de `validateUserInfo` pour les refus et d'un petit plugin avant `admin` pour la recopie du rôle et de l'adresse | agent |
+| 05/11/2026 | Prompt guidé P-04 du portail, contrat v1 : G21 ajoutée (portail D45, décision du propriétaire, à ne pas rediscuter). Il n'y a pas de portail `dev` : la branche, sur Neon `dev`, se connecte au portail de production. Corrigés en conséquence : D12, D16, D17, D18, §6, H-18, H-19, points ouverts 5 à 7, et l'essai de B1, désormais sur l'adresse fixe et sur le poste | portail (P-04), propriétaire |
+| 05/11/2026 | D23 : l'É10 attend l'année prochaine ; les résultats de 2026-2027 se saisissent sans l'attendre. Décision du propriétaire, à ne pas rediscuter | propriétaire |
+| 05/11/2026 | Relevé de la production en lecture seule (D11), nombres seulement : 17 comptes (6 `admin`), 18 adresses, 5 questions publiées, toutes closes le 05/11 à 16 h 30, 73 pronos, aucun résultat, 23 sessions, 6 migrations, aucun compte `portail`. Le §2 (30/10) reste daté : les 19 lignes de D5 sont périmées, B2 les recomptera | agent |
+| 05/11/2026 | `.env.local` vérifié par `npm run db:check` : il vise `ep-dry-hill-b2imypjr`, le point d'accès de la branche `dev` selon Neon (6 migrations, base non marquée production). Ce contrôle a réveillé `dev`, archivée depuis le 14/10 | agent |
+| 05/11/2026 | Échec intermittent de `portail-sign-in.test.ts` (4 à 12 tests selon les passages, seul il passait) : cause mesurée, `read ECONNRESET` sur une connexion gardée par le faux portail quand toute la suite charge la machine. Corrigé dans `tests/helpers/fake-portail.ts` (une connexion par requête), sans toucher à une assertion | agent |
+| 05/11/2026 | **Tests retirés ou changés (B1), et pourquoi.** Retiré, car la fonction disparaît : `auth-hooks.test.ts` (mot de passe, inscription, liste blanche, `ADMIN_EMAILS`), remplacé par `portail-sign-in.test.ts`, `auth-route.test.ts` et `portail.test.ts`. `players.test.ts` : liste blanche, rôles, désactivation et mot de passe provisoire retirés (G2, D4) ; l'anonymisation reste et coupe le lien `portail`. `players-data.test.ts` : `getAllowedEmails` retiré. `account-validation.test.ts` : `parseAdminEmails`, `parseEmail` et la liste collée retirés. Changé : `auth-config.test.ts` (8 h au lieu de 400 jours, aucune connexion locale, G9) ; `authorization-matrix.test.ts` (33 services au lieu de 39) ; `auth-routing.test.ts` (routes du flux, `/inscription` n'est plus publique) ; `env-rules.test.ts` (variables du portail) ; `seed.test.ts` (ni mot de passe ni liste) ; `migrate.test.ts` (D21). De bout en bout (D8) : `fixtures.ts` pose la session en base ; `auth.spec.ts` réécrit contre le faux portail ; `rate-limit.spec.ts` prouve qu'une équipe derrière une adresse n'est pas bloquée, au lieu du blocage à la 6e tentative ; `headers.spec.ts` sans `/inscription` ; `prod-smoke.spec.ts` vérifie le bouton du portail ; `results.spec.ts` compte Yann, créé par `auth.spec.ts` | agent |
+| 05/11/2026 | Porte de B1 au vert sur le poste : `npm run verify` et une seconde suite complète (1 141 tests chaque fois), `npm run test:e2e` (117 tests). Code commité sur `etape-b1-oidc`, non poussé | agent |

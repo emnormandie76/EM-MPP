@@ -34,7 +34,7 @@ test("at 390 px the page does not scroll sideways and the menu opens", async ({ 
   await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeVisible();
 });
 
-for (const url of ["/connexion", "/inscription"]) {
+for (const url of ["/connexion", "/connexion?error=access_denied"]) {
   test(`${url} does not scroll sideways at 390 px`, async ({ page }) => {
     await page.goto(url);
     await expectNoSidewaysScroll(page);

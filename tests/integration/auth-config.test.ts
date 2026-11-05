@@ -1,12 +1,10 @@
-import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { authBaseUrl, authTrustedOrigins, createAuth } from "@/lib/auth/auth";
-import { session } from "@/lib/db/schema";
+import { authBaseUrl, authTrustedOrigins, createAuth, SESSION_EXPIRES_IN_S } from "@/lib/auth/auth";
+import { session, user } from "@/lib/db/schema";
 import { openPglite, type ScriptDb } from "../../scripts/lib/db";
-import { SEED_PASSWORD, seedDatabase } from "../../scripts/lib/seed";
+import { authRequest, TEST_BASE_URL } from "../helpers/auth";
 
-// Better Auth configuration (architecture §6.1) against the generated schema and the seeded accounts.
-// Sign-up and its hook arrive in step 4.
+// Better Auth configuration (architecture §6.1). The sign-in itself is in portail-sign-in.test.ts.
 
 describe("createAuth", () => {
   let target: ScriptDb;
@@ -15,36 +13,41 @@ describe("createAuth", () => {
   beforeAll(async () => {
     target = await openPglite();
     await target.migrate();
-    await seedDatabase(target.db, { now: new Date("2026-11-20T10:00:00Z"), env: {} });
-    auth = createAuth(target.db);
+    auth = createAuth(target.db, { BETTER_AUTH_URL: TEST_BASE_URL });
   });
 
   afterAll(async () => {
     await target.close();
   });
 
-  it("signs in a seeded account, with its role and avatar", async () => {
-    const result = await auth.api.signInEmail({ body: { email: "admin@example.test", password: SEED_PASSWORD } });
-    expect(result.user).toMatchObject({ email: "admin@example.test", name: "Admin", role: "admin" });
-    expect(result.user.avatar).toMatch(/^maillot-/);
-    expect(result.token).toBeTruthy();
+  it("keeps a session 8 hours, without renewing it or caching it in the cookie", () => {
+    expect(SESSION_EXPIRES_IN_S).toBe(8 * 60 * 60);
+    expect(auth.options.session).toMatchObject({
+      expiresIn: SESSION_EXPIRES_IN_S,
+      disableSessionRefresh: true,
+      cookieCache: { enabled: false },
+    });
   });
 
-  it("creates a session that lasts 400 days", async () => {
-    const { token } = await auth.api.signInEmail({ body: { email: "joueur1@example.test", password: SEED_PASSWORD } });
-    const [row] = await target.db.select().from(session).where(eq(session.token, token));
-    const days = (row.expiresAt.getTime() - row.createdAt.getTime()) / 86_400_000;
-    expect(Math.round(days)).toBe(400);
+  it("has no local sign-in at all, even behind the HTTP filter (G9)", async () => {
+    expect(auth.options).not.toHaveProperty("emailAndPassword");
+    for (const path of ["/sign-in/email", "/sign-up/email"]) {
+      const body = { email: "x@example.test", password: "Mauvais-1234!", name: "Quelqu'un" };
+      const response = await auth.handler(authRequest(path, body));
+      expect(response.status, path).toBe(400);
+      expect(response.headers.getSetCookie(), path).toEqual([]);
+    }
+    expect(await target.db.select().from(user)).toEqual([]);
+    expect(await target.db.select().from(session)).toEqual([]);
   });
 
-  it("refuses a wrong password", async () => {
-    await expect(auth.api.signInEmail({ body: { email: "joueur1@example.test", password: "Mauvais-1234!" } })).rejects.toThrow();
+  it("starts without the portal's variables, with no provider: a preview has no sign-in (G12)", async () => {
+    const { socialProviders } = await auth.$context;
+    expect(socialProviders).toEqual([]);
   });
 
-  it("refuses a disabled account, with the French message", async () => {
-    await expect(auth.api.signInEmail({ body: { email: "desactive@example.test", password: SEED_PASSWORD } })).rejects.toThrow(
-      "Ton compte est désactivé. Contacte l'admin.",
-    );
+  it("sends an error before the state is read to /connexion, not to a Better Auth page", () => {
+    expect(auth.options.onAPIError?.errorURL).toBe(`${TEST_BASE_URL}/connexion`);
   });
 });
 
@@ -54,7 +57,7 @@ describe("trusted origins (§6.1)", () => {
       "https://les-petits-pronos-de-la-promo.vercel.app",
     );
     expect(authBaseUrl({ VERCEL_URL: "les-petits-pronos-de-la-promo-abc123.vercel.app" })).toBe("https://les-petits-pronos-de-la-promo-abc123.vercel.app");
-    expect(authBaseUrl({})).toBe("http://localhost:3000");
+    expect(authBaseUrl({})).toBe("http://localhost:3003");
   });
 
   it("trusts BETTER_AUTH_URL and the https deployment, branch and production addresses", () => {

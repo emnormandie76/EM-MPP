@@ -23,7 +23,7 @@ import { createAnnouncement, deleteAnnouncement, updateAnnouncement } from "@/li
 import { archiveCategory, createCategory, renameCategory, unarchiveCategory } from "@/lib/services/categories";
 import { deleteChatMessage, markChatRead, postChatMessage } from "@/lib/services/chat";
 import { cancelQuestionExtension, setQuestionExtension } from "@/lib/services/extensions";
-import { addAllowedEmails, anonymizeUser, disableUser, enableUser, removeAllowedEmail, setRole, setTemporaryPassword } from "@/lib/services/players";
+import { anonymizeUser } from "@/lib/services/players";
 import { savePrediction, setJoker, unlockPrediction, validatePrediction } from "@/lib/services/predictions";
 import { recordVisit, updateAvatar, updateDisplayName } from "@/lib/services/profile";
 import {
@@ -385,52 +385,7 @@ const CASES: { service: string; access: Access; prepare: () => Promise<Call> }[]
       return (actor) => deleteAnnouncement(db, actor, { announcementId: row.id });
     },
   },
-  // Accounts and allow list (§6.3)
-  {
-    service: "addAllowedEmails",
-    access: "admin",
-    prepare: async () => (actor) => addAllowedEmails(db, actor, { emails: "nouveau@example.test" }, now),
-  },
-  {
-    service: "removeAllowedEmail",
-    access: "admin",
-    prepare: async () => {
-      await db.insert(allowedEmail).values({ email: "libre@example.test" });
-      return (actor) => removeAllowedEmail(db, actor, { email: "libre@example.test" });
-    },
-  },
-  {
-    service: "setRole",
-    access: "admin",
-    prepare: async () => {
-      const target = await createUser(db);
-      return (actor) => setRole(db, actor, { userId: target.id, role: "admin" }, now);
-    },
-  },
-  {
-    service: "disableUser",
-    access: "admin",
-    prepare: async () => {
-      const target = await createUser(db);
-      return (actor) => disableUser(db, actor, { userId: target.id }, now);
-    },
-  },
-  {
-    service: "enableUser",
-    access: "admin",
-    prepare: async () => {
-      const target = await createUser(db, { banned: true });
-      return (actor) => enableUser(db, actor, { userId: target.id }, now);
-    },
-  },
-  {
-    service: "setTemporaryPassword",
-    access: "admin",
-    prepare: async () => {
-      const target = await createUser(db);
-      return (actor) => setTemporaryPassword(db, actor, { userId: target.id }, now);
-    },
-  },
+  // Accounts (§6.3)
   {
     service: "anonymizeUser",
     access: "admin",
@@ -489,8 +444,8 @@ const CASES: { service: string; access: Access; prepare: () => Promise<Call> }[]
 const PROFILES: Profile[] = ["anonymous", "player", "disabled player", "disabled admin", "admin"];
 
 describe("authorization matrix (§6.5, §9.3)", () => {
-  it("covers the 39 write services of §7.3 (34 until step 8b, 2 extension services of step 8c, 3 chat services of step 8d; deleteQuestion replaces deleteDraftQuestion at step 8e)", () => {
-    expect(new Set(CASES.map(({ service }) => service)).size).toBe(39);
+  it("covers the 33 write services of §7.3 (39 until the portal, which takes 6 accounts services away; 34 until step 8b, 2 extension services of step 8c, 3 chat services of step 8d; deleteQuestion replaces deleteDraftQuestion at step 8e)", () => {
+    expect(new Set(CASES.map(({ service }) => service)).size).toBe(33);
   });
 
   for (const { service, access, prepare } of CASES) {

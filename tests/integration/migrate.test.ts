@@ -5,7 +5,7 @@ import { sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterEach, describe, expect, it } from "vitest";
-import { prediction, prize, question, season, seasonStanding } from "@/lib/db/schema";
+import { prediction, prize, question, season, seasonStanding, session, user } from "@/lib/db/schema";
 import {
   countAppliedMigrations,
   isMarkedAsProduction,
@@ -47,6 +47,47 @@ describe("migrations (scripts/migrate.ts)", () => {
     target = await openPglite();
     expect((await runMigrations(target, env)).markedAsProduction).toBe(false);
     expect(await isMarkedAsProduction(target.db)).toBe(false);
+  });
+
+  it.each([{}, { VERCEL_ENV: "preview" }, { VERCEL_ENV: "development" }])("refuse a production database with %j (D21)", async (env) => {
+    target = await openPglite();
+    await target.migrate();
+    await markAsProduction(target.db);
+    await expect(runMigrations(target, env)).rejects.toThrow("Migration refusée");
+  });
+
+  it("refuse before applying anything to a production database (D21)", async () => {
+    target = await openPglite();
+    const files = migrationFiles.length;
+    await target.migrate();
+    await markAsProduction(target.db);
+    await target.db.execute(sql`delete from drizzle.__drizzle_migrations where id = (select max(id) from drizzle.__drizzle_migrations)`);
+
+    await expect(runMigrations(target, { VERCEL_ENV: "preview" })).rejects.toThrow("Migration refusée");
+
+    expect(await countAppliedMigrations(target.db)).toBe(files - 1);
+  });
+
+  it("still migrate the production database from the Vercel production environment", async () => {
+    target = await openPglite();
+    await target.migrate();
+    await markAsProduction(target.db);
+    expect(await runMigrations(target, { VERCEL_ENV: "production" })).toMatchObject({ applied: 0, markedAsProduction: true });
+  });
+
+  it("empty the sessions of before the switch, and keep the accounts (D6)", async () => {
+    target = await openPglite();
+    const { db } = target;
+    await target.migrate();
+    const owner = await createUser(db);
+    await db.insert(session).values({ id: "s1", token: "t1", userId: owner.id, expiresAt: new Date("2027-12-03T00:00:00Z"), updatedAt: new Date() });
+    await db.execute(sql`delete from drizzle.__drizzle_migrations where id = (select max(id) from drizzle.__drizzle_migrations)`);
+    expect(migrationFiles.at(-1)).toBe("0006_clear_sessions.sql");
+
+    expect(await runMigrations(target, {})).toMatchObject({ applied: 1 });
+
+    expect(await db.select().from(session)).toEqual([]);
+    expect(await db.select().from(user)).toHaveLength(1);
   });
 
   it("mark the production database idempotently", async () => {

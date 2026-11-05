@@ -49,7 +49,7 @@ export const appMeta = pgTable("app_meta", {
   value: text("value"),
 });
 
-/** Allow list: only these addresses (and ADMIN_EMAILS) can sign up. Always lower case. */
+/** Allow list of the former sign-up: only the export of step B2 reads it, until step B4 (D9). Always lower case. */
 export const allowedEmail = pgTable(
   "allowed_email",
   {

@@ -1,12 +1,8 @@
-import { z } from "zod";
-
 // Variables required locally (architecture §3.1). Values are never returned, only statuses.
 export type EnvStatus = "OK" | "MANQUANTE" | "INVALIDE";
 export type EnvCheck = { name: string; status: EnvStatus; hint?: string };
 
 type Rule = { name: string; problem: (value: string) => string | undefined };
-
-const email = z.email();
 
 function parseUrl(value: string): URL | undefined {
   try {
@@ -31,11 +27,14 @@ function secret(value: string): string | undefined {
   return value.length >= 32 ? undefined : "au moins 32 caractères";
 }
 
-function emailList(value: string): string | undefined {
-  const emails = value.split(",").map((item) => item.trim());
-  const invalid = emails.filter((item) => !email.safeParse(item).success).length;
-  if (invalid === 0) return undefined;
-  return invalid === 1 ? "1 adresse invalide" : `${invalid} adresses invalides`;
+/** The portal's issuer: compared exactly, without a trailing slash (contract §3.3). */
+function issuerUrl(value: string): string | undefined {
+  if (httpUrl(value)) return "URL http(s) attendue";
+  return value.endsWith("/") ? "sans barre finale" : undefined;
+}
+
+function present(): undefined {
+  return undefined;
 }
 
 export const ENV_RULES: readonly Rule[] = [
@@ -43,7 +42,9 @@ export const ENV_RULES: readonly Rule[] = [
   { name: "DATABASE_URL_UNPOOLED", problem: postgresUrl },
   { name: "BETTER_AUTH_SECRET", problem: secret },
   { name: "BETTER_AUTH_URL", problem: httpUrl },
-  { name: "ADMIN_EMAILS", problem: emailList },
+  { name: "PORTAIL_ISSUER", problem: issuerUrl },
+  { name: "PORTAIL_CLIENT_ID", problem: present },
+  { name: "PORTAIL_CLIENT_SECRET", problem: present },
 ];
 
 export function checkEnv(env: Record<string, string | undefined>): EnvCheck[] {

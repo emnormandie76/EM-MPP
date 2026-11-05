@@ -1,8 +1,8 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, ne, sql } from "drizzle-orm";
 import type { Database } from "@/lib/db/client";
-import { allowedEmail, user } from "@/lib/db/schema";
+import { user } from "@/lib/db/schema";
 
-// Account reads shared by the services and the sign-up hook.
+// Account reads shared by the services and the sign-in hooks.
 
 const ANONYMIZED_DOMAIN = "invalid.local";
 
@@ -22,17 +22,5 @@ export async function isDisplayNameTaken(db: Database, name: string, exceptUserI
     .from(user)
     .where(and(sql`lower(${user.name}) = lower(${name})`, exceptUserId ? ne(user.id, exceptUserId) : undefined))
     .limit(1);
-  return rows.length > 0;
-}
-
-/** `email` must already be normalized. */
-export async function hasAccount(db: Database, email: string): Promise<boolean> {
-  const rows = await db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1);
-  return rows.length > 0;
-}
-
-/** `email` must already be normalized. */
-export async function isAllowedEmail(db: Database, email: string): Promise<boolean> {
-  const rows = await db.select({ email: allowedEmail.email }).from(allowedEmail).where(eq(allowedEmail.email, email)).limit(1);
   return rows.length > 0;
 }

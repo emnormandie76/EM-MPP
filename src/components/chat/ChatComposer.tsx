@@ -6,6 +6,7 @@ import { type FormEvent, type KeyboardEvent, useId, useRef, useState, useTransit
 import { Button } from "@/components/ui/Button";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { postChatMessageAction } from "@/lib/actions/chat";
+import { SIGN_IN_AUTO_PATH } from "@/lib/auth/portail";
 import { CHAT_MAX_LENGTH } from "@/lib/chat/constants";
 import { messageLength, normalizeMessageBody } from "@/lib/chat/message-body";
 import { EmojiPalette } from "./EmojiPalette";
@@ -32,7 +33,7 @@ export function ChatComposer({ onSent }: { onSent: () => void }) {
     startTransition(async () => {
       const result = await postChatMessageAction({ body: text });
       if (!result.ok) {
-        if (result.code === "NOT_AUTHENTICATED" || result.code === "ACCOUNT_DISABLED") router.replace("/connexion");
+        if (result.code === "NOT_AUTHENTICATED" || result.code === "ACCOUNT_DISABLED") router.replace(SIGN_IN_AUTO_PATH);
         setError(result.fieldErrors?.body ?? result.message);
         return;
       }

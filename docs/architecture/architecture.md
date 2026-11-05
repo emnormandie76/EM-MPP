@@ -1,8 +1,8 @@
 # Architecture et plan de construction — Les petits pronos de la promo
 
-> **Version 1.7 du 13/10/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
+> **Version 1.8 du 05/11/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
-> - **Chantier en cours depuis le 30/10/2026 : connexion par le Portail admission**, selon le **contrat portail v1** (précisé le 2026-10-29), voir [branchement-portail.md](../features/branchement-portail.md). Les sections §3.1, §6, §9.4, §9.6 et §12 décrivent encore la connexion par mot de passe ; elles seront réécrites en v1.8 au début de l'étape B1, avant le code.
+> - **Changements de la v1.8** (chantier « Connexion par le portail », [branchement-portail.md](../features/branchement-portail.md), cahier des charges v1.8, **étapes B1 à B4**) : on se connecte par le **Portail admission**, fournisseur d'identité OIDC et seule source des accès, selon le **contrat portail v1** (précisé le 2026-10-29). Plus de mot de passe, d'inscription, de liste blanche, d'`ADMIN_EMAILS`, ni de gestion des comptes sur le site ; sessions de 8 h fixes ; préfixe de cookies `mpplike` ; port 3003 sur le poste ; garde-fou des migrations (§3.4). Sections touchées : §1, §2, §3, §4.2, §6, §7.3, §7.4, §8.3, §9, §10, §12, §14. Migration `0006_clear_sessions` ; celle de l'É10 devient la suivante. **Tant que la bascule (B3) n'a pas eu lieu, la production suit la v1.7** ; ces sections décrivent le code de la branche `etape-b1-oidc`.
 >
 > - **Changement de la v1.7** (demandé par l'utilisateur le 13/10/2026, cahier des charges v1.7, **étape É8h**) : questions fun, des questions à nombre notées à la place, `(place − 1) × malus par place`, au coefficient ×1 (§5.5). Sections touchées : §4.3, §5.5, §5.6, §5.11, §5.16, §8.2, §8.3, §11 (É8h, É9, É10), annexes A et B. Migration `0005_fun_questions` (ajouts seulement) ; celle de l'É10 devient `0006_season_rules`.
 > - **Changement de la v1.6** (demandé par l'utilisateur le 13/10/2026, cahier des charges v1.6, **étape É8g avant le lancement**) : les textes d'une question (énoncé, description, unité, source, libellé des réponses) restent modifiables avec des pronos et après la clôture ; les réponses sont renommées sur place (§5.11). Sections touchées : §5.11, §8.3, §11 (É8g, É9). Aucune migration.
@@ -32,7 +32,7 @@
 >   - **É8d** : chat général avec grille d'emojis et message automatique au résultat (§5.15).
 >   - Sections touchées : §1.1, §2, §4.3, §5, §6.4 à §6.6, §7.3, §7.4, §8, §9, §11, §13, annexes.
 > - **Changements de la v1.1** (demandés et validés par l'utilisateur le 30/09/2026, y compris la suppression de la colonne `season.ends_at`) : saisons gérées par l'admin (§4.3, §5.1, §5.11, §5.13, §8.3, étape É5b) ; étape de changement du nom du site (É8b, H-16). Précisé pendant l'É5b (30/09/2026) : règle des saisons proclamées et ordre des verrous (§5.13), saison par défaut `defaultSeason` (§5.6). Précisé pendant l'É6 (30/09/2026) : verrous des pronos (§5.4), signature de `recordVisit` (§5.9), joker posé aussitôt, onglet par défaut de `/pronos` et question annulée avant son ouverture (§8.2, §8.3). Précisé pendant l'É7 (30/09/2026) : comptes d'un classement de saison (§5.6), aucune question publiée dans une saison proclamée (§5.11, §5.12), nom anonymisé aussi dans le palmarès (§4.3, §6.3), lectures des résultats (§7.4), saison du profil public (§8.3), seed à trois saisons et deux questions clôturées (§9.6). Précisé pendant l'É8 (01/10/2026) : bordure `line-strong` foncée à #7E8796 (§8.1), classement compact sur téléphone (§8.3, §8.4), conteneur défilant des tableaux et squelettes de chargement (§2, §8.3, §8.4), page d'erreur globale (§8.3), contrôle de visibilité dans le layout de `/questions/[id]` (§7.4, §8.3), tests à 390 px (§9.4), streaming (§14). Précisé après la recette par un agent (01/10/2026, rapport `docs/recette/rapport-recette-2026-10-01.md`) : prono Juste Prix qui dépasse hors de l'écart moyen (§5.5, §5.6), étiquette « TOI » à côté du point (§5.7, §8.2), jokers masqués dans l'historique avant la clôture (§6.6), titre des pages d'admin caché aux joueurs (§6.4), confirmation de la désactivation (§6.3), messages de résultat et grilles à 390 px (§8.4, §8.5), espace des milliers et année des dates (§8.6). Précisé à l'É8b (02/10/2026) : le site s'appelle « Les petits pronos de la promo », nom écrit une seule fois dans `APP_NAME` (`src/lib/app.ts`), logo sur deux lignes (§8.2), nouvelle adresse `les-petits-pronos-de-la-promo.vercel.app` (H-16), test de fumée en production lancé seul avec `BASE_URL` (§9.1). Précisé à l'É8d (02/10/2026) : contraintes de `chat_message` (§4.3), marge d'une minute des interrogations, refus de `markChatRead`, texte du message de résultat, lecture des messages plus anciens, réponse 400 de `/api/chat` (§5.15), pastille des non lus mise à jour à chaque page vue et en-tête compacté entre 1 024 et 1 279 px (§8.2, décision de l'utilisateur), chat en pleine hauteur d'écran (§8.3), pureté et vocabulaire de `src/lib/chat` (§9.3), arrêt de l'interrogation testé avec une horloge simulée (§9.4).
-> - Règles fonctionnelles : [cahier des charges v1.2](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
+> - Règles fonctionnelles : [cahier des charges](../features/cahier-des-charges.md). En cas de désaccord entre les deux documents, le cahier des charges fait foi sur le **quoi**, ce document sur le **comment** ; signaler toute contradiction à l'utilisateur.
 > - Suivi de la construction : [avancement.md](avancement.md).
 > - Maquette visuelle retenue (B5 « Jour de match ») : [docs/design/maquette-b5/](../design/maquette-b5/).
 
@@ -81,7 +81,7 @@
 
 ### 0.3 Protocole des interventions humaines
 
-Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tableaux de bord, secrets, contenu, validation). Elles sont numérotées H-01 à H-17 et détaillées en section 12. Quand une étape en atteint une :
+Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tableaux de bord, secrets, contenu, validation). Elles sont numérotées H-01 à H-22 et détaillées en section 12 (H-18 à H-22 dans le chantier du portail). Quand une étape en atteint une :
 
 1. S'arrêter et afficher : `⏸ Intervention humaine H-xx : <titre>`, avec la raison et une durée estimée.
 2. Donner les étapes numérotées de la section 12, une par ligne, avec les libellés exacts à cliquer. Si l'interface d'un service a changé par rapport à la description, le dire et adapter.
@@ -110,7 +110,7 @@ Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tablea
 
 ### 1.1 Principes
 
-1. **Un seul projet Next.js et sa base de données, rien d'autre.** Pas d'email, pas de Power Automate, pas de service tiers en dehors de Vercel et Neon.
+1. **Un seul projet Next.js et sa base de données, rien d'autre.** Pas d'email, pas de Power Automate, pas de service tiers en dehors de Vercel et Neon. Seule exception, depuis la v1.8 : la connexion passe par le Portail admission, l'outil de l'équipe.
 2. **Le temps se déduit des dates.** Ouverture, clôture, fin d'une prolongation, validation automatique à la clôture et changement de saison ne sont jamais des événements déclenchés : le code compare l'heure actuelle aux dates enregistrées. Aucune tâche planifiée. (Le chat de l'É8d interroge le serveur depuis le navigateur pendant que sa page est ouverte : ce n'est pas une tâche planifiée, §5.15.)
 3. **Les malus ne sont jamais stockés.** Ils sont recalculés à partir des pronos et des résultats à chaque lecture. Seul le palmarès (classement final proclamé) est figé. (Jusqu'à la v1.1, on parlait de « points » ; le barème est un malus depuis la v1.2, §5.5.)
 4. **Les règles du jeu sont des fonctions pures**, sans accès à la base, dans `src/lib/game/`, couvertes à au moins 95 %.
@@ -132,7 +132,7 @@ Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tablea
 | Pilote en tests | `@electric-sql/pglite` avec `drizzle-orm/pglite` | PostgreSQL en mémoire, sans réseau ni Docker |
 | Pilote en local sur le réseau de l'école | `@neondatabase/serverless` avec `drizzle-orm/neon-serverless` (`DB_DRIVER=neon-ws`) | connexion à Neon en WebSocket par le port 443, le réseau de l'EM Normandie bloquant le port 5432 (décision du 30/09/2026) |
 | Accès aux données | Drizzle ORM, drizzle-kit (migrations) | schéma typé, migrations SQL |
-| Authentification | Better Auth (email + mot de passe, plugin admin) | comptes, sessions, rôles |
+| Authentification | Better Auth (plugins `genericOAuth` et `admin`), client OIDC du Portail admission (v1.8) | comptes, sessions, rôles |
 | Validation | Zod | toutes les entrées de formulaires |
 | Dates | `date-fns`, `@date-fns/tz` | fuseau Europe/Paris |
 | Tests unitaires et d'intégration | Vitest, `@vitest/coverage-v8` | règles et services |
@@ -154,7 +154,7 @@ Vercel ── Next.js (région fra1)
    ├─ proxy/middleware ─── redirection optimiste vers /connexion si pas de cookie
    ├─ pages (Server Components) ─→ src/lib/data  ─→ src/lib/game (fonctions pures)
    ├─ Server Actions ────────────→ src/lib/services (contrôles + écriture + trace)
-   ├─ /api/auth/[...all] ────────→ Better Auth
+   ├─ /api/auth/[...all] ────────→ Better Auth ⇄ Portail admission (OIDC, v1.8)
    ├─ /api/chat ─────────────────→ nouveaux messages du chat (É8d, lecture seule)
    └─ /api/health ───────────────→ test de connexion à la base
    │
@@ -166,10 +166,11 @@ Neon PostgreSQL (Francfort) : branche « production » et branche « dev »
 
 | Environnement | Adresse | Base de données | Données | Comment |
 |---|---|---|---|---|
-| Développement local | http://localhost:3000 | Neon, branche `dev` | seed | `npm run dev` |
+| Développement local | http://localhost:3003 (v1.8 ; 3000 : portail, 3001 : appVC, 3002 : EM Drive) | Neon, branche `dev` | seed | `npm run dev` |
 | Tests unitaires et d'intégration | — | PGlite en mémoire | jeux de tests | `npm run test` |
-| Tests de bout en bout | http://localhost:3100 | PGlite dans `.pglite-e2e/` | seed | `npm run test:e2e` |
-| Prévisualisation | `*.vercel.app` (une par branche) | Neon, branche `dev` | seed, recette | push d'une branche |
+| Tests de bout en bout | http://localhost:3100, faux portail sur le port 3101 | PGlite dans `.pglite-e2e/` | seed | `npm run test:e2e` |
+| Prévisualisation | `*.vercel.app` (une par branche), sans connexion (v1.8, G12) | Neon, branche `dev` | seed | push d'une branche |
+| Recette (v1.8) | adresse fixe de **une** branche, `https://<projet>-git-<branche>-<équipe>.vercel.app`, connectée au portail de production (G21) | Neon, branche `dev` | seed, recette | push de la branche `etape-b1-oidc` ; ses variables sont limitées à cette branche |
 | Production | `https://<projet>.vercel.app`, nom choisi en H-03 | Neon, branche `production` | réelles | push sur `main` |
 
 ---
@@ -198,15 +199,15 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 │  ├─ seed.ts                     données de développement (interdit en production)
 │  ├─ check-env.ts                contrôle des variables (noms seulement)
 │  ├─ check-db.ts                 contrôle de connexion (sans afficher l'URL)
-│  ├─ e2e-prepare.ts              remet à zéro .pglite-e2e, migre, seed
+│  ├─ e2e-prepare.ts              remet à zéro .pglite-e2e, migre, seed, pose les sessions de test (v1.8)
 │  └─ lib/                        db.ts (ouverture et migration), env-rules.ts, load-env.ts, seed.ts,
 │                                  seed-seasons.ts (saisons du seed, lues aussi par les tests de bout en bout)
 ├─ docs/                          cahier des charges, architecture, maquette, recette (prompt de recette par un agent, É8)
-├─ e2e/                           tests Playwright (*.spec.ts)
+├─ e2e/                           tests Playwright (*.spec.ts), fake-portail-server.ts (faux portail, v1.8)
 ├─ tests/
 │  ├─ unit/                       règles pures (src/lib/game, format)
 │  ├─ integration/                services et données sur PGlite
-│  └─ helpers/                    createTestDb, fabriques de données, horloge
+│  └─ helpers/                    createTestDb, fabriques de données, horloge, faux portail OIDC (v1.8)
 └─ src/
    ├─ app/
    │  ├─ layout.tsx               <html lang="fr">, polices, fond
@@ -217,8 +218,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
    │  ├─ robots.ts                tout interdire
    │  ├─ (public)/
    │  │  ├─ layout.tsx            page centrée, sans en-tête de jeu
-   │  │  ├─ connexion/page.tsx
-   │  │  └─ inscription/page.tsx
+   │  │  └─ connexion/page.tsx    bouton du portail, lancement automatique, erreurs (v1.8)
    │  ├─ (jeu)/
    │  │  ├─ layout.tsx            exige une session ; en-tête ; suivi de visite
    │  │  ├─ (accueil)/page.tsx    accueil, dans son propre groupe pour que son loading.tsx
@@ -281,7 +281,9 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
       │  ├─ schema/               auth.ts (généré), app.ts, index.ts
       │  └─ client.ts             getDb() : node-postgres ou PGlite
       ├─ auth/
-      │  ├─ auth.ts               createAuth(db) + instance
+      │  ├─ auth.ts               createAuth(db) + instance, getPortailAuth
+      │  ├─ portail.ts            variables, adresses et constantes du portail, sans dépendance (v1.8)
+      │  ├─ portail-identity.ts   refus et recopie à la connexion, pseudo de départ (v1.8)
       │  ├─ auth-client.ts        client navigateur
       │  └─ session.ts            getViewer, requireUser, requireAdmin
       ├─ services/                écritures métier (db, actor, input, now) ; extensions.ts (É8c),
@@ -302,19 +304,21 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 | `DATABASE_URL` | intégration Neon (H-05) | Production (branche `production`), Preview et Development (branche `dev`) | chaîne de connexion poolée |
 | `DATABASE_URL_UNPOOLED` | intégration Neon | idem | chaîne directe, utilisée pour les migrations |
 | `BETTER_AUTH_SECRET` | utilisateur (H-06) | tous, **une valeur différente par environnement** | au moins 32 caractères aléatoires |
-| `BETTER_AUTH_URL` | utilisateur (H-06) | Production : URL de production ; Development : `http://localhost:3000` ; Preview : non définie | URL de base de l'application |
-| `ADMIN_EMAILS` | utilisateur (H-06) | tous | adresses admin séparées par des virgules |
+| `BETTER_AUTH_URL` | utilisateur (H-06, H-19) | Production : URL de production ; Development : `http://localhost:3003` ; branche de recette : son adresse fixe exacte ; autres Preview : non définie | URL de base de l'application, et base des adresses de retour du portail |
+| `PORTAIL_ISSUER` | utilisateur (H-19, H-22) | poste et branche de recette ; Production à la bascule (H-22) | émetteur du portail, sans barre finale, comparé exactement (contrat §3.3). Le même partout : poste, recette et production (G14, G21). **Jamais en dur dans le code** : le lien vers le portail s'en déduit |
+| `PORTAIL_CLIENT_ID` | utilisateur (H-19, H-22) | idem | identifiant du client de l'environnement (`dev`, `recette` ou `production`) |
+| `PORTAIL_CLIENT_SECRET` | utilisateur (H-19, H-22) | idem | son secret : jamais lu, demandé ni écrit ailleurs que dans les variables |
 | `DB_DRIVER` | scripts de test ; `.env.development.local` du poste | tests et e2e (`pglite`) ; développement local sur un réseau qui bloque le port 5432 (`neon-ws`) | **jamais défini sur Vercel** |
 | `PGLITE_DIR` | scripts de test | e2e | dossier de données PGlite |
 | `VERCEL_URL`, `VERCEL_BRANCH_URL`, `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_ENV` | Vercel (automatique) | Preview, Production | origines de confiance pour l'authentification, garde du seed |
 
-`scripts/check-env.ts` vérifie la présence et le format de chaque variable requise (URL PostgreSQL, secret d'au moins 32 caractères, adresses valides) et n'affiche que les noms. Les scripts chargent `.env.local` avec `loadEnvConfig` de `@next/env`.
+`scripts/check-env.ts` vérifie la présence et le format de chaque variable requise (URL PostgreSQL, secret d'au moins 32 caractères, émetteur en URL sans barre finale) et n'affiche que les noms. Sans les trois variables `PORTAIL_*`, le site démarre, mais `/connexion` annonce que la connexion n'est pas disponible : c'est le cas des prévisualisations autres que la recette (G12). Les scripts chargent `.env.local` avec `loadEnvConfig` de `@next/env`.
 
 ### 3.2 Scripts npm
 
 | Script | Commande | Usage |
 |---|---|---|
-| `dev` | `next dev` | développement |
+| `dev` | `next dev -p 3003` | développement, sur le port déclaré au portail (D7) |
 | `build` | `next build` | build local, sans migration |
 | `build:vercel` | `tsx scripts/migrate.ts && next build` | build Vercel (§3.4) |
 | `start` | `next start` | |
@@ -353,7 +357,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 
 **`vitest.config.ts`** : environnement `node`, alias `@` → `src`, `setupFiles: ['vitest.setup.ts']` (qui fixe `process.env.TZ = 'UTC'` comme sur Vercel), couverture v8 avec les seuils du §9.5.
 
-**`playwright.config.ts`** : `testDir: 'e2e'`, `workers: 1`, `fullyParallel: false`, `use.baseURL: 'http://localhost:3100'`, `webServer` avec `command: 'npm run e2e:serve'`, `url: 'http://localhost:3100/api/health'`, `timeout: 180000`, `reuseExistingServer: false` et l'environnement suivant : `DB_DRIVER=pglite`, `PGLITE_DIR=.pglite-e2e`, `BETTER_AUTH_SECRET=<valeur de test fixe de 32 caractères>`, `BETTER_AUTH_URL=http://localhost:3100`, `ADMIN_EMAILS=admin@example.test`, `TZ=UTC`.
+**`playwright.config.ts`** : `testDir: 'e2e'`, `workers: 1`, `fullyParallel: false`, `use.baseURL: 'http://localhost:3100'`, `webServer` avec `command: 'npm run e2e:serve'`, `url: 'http://localhost:3100/api/health'`, `timeout: 180000`, `reuseExistingServer: false` et l'environnement suivant : `DB_DRIVER=pglite`, `PGLITE_DIR=.pglite-e2e`, `BETTER_AUTH_SECRET=<valeur de test fixe de 32 caractères>`, `BETTER_AUTH_URL=http://localhost:3100`, `PORTAIL_ISSUER=http://localhost:3101/api/auth`, `PORTAIL_CLIENT_ID` et `PORTAIL_CLIENT_SECRET` de test, `TZ=UTC`. Un second `webServer` lance le faux portail (`e2e/fake-portail-server.ts`) sur le port 3101 (§9.4).
 
 **`.gitignore`** : ajouter `.pglite-*`, `playwright-report/`, `test-results/`, `coverage/`, `.vercel/`, en plus de ce que génère Next.js. Conserver les entrées existantes (`.env`, `.env.local`, `.env.*.local`).
 
@@ -362,6 +366,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 Sur Vercel, `build:vercel` applique les migrations en attente **avant** `next build`, avec la base de l'environnement concerné (`dev` pour les prévisualisations, `production` pour `main`). Drizzle garde la trace des migrations appliquées : relancer est sans effet. `scripts/migrate.ts` :
 - si `DB_DRIVER=pglite` : migre le dossier `PGLITE_DIR` ;
 - sinon : se connecte avec `DATABASE_URL_UNPOOLED` (ou `DATABASE_URL`), migre, ferme la connexion ;
+- **refuse de migrer une base marquée « production » hors de l'environnement Production de Vercel** (`VERCEL_ENV !== 'production'`) et sort en erreur, ce qui fait échouer le build : une variable de Preview mal posée ne peut plus migrer la production (D21) ;
 - si `VERCEL_ENV === 'production'`, écrit ensuite le marqueur `app_meta.environment = 'production'` (§4.3), qui interdit définitivement le seed sur cette base ;
 - affiche le nombre de migrations appliquées, jamais l'URL ;
 - sort avec un code d'erreur en cas d'échec, ce qui fait échouer le déploiement.
@@ -389,7 +394,8 @@ Générées par la CLI de Better Auth (paquet `auth` depuis Better Auth 1.7 : `D
     - `avatar` (text, non nul, défaut calculé à l'inscription, §8.2) ;
     - `last_seen_at` (timestamptz, nullable) ;
     - `previous_visit_at` (timestamptz, nullable).
-- **`session`** (avec `impersonated_by` du plugin admin, inutilisé), **`account`** (contient le hachage du mot de passe), **`verification`**, **`rate_limit`** (stockage des limites de tentatives en base).
+- **`session`** (avec `impersonated_by` du plugin admin, inutilisé), **`account`**, **`verification`** (état du flux OIDC), **`rate_limit`** (stockage des limites de tentatives en base).
+- **`account`** porte le lien avec le portail (v1.8) : `provider_id = 'portail'`, `account_id = sub`, `id_token` (rafraîchi à chaque connexion, il sert à la déconnexion). Aucune colonne ajoutée. Les lignes `credential` (hachage des anciens mots de passe) restent jusqu'à B4 (D9).
 
 ### 4.3 Tables de l'application (`src/lib/db/schema/app.ts`)
 
@@ -402,7 +408,7 @@ Générées par la CLI de Better Auth (paquet `auth` depuis Better Auth 1.7 : `D
 
 Seule clé utilisée : `environment`, qui vaut `production` sur la base de production (posée par `scripts/migrate.ts`, §3.4).
 
-**`allowed_email`** : liste blanche.
+**`allowed_email`** : ancienne liste blanche. Plus aucun écran ne l'utilise depuis la v1.8 ; elle sert encore à l'export des comptes (B2), et se retire à B4 (D9).
 
 | Colonne | Type | Contraintes |
 |---|---|---|
@@ -1403,68 +1409,82 @@ Effet : met à jour la saison et, si au moins une règle change, ajoute une lign
 Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement de test), et instance de l'application `getAuth()`, créée au premier usage et non à l'import : `next build` charge le module et ne doit pas ouvrir la base (PGlite des tests de bout en bout). La CLI de génération lit l'instance exportée par `src/lib/auth/auth-cli.ts` (décision du 30/09/2026).
 
 - **Adaptateur** : Drizzle, fournisseur `pg`, avec le schéma de `src/lib/db/schema`.
-- **Email et mot de passe** : activé ; vérification d'email désactivée ; mot de passe de 8 à 128 caractères ; connexion automatique après inscription.
+- **Aucune connexion locale** (v1.8, G9) : ni email et mot de passe, ni chemin de test, ni connexion « de secours ».
+- **Fournisseur `portail`** (plugin `genericOAuth`), ajouté seulement si les trois variables `PORTAIL_*` existent :
+  - découverte sur `<PORTAIL_ISSUER>/.well-known/openid-configuration` : aucune adresse du portail n'est écrite dans le code ;
+  - `requireIdTokenVerification: true` : un fournisseur dont le jeton ne se vérifie pas est écarté ; le jeton est vérifié par les clés `jwks_uri` (`iss`, `aud`, `exp`, `nonce`) ;
+  - code d'autorisation avec PKCE S256, `state` et `nonce` ; `authentication: "basic"` (`client_secret_basic`) ; scopes `openid profile email`, sans `offline_access`.
+- **Rapprochement** : `account.accountLinking` avec `trustedProviders: ["portail"]` et `requireLocalEmailVerified: false` : les comptes existants, tous à `email_verified = false`, se lient par l'adresse sans s'appuyer sur `email_verified` (D2). `updateUserInfoOnLink` et `overrideUserInfo` restent désactivés : le pseudo n'est jamais réécrit (D3).
 - **Session** :
-  - durée de 400 jours (le maximum qu'acceptent les navigateurs pour un cookie) ;
-  - renouvelée à chaque visite (au plus une fois par jour) ;
-  - cache du cookie de session **désactivé** : chaque page relit la session en base, pour qu'une désactivation, un changement de rôle ou de nom s'applique tout de suite (décision du 30/09/2026 ; la v1.0 prévoyait un cache de quelques minutes).
+  - **8 h fixes depuis la connexion**, jamais prolongées (`expiresIn` de 8 h, `disableSessionRefresh: true`, G6) ;
+  - cache du cookie de session **désactivé** : chaque page relit la session en base, pour qu'un changement de rôle ou de nom s'applique tout de suite (décision du 30/09/2026 ; la v1.0 prévoyait un cache de quelques minutes).
+- **Cookies** : préfixe `mpplike` (`advanced.cookiePrefix`, D6), repris par `getSessionCookie` dans le proxy. La constante est dans `src/lib/auth/portail.ts`, sans dépendance, car le proxy ne charge pas Better Auth.
 - **Plugins** :
-  - `admin` : rôle par défaut `player`, rôle admin `admin` ;
-  - `nextCookies` : pour que les Server Actions puissent poser les cookies.
-- **Champs additionnels** de `user` : `avatar`, `lastSeenAt`, `previousVisitAt` (§4.2). Ils ne sont pas modifiables par le client lors de l'inscription.
-- **Hook avant création d'un utilisateur** (§6.2).
-- **Limitation des tentatives** : activée, stockée en base.
-  - `/sign-in/email` : 5 tentatives par minute ;
-  - `/sign-up/email` : 5 par 10 minutes ;
-  - adresse IP lue dans `x-forwarded-for` (fourni par Vercel).
+  - `portailIdentity` : la recopie du §6.2. Il reste **avant** `admin` ;
+  - `admin` : rôle par défaut `player`, rôle admin `admin`, et le refus d'une session à un compte banni. Ses routes HTTP restent fermées ;
+  - `genericOAuth` : le fournisseur ci-dessus ;
+  - `nextCookies` : pour que les Server Actions puissent poser les cookies. Il reste le dernier.
+- **Champs additionnels** de `user` : `avatar`, `lastSeenAt`, `previousVisitAt` (§4.2). Ils ne sont pas modifiables par le client.
+- **Crochets** (§6.2) : `user.validateUserInfo`, `databaseHooks.user.create.before`, et `session.create.before` porté par le plugin `portailIdentity`.
+- **Limitation des tentatives** : activée, stockée en base. La règle par défaut de Better Auth limite `/sign-in*` à 3 requêtes par 10 s et par IP : toute l'école sort par une seule IP, donc `/sign-in/social` a sa propre règle, **60 par minute**. Adresse IP lue dans `x-forwarded-for` (fourni par Vercel).
 - **Origines de confiance** :
-  - `baseURL` = `BETTER_AUTH_URL`, sinon `https://${VERCEL_URL}`, sinon `http://localhost:3000` ;
+  - `baseURL` = `BETTER_AUTH_URL`, sinon `https://${VERCEL_URL}`, sinon `http://localhost:3003` ;
   - `trustedOrigins` contient `BETTER_AUTH_URL` et les variantes `https://` de `VERCEL_URL`, `VERCEL_BRANCH_URL` et `VERCEL_PROJECT_PRODUCTION_URL` quand elles existent.
-- **Route** : `src/app/api/auth/[...all]/route.ts` expose le gestionnaire de Better Auth, **limité** aux routes dont l'interface a besoin (`/sign-in/email`, `/sign-up/email`, `/get-session`, liste dans `src/lib/auth/http-paths.ts`). Toutes les autres répondent 404, en particulier celles du plugin admin (`/admin/*`) et `/update-user`, qui contourneraient les règles des services (dernier admin, nom unique, jamais de suppression d'un compte qui a des pronos). Les appels côté serveur (`auth.api.*`) ne sont pas concernés (décision du 30/09/2026).
-- **Connexion et inscription** passent par HTTP (client Better Auth dans le navigateur), pour que la limitation des tentatives s'applique : elle n'agit que sur les requêtes HTTP, pas sur les appels `auth.api.*`. Déconnexion et changement de mot de passe sont des Server Actions.
-- **Client** : `src/lib/auth/auth-client.ts` crée le client React, sans le plugin client admin : les actions d'admin sont des Server Actions (§6.3).
+- **Erreurs** : `onAPIError.errorURL` mène à `<baseURL>/connexion` : sans lui, une erreur d'avant la lecture de `state` finirait sur `/api/auth/error`, que le filtre HTTP rend en 404.
+- **Route** : `src/app/api/auth/[...all]/route.ts` expose le gestionnaire de Better Auth, **limité** aux routes dont l'interface a besoin (`/sign-in/social`, `/callback/portail`, `/get-session`, liste dans `src/lib/auth/http-paths.ts`). Toutes les autres répondent 404, en particulier celles du plugin admin (`/admin/*`) et `/update-user`, qui contourneraient les règles des services (nom unique, jamais de suppression d'un compte qui a des pronos). Les appels côté serveur (`auth.api.*`) ne sont pas concernés (décision du 30/09/2026).
+- **Connexion** par HTTP (client Better Auth dans le navigateur), pour que la limitation s'applique : elle n'agit pas sur les appels `auth.api.*`. La déconnexion est une Server Action.
+- **Client** : `src/lib/auth/auth-client.ts` crée le client React, sans le plugin client admin.
 
 > Les noms exacts d'options de Better Auth peuvent changer d'une version à l'autre (§14). Vérifier dans la documentation de la version installée ; le **comportement** décrit ici est le contrat.
 
-### 6.2 Inscription, liste blanche et premier admin
+### 6.2 Connexion par le portail (contrat portail v1)
 
-- **Hooks** (décision du 30/09/2026) : les contrôles qui lisent la base (liste blanche, compte existant, nom pris) tournent dans un hook `before` de Better Auth sur `/sign-up/email`, avant la transaction d'inscription (une requête hors transaction bloquerait PGlite, qui n'a qu'une connexion). Le hook de base de données `user.create.before` pose ensuite l'identifiant, l'email normalisé, le rôle et l'avatar.
-- **Contrôles** : l'email est mis en minuscules et débarrassé de ses espaces.
-  - S'il ne figure ni dans `allowed_email` ni dans `ADMIN_EMAILS`, l'inscription est refusée avec « Cette adresse n'est pas sur la liste des joueurs. Contacte l'admin. »
-  - S'il figure dans `ADMIN_EMAILS`, `role = 'admin'`, sinon `player`.
-  - `avatar` reçoit la valeur par défaut calculée (§8.2).
-- **Nom affiché** : de 2 à 30 caractères après retrait des espaces, **unique** (insensible à la casse), vérifié par le formulaire et par le hook : « Ce nom est déjà pris. »
-- **Compte déjà existant** : « Un compte existe déjà avec cette adresse. Connecte-toi. »
-- Une adresse de `ADMIN_EMAILS` n'a pas besoin d'être dans `allowed_email` : le hook l'accepte directement. C'est ce qui permet de créer le premier compte admin (H-09).
+Le contrat est écrit dans `../portail/docs/architecture/contrat-apps.md` ; l'essentiel est au §4 du [chantier](../features/branchement-portail.md).
 
-### 6.3 Gestion des comptes (admin)
+**Le flux.** Le bouton de `/connexion`, ou le lancement automatique (D20), appelle `signIn.social({ provider: "portail", callbackURL: "/", errorCallbackURL: "/connexion" })` : `POST /api/auth/sign-in/social`, puis le portail, puis `GET /api/auth/callback/portail`, qui ouvre la session et mène à `/`.
 
-- **Mise en œuvre** (décision du 30/09/2026) : les services de `src/lib/services/players.ts` écrivent eux-mêmes ce qu'écrirait l'API admin de Better Auth (champs de bannissement, suppression des sessions, mot de passe haché par `better-auth/crypto`). Cette API exige la session HTTP de l'admin, incompatible avec la signature `(db, actor, input, now)` des services (§7.1).
-- **Désactiver** : bannissement Better Auth, sans date de fin, ce qui révoque les sessions ; après une confirmation, puisque la session du joueur tombe aussitôt (décision du 01/10/2026). **Réactiver** : levée du bannissement, sans confirmation.
-- **Mot de passe provisoire** :
-  - 12 caractères aléatoires, alphabet sans caractères ambigus (pas de `0 O o 1 l I`) ;
-  - haché comme le fait Better Auth et enregistré sur le compte « credential » du joueur ;
-  - affiché une seule fois à l'admin dans une boîte de dialogue, avec « Copier » ;
-  - les sessions du joueur sont révoquées ;
-  - le joueur le change ensuite dans `/profil`.
-- **Rôle** : passer admin ou joueur. On ne peut ni se retirer soi-même le rôle admin, ni se désactiver soi-même. Il doit toujours rester au moins un admin.
+**Sans session** (D20) : le proxy et `requireUser()` envoient vers `/connexion?auto=1` (constante `SIGN_IN_AUTO_PATH`), comme la page du chat quand elle reçoit un 401. La page lance alors le flux une seule fois. Une déconnexion mène à `/connexion`, une erreur à `/connexion?error=<code>` : le flux n'y part jamais seul, ce qui exclut toute boucle.
+
+**Le rapprochement** (contrat §3.2) : par (`portail`, `sub`), sinon la première fois par l'adresse, puis enregistrement de `sub`, sinon création. C'est le comportement de Better Auth, avec les réglages du §6.1.
+
+**Les refus**, dans `user.validateUserInfo` (`src/lib/auth/portail-identity.ts`). Ce crochet voit les champs du jeton avant toute écriture, à la création, à la liaison et à la connexion ; son refus revient à l'adresse d'erreur. Chaque refus écrit une ligne au journal du serveur, avec le code et l'identifiant du compte, sans adresse :
+
+| Code | Cas |
+|---|---|
+| `issuer_mismatch` | `iss` différent de `PORTAIL_ISSUER`, comparé exactement. Couvre aussi une réponse du portail sans `id_token` : Better Auth lirait alors la route userinfo sans rien vérifier |
+| `role_not_allowed` | `role` hors de `ROLES` : refus avant toute création |
+| `address_reassigned` | à la liaison, le compte trouvé par l'adresse est déjà lié à un autre `sub` : c'est le signe d'une adresse réattribuée. Sans ce crochet, Better Auth lierait un second compte `portail` |
+| `address_taken` | à la connexion par `sub`, la nouvelle adresse reçue est déjà celle d'un autre compte |
+
+**La recopie**, dans un crochet `session.create.before` : il relit `account.id_token`, écrit dans la même requête et déjà vérifié, et recopie le **rôle** et l'**adresse** à chaque connexion. Better Auth ignore `role` (`input: false`) et `overrideUserInfo` réécrirait aussi le nom : c'est pourquoi ce code est à nous. Le crochet **lève aussi une désactivation d'avant le portail** (D4). Better Auth exécute d'abord les crochets des plugins, dans leur ordre, et ceux des options en dernier : le crochet est donc porté par le plugin `portailIdentity`, placé avant `admin`, qui refuse ensuite un compte encore banni. Un compte anonymisé n'est jamais levé.
+
+**Le pseudo** (D3) : `user.name` reste à MPPlike. À la création, `mapProfileToUser` part du nom du portail, le coupe à 30 caractères et le rend unique sans tenir compte de la casse (« Prénom 2 ») ; ce calcul se fait avant la transaction de création, car une requête hors transaction bloquerait PGlite. Le nom n'est jamais réécrit ensuite. `databaseHooks.user.create.before` pose l'identifiant, l'adresse normalisée et l'avatar.
+
+**La déconnexion** (contrat §3.8) : `signOutAction` appelle `auth.api.signOut` avec `callbackURL: "/connexion"` et `disableRedirect: true`, puis suit l'adresse rendue, celle de `end_session_endpoint` avec `id_token_hint`, `client_id` et `post_logout_redirect_uri`. Sans adresse rendue, elle mène à `/connexion`.
+
+**La panne** (contrat §3.1) : si la découverte échoue, le plugin écarte le fournisseur pour toute la vie de l'instance. `getPortailAuth()` recrée alors l'instance, au plus une fois toutes les 30 s. La route répond 503 à `/sign-in/social` et mène à `/connexion?error=portail_unavailable` depuis le retour. Les pages n'en dépendent pas : les sessions déjà ouvertes continuent. Le plugin n'a pas de délai d'attente : un portail qui ne répond pas du tout retarde le premier appel d'une instance neuve.
+
+**Le lien vers le portail** se déduit de `PORTAIL_ISSUER` (son origine, `portailHomeUrl`).
+
+### 6.3 Comptes (admin)
+
+Le portail gère les accès et les rôles (G2, G3) : `/admin/joueurs` n'en est plus que la lecture, avec un lien vers le portail. Rien n'empêche que MPPlike se retrouve sans admin si la grille n'en donne plus : le super-admin du portail le répare. Une seule action reste à l'admin de MPPlike, car elle porte sur ses données.
+
+- **Mise en œuvre** (décision du 30/09/2026) : le service de `src/lib/services/players.ts` écrit lui-même ce qu'écrirait l'API admin de Better Auth (champs de bannissement, suppression des sessions). Cette API exige la session HTTP de l'admin, incompatible avec la signature `(db, actor, input, now)` des services (§7.1).
 - **Anonymiser** (droit à l'effacement), avec confirmation :
   - `name = « Ancien joueur n »` ;
   - `email = anonyme-<id>@invalid.local` ;
-  - avatar par défaut, compte désactivé ;
-  - adresse retirée de la liste blanche ;
+  - avatar par défaut, compte banni ;
+  - adresse retirée de `allowed_email`, pour qu'elle ne parte pas dans l'export (B2) ;
+  - **lien `portail` supprimé** (v1.8, D4) : une personne qui reviendrait aurait un compte neuf, jamais l'ancien. L'accès, lui, se retire au portail ;
   - le nom est aussi remplacé dans le palmarès (`season_standing.name_snapshot`) ; rangs et malus restent figés (décision du 30/09/2026) ;
   - les pronos sont conservés, pour que le classement des autres reste juste ;
   - ses messages du chat sont effacés (v1.2, É8d, §5.15).
-- **Liste blanche** :
-  - ajout en série (une adresse par ligne ; virgules et points-virgules acceptés) ;
-  - bilan affiché : « 3 ajoutées, 1 déjà présente, 1 invalide » ;
-  - retrait possible seulement s'il n'existe pas de compte avec cette adresse (sinon, désactiver le compte).
 
 ### 6.4 Protection des routes
 
-1. **Proxy/middleware** (redirection rapide, pas une sécurité) : sans cookie de session Better Auth, toute route sauf `/connexion`, `/inscription`, `/api/auth/*`, `/api/health`, `/api/chat` (É8d : la route répond elle-même `401` en JSON, une redirection n'aurait pas de sens pour un appel `fetch`) et les fichiers statiques redirige vers `/connexion`.
-2. **Layout `(jeu)`** : `requireUser()`. Sans session valide, redirection vers `/connexion`. Un compte désactivé n'a plus de session.
+1. **Proxy/middleware** (redirection rapide, pas une sécurité) : sans cookie de session Better Auth, toute route sauf `/connexion`, `/api/auth/*`, `/api/health`, `/api/chat` (É8d : la route répond elle-même `401` en JSON, une redirection n'aurait pas de sens pour un appel `fetch`) et les fichiers statiques redirige vers `/connexion?auto=1` (§6.2).
+2. **Layout `(jeu)`** : `requireUser()`. Sans session valide, redirection vers `/connexion?auto=1`. Un compte banni n'a plus de session.
 3. **Layout `admin`** : `requireAdmin()`. Un joueur non admin reçoit la page 404 (on ne révèle pas l'existence du back-office). Next résout les métadonnées d'une page même quand son layout répond 404 : les pages d'admin donnent leur titre par `generateMetadata`, qui passe par `adminMetadata(titre)` (`requireAdmin()` d'abord). Sinon, l'onglet d'un joueur affichait « Back-office · Le Bon Chiffre » (recette du 01/10/2026, R-02).
 4. **Chaque Server Action** appelle `requireUser()` ou `requireAdmin()` et renvoie une erreur `NOT_AUTHENTICATED` ou `FORBIDDEN`, jamais une exception non gérée.
 5. **Chaque service** revérifie le rôle de l'acteur qu'il reçoit (défense en profondeur).
@@ -1473,6 +1493,8 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
 `getViewer()` lit la session (`auth.api.getSession({ headers })`) et renvoie `{ id, name, role, banned, avatar, lastSeenAt, previousVisitAt } | null`.
 
 ### 6.5 Matrice des autorisations
+
+« Joueur désactivé » désigne depuis la v1.8 un compte banni : un compte anonymisé, ou désactivé avant le portail et pas encore revenu.
 
 | Action | Anonyme | Joueur | Joueur désactivé | Admin |
 |---|---|---|---|---|
@@ -1485,8 +1507,8 @@ Fabrique `createAuth(db, env)` (pour pouvoir brancher la base et l'environnement
 | Gérer questions, catégories, saisons, lots, annonces | refusé | refusé | refusé | oui |
 | Supprimer une question (v1.4, É8e) | refusé | refusé | refusé | oui, sauf une question publiée ou annulée d'une saison proclamée (§5.11) |
 | Régler les règles d'une saison (É10) | refusé | refusé | refusé | oui, jusqu'au premier résultat de la saison (§5.16) |
-| Gérer liste blanche et comptes | refusé | refusé | refusé | oui |
-| Modifier son nom, son avatar, son mot de passe | refusé | oui | refusé | oui |
+| Voir les comptes, anonymiser un compte | refusé | refusé | refusé | oui, jamais soi-même |
+| Modifier son nom, son avatar | refusé | oui | refusé | oui |
 | Lire et écrire dans le chat, marquer comme lu (É8d) | refusé (`401` pour `/api/chat`) | oui | refusé | oui |
 | Supprimer un message du chat (É8d) | refusé | les siens | refusé | tous, messages de résultat compris |
 
@@ -1562,11 +1584,11 @@ type Result<T = void> =
 | `categories.ts` | `createCategory`, `renameCategory`, `archiveCategory`, `unarchiveCategory` |
 | `seasons.ts` | `createSeason`, `updateSeason`, `deleteSeason`, `upsertPrizes`, `proclaimSeason` (v1.1 : `ensureSeason` disparaît, §5.13), `updateSeasonRules` (É10, §5.16) |
 | `announcements.ts` | `createAnnouncement`, `updateAnnouncement`, `deleteAnnouncement` |
-| `players.ts` | `addAllowedEmails`, `removeAllowedEmail`, `setRole`, `disableUser`, `enableUser`, `setTemporaryPassword`, `anonymizeUser` |
-| `profile.ts` | `updateDisplayName`, `updateAvatar`, `recordVisit` (le changement de mot de passe passe par Better Auth) |
+| `players.ts` | `anonymizeUser` (v1.8 : les autres partent, §6.3) |
+| `profile.ts` | `updateDisplayName`, `updateAvatar`, `recordVisit` |
 | `chat.ts` (É8d) | `postChatMessage`, `deleteChatMessage`, `markChatRead` (§5.15) |
 
-La matrice d'autorisation (`tests/integration/authorization-matrix.test.ts`, §9.3) compte ces services : 34 jusqu'à l'É8b, 36 après l'É8c, 39 après l'É8d (et après l'É8e, où `deleteQuestion` remplace `deleteDraftQuestion`), 40 après l'É10.
+La matrice d'autorisation (`tests/integration/authorization-matrix.test.ts`, §9.3) compte ces services : 34 jusqu'à l'É8b, 36 après l'É8c, 39 après l'É8d (et après l'É8e, où `deleteQuestion` remplace `deleteDraftQuestion`), 33 depuis la v1.8, 34 après l'É10.
 
 ### 7.4 Liste des lectures
 
@@ -1577,7 +1599,7 @@ La matrice d'autorisation (`tests/integration/authorization-matrix.test.ts`, §9
 | `results.ts` (É7) | `getQuestionResults` (après la clôture : pronos visibles, sagesse de la foule, malus une fois résolue, **absents compris** avec leur malus d'absence, badges gagnés sur la question ; passe par `getQuestionPredictionsForViewer`), `getLatestResult` (accueil) |
 | `badges.ts` (É7) | `getPlayerResults` (questions résolues de la saison pour un joueur, avec son prono et son malus, ou « pas de prono » et le malus d'absence), `getPlayerBadges`, `getBadgesOnQuestion` |
 | `standings.ts` | `getStandings({ seasonId? })`, `getAvailableSeasons` |
-| `players.ts` | `getPlayerProfile({ userId, seasonId? })`, `getAllowedEmails`, `getAccounts` |
+| `players.ts` | `getPlayerProfile({ userId, seasonId? })`, `getAccounts` |
 | `admin.ts` | `getAdminDashboard` (avec les prolongations en cours), `getAdminQuestion` (avec la prolongation de chaque joueur et ce que l'admin peut en faire ; depuis l'É8e, `deletion` : `{ allowed, reason, predictions, extensions, resultMessage }`, le bilan affiché par la fenêtre de suppression, sans compter les jokers, que l'admin ne doit pas voir avant la clôture, §6.6), `getAdminQuestionsList(filters)` (depuis l'É8e, chaque ligne a aussi son `deletion`, calculé comme pour `getAdminQuestion`, pour la suppression en série), `getSeasonsAdmin` (avec la raison de ne pas proclamer et le réglage des jokers ; depuis l'É10, les règles, leurs verrous et leur historique, §5.16), `suggestedSeasonRules` (É10, formulaire de création), `hasSeasons` (formulaire de question, §5.13) |
 | `content.ts` | `getAnnouncements`, `getPrizes(seasonId)`, `getPalmares`, `getCurrentSeason` (pied de page, `/lots`, tuile Jokers ; avec `jokersEnabled`, et depuis l'É10 toutes les `rules` de la saison, lues aussi par `/reglement`) |
 
@@ -1754,19 +1776,12 @@ Les tailles et styles proviennent de la maquette (`docs/design/maquette-b5/Stade
 
 Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px, puis le pied de page.
 
-**`/connexion`**
+**`/connexion`** (v1.8)
 - Carte centrée de 420 px, logo au-dessus.
-- Champs : email, mot de passe. Bouton « SE CONNECTER ». Lien « Créer mon compte ».
-- Texte d'aide : « Mot de passe oublié ? Demande à l'admin un mot de passe provisoire. »
-- Erreurs :
-  - « Email ou mot de passe incorrect. » ;
-  - « Trop de tentatives. Réessaie dans une minute. » ;
-  - compte désactivé : « Ton compte est désactivé. Contacte l'admin. »
-
-**`/inscription`**
-- Champs : email, nom affiché (« Ton prénom, tel que les autres le verront »), mot de passe, confirmation.
-- Bouton « CRÉER MON COMPTE », puis redirection vers l'accueil.
-- Erreurs du §6.2.
+- Bouton « SE CONNECTER AVEC LE PORTAIL ». Texte d'aide : « Ton compte et ton mot de passe se gèrent sur le portail. »
+- Avec `?auto=1`, sans `error` : le flux part seul, le bouton affiche son état « en cours » (§6.2).
+- Avec `?error=<code>` : message neutre, le même pour toutes les erreurs : « La connexion n'a pas abouti. Retourne sur le portail pour réessayer. », avec un lien vers le portail. Le flux ne part pas seul.
+- Sans les variables du portail (prévisualisations autres que la recette) : « La connexion n'est pas disponible à cette adresse. », sans bouton.
 
 **`/` Accueil**, dans l'ordre de la maquette :
 1. Annonces (jusqu'à 3).
@@ -1812,7 +1827,6 @@ Tous les écrans ont la même base : l'en-tête, le contenu centré de 1 184 px,
 **`/profil` Mon compte**
 - Nom affiché.
 - Galerie d'avatars : 16 tuiles radio.
-- Changement de mot de passe : actuel, nouveau, confirmation.
 - Bouton « Se déconnecter ».
 
 **`/lots`** : lots de la saison courante (rang et description). EmptyState « Les lots seront annoncés bientôt. » Lien vers le règlement (jusqu'à l'É10, pour un admin seulement : la phrase qui le porte est réécrite sans lien pour un joueur, sans laisser de ponctuation orpheline).
@@ -1890,9 +1904,9 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. De
 - **Résultat** : si la question est clôturée ou résolue ; désactivé, avec la raison, tant qu'une prolongation court ;
 - **Historique** : les événements, sans valeurs avant la clôture (§6.6).
 
-**`/admin/joueurs`**
-- **Liste blanche** : zone de texte pour l'ajout en série, liste avec « Compte créé : oui / non » et bouton de retrait.
-- **Comptes** : nom, email, rôle, statut, dernière visite. Actions : Passer admin ou joueur, Désactiver ou Réactiver, Mot de passe provisoire, Anonymiser.
+**`/admin/joueurs`** (v1.8)
+- Lien vers le portail : « Les accès et les rôles se gèrent sur le portail. »
+- **Comptes** : nom, email, rôle, statut, dernière visite. Action : Anonymiser.
 
 **`/admin/categories`** : liste, ajout, renommage, archivage (une catégorie archivée disparaît des choix mais reste sur ses questions).
 
@@ -1970,14 +1984,15 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. De
 | Intégration | Vitest et PGlite | `tests/integration/` | services, lectures et visibilité, hooks d'authentification, migrations, seed |
 | Bout en bout | Playwright | `e2e/` | parcours réels dans le navigateur, sur `next start` avec PGlite |
 | Accessibilité | `@axe-core/playwright` | `e2e/a11y.spec.ts` | pages principales |
-| Fumée en production | Playwright | `e2e/prod-smoke.spec.ts` | `/connexion` et `/api/health` en production, en lecture seule, lancé à la main avec `BASE_URL`. Avec `BASE_URL`, `playwright.config.ts` ne lance que ce fichier, sans serveur local ; sans elle, `npm run test:e2e` l'exclut (écrit à l'É8b) |
+| Fumée en production | Playwright | `e2e/prod-smoke.spec.ts` | `/connexion` (bouton du portail depuis la v1.8) et `/api/health` en production, en lecture seule, lancé à la main avec `BASE_URL`. Avec `BASE_URL`, `playwright.config.ts` ne lance que ce fichier, sans serveur local ; sans elle, `npm run test:e2e` l'exclut (écrit à l'É8b) |
 
 ### 9.2 Outils de test partagés (`tests/helpers/`)
 
 - `createTestDb()` : PGlite en mémoire, migrations appliquées.
 - `makeClock(iso)` : fabrique de dates (`at('+2h')`, `at('-1d')`).
 - Fabriques : `createUser(db, { role, email, name })`, `createQuestion(db, overrides)`, `createPrediction(db, overrides)`, avec des valeurs par défaut valides.
-- `createTestAuth(db, env)` : instance Better Auth branchée sur la base de test, pour les hooks d'inscription ; `authRequest()` construit une requête HTTP pour tester la limitation des tentatives.
+- `createTestAuth(db, env)` : instance Better Auth branchée sur la base de test ; `authRequest()` construit une requête HTTP pour tester la limitation des tentatives.
+- `startFakePortail()` (`tests/helpers/fake-portail.ts`, v1.8) : un faux fournisseur OIDC sur un port local (découverte, clés, autorisation, jeton RS256, fin de session), qu'un test peut faire mentir (mauvaise signature, mauvais `aud`, `nonce` ou `iss`, jeton expiré, jeton absent). `signInThroughPortail()` joue le flux complet contre `auth.handler`. Ce même faux portail sert les tests de bout en bout.
 
 ### 9.3 Tests transverses obligatoires
 
@@ -1994,8 +2009,9 @@ Les champs verrouillés (§5.11) sont désactivés, avec la raison affichée. De
 - `scripts/e2e-prepare.ts` supprime `.pglite-e2e/`, applique les migrations, lance le seed en mode `e2e`, puis ferme PGlite **avant** le démarrage du serveur (une seule connexion PGlite à la fois).
 - Un seul worker, tests indépendants entre eux : chaque test qui écrit utilise ses propres comptes et questions du seed.
 - Sélecteurs par rôle et par libellé (`getByRole`, `getByLabel`). `data-testid` seulement pour les zones sans rôle (compte à rebours, graphique).
-- Les tests importent `test` depuis `e2e/fixtures.ts` : chaque test y reçoit sa propre adresse client (`x-forwarded-for`), sinon la limitation des tentatives (5 connexions par minute et par adresse) bloquerait la suite. `signIn()` et `signOut()` passent par l'interface. Un test qui modifie un compte du seed (nom, mot de passe) le remet dans son état initial.
-- Accessibilité : `AxeBuilder` sur `/connexion`, `/`, `/pronos`, `/questions/<résolue>`, `/classement`, `/profil`, `/admin`, `/admin/questions/<id>`, et depuis la v1.2 `/questions/<clôturée, sans prono>` et `/chat` (palette ouverte comprise). Aucune violation `serious` ni `critical`. Depuis l'É8, aussi à 390 px sur les pages à tableaux (zones défilantes accessibles au clavier) ; après une navigation côté client, attendre le `<title>` avant axe (Next l'ajoute un peu plus tard).
+- Les tests importent `test` depuis `e2e/fixtures.ts` : chaque test y reçoit sa propre adresse client (`x-forwarded-for`). Un test qui modifie un compte du seed (nom) le remet dans son état initial.
+- **Connexion dans les tests** (v1.8, D8) : aucun chemin de connexion de test dans l'application. `scripts/e2e-prepare.ts` pose une session par compte du seed dans la base PGlite, avant le démarrage du serveur (PGlite n'accepte qu'un processus à la fois) ; `signIn()` donne au navigateur le cookie signé avec le secret des tests. `signOut()` retire ce cookie sans toucher à la session, qui resservira : la vraie déconnexion, et le vrai flux de connexion, se prouvent dans `e2e/auth.spec.ts`, contre le faux portail (`e2e/fake-portail-server.ts`, port 3101).
+- Accessibilité : `AxeBuilder` sur `/connexion` (et son message d'erreur), `/`, `/pronos`, `/questions/<résolue>`, `/classement`, `/profil`, `/admin`, `/admin/questions/<id>`, et depuis la v1.2 `/questions/<clôturée, sans prono>` et `/chat` (palette ouverte comprise). Aucune violation `serious` ni `critical`. Depuis l'É8, aussi à 390 px sur les pages à tableaux (zones défilantes accessibles au clavier) ; après une navigation côté client, attendre le `<title>` avant axe (Next l'ajoute un peu plus tard).
 - Chat (`e2e/chat.spec.ts`, É8d) : l'arrêt de l'interrogation (onglet caché, inactivité de 5 min) et sa reprise immédiate sont vérifiés avec l'horloge simulée de Playwright (`page.clock`), en comptant les appels à `/api/chat`.
 - Responsive (`e2e/responsive.spec.ts`, É8) : à 390 × 844, pas de défilement horizontal sur toutes les pages du joueur et de l'admin ; menu, champ du prono et boutons visibles ; liste compacte de `/classement`. En-têtes (`e2e/headers.spec.ts`) : ceux du §3.3 sur les pages publiques, connectées, l'API et les redirections, `robots.txt`, balise `noindex`.
 
@@ -2016,8 +2032,7 @@ Saisons (v1.1) : le seed crée lui-même trois saisons, l'ancienne, la précéde
 
 | Élément | Contenu |
 |---|---|
-| Comptes (mot de passe `Test-1234!`) | `admin@example.test` (admin, nom « Admin »), `joueur1@` à `joueur8@example.test` (joueurs : Sarah, Julien, Inès, Camille, Thomas, Mehdi, Léa, Hugo), `desactive@example.test` (désactivé) |
-| Liste blanche sans compte | `nouveau1@example.test` (test d'inscription). `nouveau2@example.test` n'y est pas : l'admin l'ajoute dans `e2e/auth.spec.ts` (décision du 30/09/2026) |
+| Comptes (sans mot de passe depuis la v1.8) | `admin@example.test` (admin, nom « Admin »), `joueur1@` à `joueur8@example.test` (joueurs : Sarah, Julien, Inès, Camille, Thomas, Mehdi, Léa, Hugo), `desactive@example.test` (désactivé). Ils n'entrent pas par un vrai portail (G4) : sur la recette, le propriétaire se connecte avec son compte du portail de production |
 | Catégories | JPO, Candidatures, Intégration, Archivée (archivée) |
 | Saison ancienne (É7) | pas proclamée, prête à l'être : 1 question résolue (JPO, valeur réelle 180) et 4 pronos |
 | Saison précédente | proclamée, avec 2 questions résolues et un `season_standing` (palmarès) |
@@ -2040,10 +2055,10 @@ Le choix des joueurs (prolongé, sans prono…) tient compte des états laissés
 ## 10. Sécurité et exploitation
 
 - **En-têtes HTTP** : §3.3. **Indexation** : `robots.ts` interdit tout, et chaque page porte `noindex` (site privé).
-- **Mots de passe** : hachés par Better Auth, jamais journalisés. Tentatives de connexion limitées (§6.1).
+- **Connexion** (v1.8) : le site ne reçoit aucun mot de passe. Les anciens hachages restent en base jusqu'à B4 (D9). Jeton d'identité vérifié, PKCE, `state`, `nonce` (§6.1) ; `PORTAIL_CLIENT_SECRET` dans les variables seulement. Les refus du §6.2 sont journalisés sans adresse.
 - **Entrées** : toutes validées par Zod côté serveur, même si le formulaire valide déjà.
 - **Server Actions** : contrôle des droits dans chaque action et dans chaque service (§6.4).
-- **Données sensibles** : les chiffres de l'école ne sont visibles qu'après connexion d'un compte de la liste blanche. Aucune page publique hormis `/connexion`, `/inscription` et `/api/health`, qui renvoie seulement `{ "ok": true }` ou `{ "ok": false }`.
+- **Données sensibles** : les chiffres de l'école ne sont visibles qu'après connexion d'une personne autorisée par le portail. Aucune page publique hormis `/connexion` et `/api/health`, qui renvoie seulement `{ "ok": true }` ou `{ "ok": false }`.
 - **Journaux** : `console.error` avec un code d'erreur et l'identifiant utilisateur, sans valeur de prono, sans texte de message du chat, sans donnée personnelle. Consultables dans les logs Vercel.
 - **Chat** (É8d) : texte affiché échappé, liens non cliquables, 10 messages par minute au plus, contenu effacé à la suppression et à l'anonymisation (§5.15).
 - **Sauvegarde** : restauration à un instant donné proposée par Neon (fenêtre selon l'offre gratuite). Pas d'export applicatif (écarté dans le cahier des charges).
@@ -2084,7 +2099,7 @@ Les étapes É1 à É8b sont faites. Elles décrivent ce qui a été construit a
 | É8g | Correction des textes d'une question publiée (v1.6) | 13/10, avant le lancement |
 | É8h | Questions fun, notées à la place (v1.7) | 13/10, avant le lancement |
 | É9 | Recette et lancement | 13/10, lancement le 14/10 |
-| É10 | Règles réglables par saison (v1.3) | après le lancement, avant le premier résultat de 2026-2027 (novembre) |
+| É10 | Règles réglables par saison (v1.3) | l'année prochaine, après le chantier du portail (D23) |
 
 ### É1 — Socle du projet
 
@@ -2826,6 +2841,8 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
 
 ## 12. Interventions humaines
 
+H-18 à H-22 appartiennent au chantier du portail : voir le §9 de [branchement-portail.md](../features/branchement-portail.md). Depuis la v1.8, la recette sur un aperçu avec les comptes du seed s'arrête (H-07, D7) : les essais passent par la branche de recette et le portail de production (G21).
+
 > Les libellés des interfaces Vercel et Neon peuvent avoir changé. L'agent adapte les instructions à ce que l'utilisateur voit, sans jamais lui demander de coller un secret dans le chat.
 
 ### H-01 — Node.js et Git (É1)
@@ -2987,7 +3004,8 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | PGlite dans Next | `serverExternalPackages` obligatoire. Si PGlite pose problème sous `next start`, repli : une branche Neon `test` dédiée aux tests de bout en bout (nouvelle intervention humaine à proposer à l'utilisateur). |
 | `@vercel/functions` | `attachDatabasePool` sert à libérer proprement les connexions avec le calcul « Fluid ». S'il n'est pas disponible, utiliser un pool de petite taille (`max: 5`) et un délai d'inactivité court. |
 | Vercel : commande de build | `vercel.json` → `buildCommand`. Vérifier dans les logs de build que la migration s'exécute bien avant `next build`. |
-| Cookies de 400 jours | Chrome plafonne la durée d'un cookie à 400 jours : ne pas dépasser. |
+| Vercel : adresse d'une branche | Le nom d'hôte tient en 63 caractères ; au-delà, Vercel coupe et ajoute un hachage. Avec ce projet et cette équipe, il reste 15 caractères pour la branche (D14). |
+| Vercel : protection des aperçus | L'aperçu de la recette reste protégé par la connexion Vercel, sans effet sur la connexion : le portail n'appelle jamais le serveur de MPPlike, et son domaine de production est public. Une réponse 302 ou 401 du portail serait une panne : prévenir l'utilisateur, ne rien contourner (D18). |
 | Heures d'été et d'hiver | Toujours passer par `@date-fns/tz`. Ne jamais construire une date « Paris » en ajoutant +1 ou +2 heures à la main. |
 | Chat : interrogation périodique (É8d) | Pas de WebSocket sur les fonctions Vercel : la page interroge `GET /api/chat`, seulement onglet visible et personne active (§5.15). Chaque appel est une invocation de fonction Vercel et réveille la base Neon (mise en veille après quelques minutes sans requête) : vérifier les quotas des offres gratuites au moment de l'étape et garder l'intervalle de 10 s au minimum. Ne pas utiliser une Server Action pour interroger le serveur : Next les exécute l'une après l'autre, elles bloqueraient l'envoi d'un message. |
 | Emojis (É8d) | Une longueur JavaScript (`.length`) compte les unités UTF-16 : un emoji en vaut 2. Compter en points de code (`[...texte].length`), comme `char_length` de PostgreSQL. Certains emojis composés (familles, drapeaux) comptent plusieurs points de code : sans importance avec la palette choisie. |

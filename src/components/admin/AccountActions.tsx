@@ -1,86 +1,33 @@
 "use client";
 
-import { Ban, Check, Copy, KeyRound, RotateCcw, ShieldCheck, UserRound, UserX } from "lucide-react";
+import { UserX } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
-import {
-  anonymizeUserAction,
-  disableUserAction,
-  enableUserAction,
-  setRoleAction,
-  setTemporaryPasswordAction,
-} from "@/lib/actions/players";
-import type { Result } from "@/lib/services/result";
+import { anonymizeUserAction } from "@/lib/actions/players";
 
-export type AccountSummary = { id: string; name: string; role: "player" | "admin"; banned: boolean };
-
-type OpenDialog = null | "confirm-disable" | "confirm-password" | "confirm-anonymize" | { password: string };
+export type AccountSummary = { id: string; name: string };
 
 const ICON = { "aria-hidden": true, size: 16, strokeWidth: 2.4 } as const;
 
-/**
- * Actions on one account (§6.3): role, disable (with a confirmation: it closes the player's session;
- * decision of 01/10/2026) or enable, temporary password, anonymize.
- */
+/** The one action left on an account (§6.3): the accesses and the roles are managed on the portal. */
 export function AccountActions({ account }: { account: AccountSummary }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<OpenDialog>(null);
-  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  function run<T>(action: () => Promise<Result<T>>, onSuccess?: (data: T) => void) {
+  function anonymize() {
     startTransition(async () => {
-      const result = await action();
-      if (result.ok) {
-        setError(null);
-        onSuccess?.(result.data);
-      } else {
-        setError(result.message);
-        setDialog(null);
-      }
+      const result = await anonymizeUserAction(account.id);
+      setError(result.ok ? null : result.message);
+      setOpen(false);
     });
-  }
-
-  async function copy(password: string) {
-    try {
-      await navigator.clipboard.writeText(password);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
   }
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap gap-1.5">
-        {account.role === "admin" ? (
-          <Button variant="secondary" pending={pending} onClick={() => run(() => setRoleAction(account.id, "player"))}>
-            <UserRound {...ICON} />
-            Passer joueur
-          </Button>
-        ) : (
-          <Button variant="secondary" pending={pending} onClick={() => run(() => setRoleAction(account.id, "admin"))}>
-            <ShieldCheck {...ICON} />
-            Passer admin
-          </Button>
-        )}
-        {account.banned ? (
-          <Button variant="secondary" pending={pending} onClick={() => run(() => enableUserAction(account.id))}>
-            <RotateCcw {...ICON} />
-            Réactiver
-          </Button>
-        ) : (
-          <Button variant="danger" pending={pending} onClick={() => setDialog("confirm-disable")}>
-            <Ban {...ICON} />
-            Désactiver
-          </Button>
-        )}
-        <Button variant="secondary" pending={pending} onClick={() => setDialog("confirm-password")}>
-          <KeyRound {...ICON} />
-          Mot de passe provisoire
-        </Button>
-        <Button variant="danger" pending={pending} onClick={() => setDialog("confirm-anonymize")}>
+        <Button variant="danger" pending={pending} onClick={() => setOpen(true)}>
           <UserX {...ICON} />
           Anonymiser
         </Button>
@@ -89,84 +36,17 @@ export function AccountActions({ account }: { account: AccountSummary }) {
         {error}
       </p>
 
-      <Dialog open={dialog === "confirm-disable"} onClose={() => setDialog(null)} title={`Désactiver ${account.name} ?`}>
-        <p className="text-[15px] text-ink-2">
-          {account.name} ne pourra plus se connecter, et sa session ouverte sera fermée. Ses pronos restent comptés au
-          classement, avec la mention « inactif ». Tu pourras réactiver le compte à tout moment.
-        </p>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDialog(null)}>
-            Annuler
-          </Button>
-          <Button variant="danger" pending={pending} onClick={() => run(() => disableUserAction(account.id), () => setDialog(null))}>
-            Désactiver
-          </Button>
-        </div>
-      </Dialog>
-
-      <Dialog open={dialog === "confirm-password"} onClose={() => setDialog(null)} title="Mot de passe provisoire">
-        <p className="text-[15px] text-ink-2">
-          {account.name} recevra un nouveau mot de passe, que tu lui transmettras. L&apos;ancien ne fonctionnera plus et
-          ses sessions seront fermées.
-        </p>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDialog(null)}>
-            Annuler
-          </Button>
-          <Button
-            pending={pending}
-            onClick={() =>
-              run(
-                () => setTemporaryPasswordAction(account.id),
-                ({ password }) => {
-                  setCopied(false);
-                  setDialog({ password });
-                },
-              )
-            }
-          >
-            Créer le mot de passe
-          </Button>
-        </div>
-      </Dialog>
-
-      <Dialog open={typeof dialog === "object" && dialog !== null} onClose={() => setDialog(null)} title="Mot de passe provisoire">
-        {typeof dialog === "object" && dialog !== null ? (
-          <>
-            <p className="text-[15px] text-ink-2">
-              Transmets ce mot de passe à {account.name}. Il ne sera plus affiché ensuite. {account.name} pourra le
-              changer dans son profil.
-            </p>
-            <p
-              data-testid="temporary-password"
-              className="select-all rounded-field border border-line bg-bg px-4 py-3 text-center font-mono text-2xl font-bold tracking-[0.12em]"
-            >
-              {dialog.password}
-            </p>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <p aria-live="polite" className="mr-auto text-sm font-medium text-up">
-                {copied ? "Copié." : null}
-              </p>
-              <Button variant="secondary" onClick={() => copy(dialog.password)}>
-                {copied ? <Check {...ICON} /> : <Copy {...ICON} />}
-                Copier
-              </Button>
-              <Button onClick={() => setDialog(null)}>Terminé</Button>
-            </div>
-          </>
-        ) : null}
-      </Dialog>
-
-      <Dialog open={dialog === "confirm-anonymize"} onClose={() => setDialog(null)} title={`Anonymiser ${account.name} ?`}>
+      <Dialog open={open} onClose={() => setOpen(false)} title={`Anonymiser ${account.name} ?`}>
         <p className="text-[15px] text-ink-2">
           Le nom, l&apos;adresse et l&apos;avatar seront effacés et le compte sera désactivé, sans retour possible. Les
-          pronos sont conservés sous le nom « Ancien joueur », pour que le classement des autres reste juste.
+          pronos sont conservés sous le nom « Ancien joueur », pour que le classement des autres reste juste. L&apos;accès,
+          lui, se retire sur le portail.
         </p>
         <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDialog(null)}>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
             Annuler
           </Button>
-          <Button variant="danger" pending={pending} onClick={() => run(() => anonymizeUserAction(account.id), () => setDialog(null))}>
+          <Button variant="danger" pending={pending} onClick={anonymize}>
             Anonymiser
           </Button>
         </div>

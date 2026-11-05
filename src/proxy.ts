@@ -1,12 +1,14 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
+import { COOKIE_PREFIX, SIGN_IN_AUTO_PATH } from "@/lib/auth/portail";
 import { isPublicPath } from "@/lib/auth/public-paths";
 
-// Quick redirection to /connexion without a session cookie (architecture §6.4). Not a security
+// Quick redirection to the sign-in without a session cookie (architecture §6.4). Not a security
 // check: the cookie is not verified here. The layouts and every action check the session.
 export function proxy(request: NextRequest) {
-  if (isPublicPath(request.nextUrl.pathname) || getSessionCookie(request)) return NextResponse.next();
-  return NextResponse.redirect(new URL("/connexion", request.url));
+  const { pathname } = request.nextUrl;
+  if (isPublicPath(pathname) || getSessionCookie(request, { cookiePrefix: COOKIE_PREFIX })) return NextResponse.next();
+  return NextResponse.redirect(new URL(SIGN_IN_AUTO_PATH, request.url));
 }
 
 export const config = {

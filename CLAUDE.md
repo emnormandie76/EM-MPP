@@ -10,7 +10,7 @@ Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plu
 | [docs/architecture/architecture.md](docs/architecture/architecture.md) | Référence technique et plan de construction par étapes : le **comment** |
 | [docs/architecture/avancement.md](docs/architecture/avancement.md) | Étape en cours, interventions humaines faites, journal des décisions |
 | [docs/design/maquette-b5/](docs/design/maquette-b5/) | Maquette visuelle retenue (style B5 « Jour de match ») ; la couleur principale est #0036B3 depuis la v1.2 (architecture §8.1) |
-| [docs/features/branchement-portail.md](docs/features/branchement-portail.md) | Chantier de la connexion par le Portail admission (prompt guidé P-03 du portail, **contrat portail v1**) : décisions G du portail et D de MPPlike, étapes B0 à B4, journal |
+| [docs/features/branchement-portail.md](docs/features/branchement-portail.md) | Chantier de la connexion par le Portail admission (prompts guidés P-03 et P-04 du portail, **contrat portail v1**) : décisions G du portail et D de MPPlike, étapes B0 à B4, journal |
 
 ## Phase en cours
 

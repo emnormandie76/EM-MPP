@@ -43,6 +43,13 @@
       "when": 1791883144527,
       "tag": "0005_fun_questions",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793869786266,
+      "tag": "0006_clear_sessions",
+      "breakpoints": true
     }
   ]
 }

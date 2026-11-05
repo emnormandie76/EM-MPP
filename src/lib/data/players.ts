@@ -1,9 +1,9 @@
 import "server-only";
-import { asc, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Viewer } from "@/lib/auth/session";
 import { isAvatarKey, type AvatarKey } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
-import { allowedEmail, questionOption, user } from "@/lib/db/schema";
+import { questionOption, user } from "@/lib/db/schema";
 import type { Role } from "@/lib/services/result";
 import { isAnonymized } from "@/lib/services/users";
 import { type BadgeView, getPlayerBadges, getPlayerResults } from "./badges";
@@ -16,19 +16,6 @@ type ViewerRole = Pick<Viewer, "id" | "role">;
 
 function assertAdmin(viewer: ViewerRole): void {
   if (viewer.role !== "admin") throw new Error("FORBIDDEN: admin reads only");
-}
-
-export type AllowedEmailRow = { email: string; hasAccount: boolean };
-
-/** The allow list, with whether an account uses each address. */
-export async function getAllowedEmails(db: Database, viewer: ViewerRole): Promise<AllowedEmailRow[]> {
-  assertAdmin(viewer);
-  const rows = await db
-    .select({ email: allowedEmail.email, userId: user.id })
-    .from(allowedEmail)
-    .leftJoin(user, eq(user.email, allowedEmail.email))
-    .orderBy(asc(allowedEmail.email));
-  return rows.map(({ email, userId }) => ({ email, hasAccount: userId !== null }));
 }
 
 export type AccountRow = {

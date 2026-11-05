@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { deleteChatMessageAction, loadOlderChatMessagesAction, markChatReadAction } from "@/lib/actions/chat";
+import { SIGN_IN_AUTO_PATH } from "@/lib/auth/portail";
 import { CHAT_FAILURES_BEFORE_NOTICE, CHAT_POLL_MS } from "@/lib/chat/constants";
 import { shouldPoll } from "@/lib/chat/polling";
 import type { ChatMessageView, ChatPage, ChatUpdates } from "@/lib/data/chat";
@@ -151,7 +152,7 @@ export function ChatRoom({ initial, viewerId }: { initial: ChatPage; viewerId: s
         const after = messagesRef.current.at(-1)?.id ?? 0;
         const response = await fetch(`/api/chat?after=${after}&since=${encodeURIComponent(since.current)}`, { cache: "no-store" });
         if (response.status === 401) {
-          router.replace("/connexion");
+          router.replace(SIGN_IN_AUTO_PATH);
           return;
         }
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -251,7 +252,7 @@ export function ChatRoom({ initial, viewerId }: { initial: ChatPage; viewerId: s
     try {
       const page = await loadOlderChatMessagesAction({ beforeId: first.id });
       if (!page) {
-        router.replace("/connexion");
+        router.replace(SIGN_IN_AUTO_PATH);
         return;
       }
       const element = log.current;
