@@ -110,6 +110,7 @@ Consignes du propriétaire pour mener B1, données le 05/11/2026 (D12 à D19). E
 | D22 | **Migration `0006`** | Jouée sur la branche Neon `dev`, et seulement là, au build de l'aperçu (accord du 05/11, demandé par le §8 ci-dessous). Elle atteindra la production avec la bascule (D6). |
 | D23 | **L'É10 attend l'année prochaine** | Décision du propriétaire, à ne pas rediscuter : l'É10 (règles réglables par saison) se développera l'année prochaine, bien après le chantier du portail. Le chantier passe d'abord (D10 tient). Les résultats de 2026-2027 se saisissent sans l'attendre : les règles de cette saison restent celles du code. Écarté : faire passer l'É10 avant le premier résultat. |
 | D24 | **Branche créée avant ses variables** (point ouvert 6) | Décision du propriétaire, à cocher, sur la recommandation : `etape-b1-oidc` naît sur GitHub au commit de `main` (`8c93039`), **sans le code de B1**, pour que Vercel la connaisse et qu'on puisse y limiter les variables. Écart à la lettre de D15, pas à son but : ce push porte le code de la production, sans migration à jouer, et Vercel n'a d'ailleurs rien construit (aucun déploiement sept minutes après, cause non établie). L'adresse fixe ne se confirmera donc qu'au premier déploiement du code de B1. D15 s'applique au premier push **du code de B1**, qui reste à la demande du propriétaire. Écarté : essayer d'abord `vercel env add … --git-branch` sur une branche absente de GitHub. |
+| D25 | **Rôles à l'export** (point ouvert 2) | Décision du propriétaire, le 06/11/2026 : les six comptes `admin` de MPPlike le restent. L'export les déclare `admin` (D5), sans correction dans la grille du portail. Si B2 trouve un autre nombre de comptes `admin`, l'agent le dit au propriétaire avant de remettre le fichier. |
 
 ## 6. Déclaration au portail (à transmettre)
 
@@ -216,7 +217,7 @@ Ordre confirmé par le portail le 06/11/2026 (portail D31 maintenue, G19) : B2, 
 ## 10. Points ouverts
 
 1. *(Réglé le 05/11/2026 : D20, connexion silencieuse.)*
-2. **Six comptes `admin`** (quatre au 30/10, relevé du 05/11) : l'export les déclarera `admin` (D5). Si certains doivent être `player`, le propriétaire le dit avant B2, ou corrige la case dans la grille du portail (G15).
+2. *(Réglé le 06/11/2026 : D25, les six comptes `admin` le restent.)*
 3. **`BETTER_AUTH_URL` en Development sur Vercel** (H-06) : elle vaut probablement `http://localhost:3000` ; à remettre à 3003 si le propriétaire tire encore `.env.local` par `vercel env pull`.
 4. **L'É9** : le propriétaire dira s'il la considère comme close (H-12 et H-13 non signalées, campagne en brouillon).
 5. *(Sans objet depuis P-04 : l'émetteur est le même partout, G21.)*
@@ -258,3 +259,4 @@ Ordre confirmé par le portail le 06/11/2026 (portail D31 maintenue, G19) : B2, 
 | 06/11/2026 | Le journal du portail signalait un point jamais rapporté : la fermeture de sa session après le clic de confirmation. Vérifié par l'agent en ouvrant l'accueil du portail dans Chrome : il renvoyait vers sa page de connexion, la session était donc fermée. **Imprévu** : juste après, le formulaire pré-rempli est parti sans clic ni saisie de l'agent (bouton « Connexion… »), et une session du portail s'est ouverte dans le Chrome du propriétaire. Cause non établie (gestionnaire de mots de passe, ou geste du propriétaire). L'agent n'a rien fait sur le portail et a fermé son onglet | agent |
 | 06/11/2026 | Même retour du portail recollé par le propriétaire : ses trois points étaient déjà reportés dans `f6ebdfd`, rien d'ajouté au chantier. Architecture v1.8 mise d'accord avant sa relecture : date du contrat (en-tête) et cas de déconnexion sans retour (§6.2, G22). v1.8 soumise au propriétaire ; première case de B1 décochée jusqu'à sa réponse | agent |
 | 06/11/2026 | **H-08 de B1** : le propriétaire valide l'étape (« je valide B1 »). Première case de B1 cochée sur cette validation : il n'a rien dit à part sur la relecture de la v1.8. Le même retour du portail, recollé une troisième fois, n'ajoute rien (reporté dans `f6ebdfd`). Pas de fusion dans `main`, elle attend la bascule (B3). B2 n'est pas commencée : elle revient à un nouvel agent au contexte vidé, comme le prévoit `avancement.md` | propriétaire |
+| 06/11/2026 | D25 : les six comptes `admin` le restent sur MPPlike (point ouvert 2 réglé) | propriétaire |
