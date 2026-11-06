@@ -1,7 +1,7 @@
 # Chantier — Connexion par le portail
 
 > **Source** : prompt guidé P-03 du portail (`../portail/docs/prompts/P-03-MPPlike-connexion-portail.md`, émis le 2026-10-30), **contrat portail v1** (précisé en dernier le 2026-11-06). Corrigé par le prompt guidé P-04 du portail (`../portail/docs/prompts/P-04-MPPlike-rattachement-production.md`, émis le 2026-11-05), contrat v1 inchangé.
-> **Ouvert le** 30/10/2026. **B0 validée le 30/10/2026** ; **B1** (le branchement, sur le poste et sur la branche de recette, D12), commencée le 05/11/2026, est **en attente de validation depuis le 06/11/2026**.
+> **Ouvert le** 30/10/2026. **B0 validée le 30/10/2026** ; **B1** (le branchement, sur le poste et sur la branche de recette, D12), commencée le 05/11/2026, est **validée le 06/11/2026**. **B2** est la prochaine étape.
 > Le portail est le fournisseur de connexion des applications de l'équipe ; il lit ce dépôt et n'y écrit jamais (G7). Ce fichier porte les décisions du chantier, ses étapes à cocher et son journal. Le suivi général reste dans [avancement.md](../architecture/avancement.md) (étapes B0 à B4).
 
 ## 1. Objet
@@ -169,7 +169,7 @@ Une étape à la fois, sur sa branche (`etape-bN-…`), avec la porte habituelle
 
 ### B1 — Le branchement, sur le poste et sur la branche de recette (G19, temps 1 ; D12)
 
-- [ ] Cahier des charges v1.8 et architecture v1.8 (§3.1, §6, §9.4, §9.6, §12 ; « contrat portail v1 ») écrits avant le code, et soumis au propriétaire.
+- [x] Cahier des charges v1.8 et architecture v1.8 (§3.1, §6, §9.4, §9.6, §12 ; « contrat portail v1 ») écrits avant le code, et soumis au propriétaire. Commités avec le code, soumis le 06/11 (écart noté au compte rendu de B1).
 - [x] H-18 : le propriétaire déclare `mpplike` au portail de production (avec l'agent du portail, G18, G21), selon le §6, avec ses clients `recette` et `dev` ; puis H-19 : il pose les variables de la branche (D16) sur Vercel, limitées à `etape-b1-oidc`, et celles de `.env.local` (`BETTER_AUTH_URL=http://localhost:3003`, `PORTAIL_ISSUER` et le client `dev`). L'agent ne les demande pas et ne lit que les noms ; `npm run check:env` vérifie leur présence sur le poste.
 - [x] Avant le premier push (D15) : variables de la branche relues avec le propriétaire, par leurs noms ; il confirme qu'elles visent Neon `dev`.
 - [x] Tests d'abord : rapprochement par `sub`, puis par l'adresse (comptes locaux à `email_verified = false` compris), puis création ; refus d'une adresse déjà liée à un autre `sub` (consigné) ; rôle recopié à chaque connexion, rôle inconnu refusé ; adresse recopiée ; pseudo de départ coupé et rendu unique, jamais réécrit (D3) ; désactivation d'avant levée, compte anonymisé jamais rouvert (D4) ; session refusée après 8 h depuis la connexion, même relue entre-temps ; `/sign-in/social` qui ne bloque pas une IP partagée.
@@ -179,6 +179,7 @@ Une étape à la fois, sur sa branche (`etape-bN-…`), avec la porte habituelle
 - [x] Garde-fou des migrations (D21), en place avant le premier push.
 - [x] Branche poussée à la demande du propriétaire ; déploiement prêt à l'adresse fixe, sur `dev` (D14).
 - [x] Essai de bout en bout **sur l'adresse fixe et sur le poste**, contre le portail de production (D17, G21), **le propriétaire se connectant lui-même** (aucun compte de test en production) : connexion, refus (sans accès), retrait d'accès (refus à la connexion suivante), déconnexion.
+- [x] Validation du propriétaire (H-08), le 06/11/2026.
 
 **Ordre avec le propriétaire** (P-04 §5) : l'agent confirme l'adresse fixe de la branche ; le propriétaire déclare `mpplike` au portail de production avec l'agent du portail ; il pose les valeurs ; l'agent relit avec lui les noms des variables (D15) ; il demande le premier push.
 
@@ -256,3 +257,4 @@ Ordre confirmé par le portail le 06/11/2026 (portail D31 maintenue, G19) : B2, 
 | 06/11/2026 | Retour du portail (contrat v1 précisé le 2026-11-06, son commit `d77ad53`), collé par le propriétaire : P-04 vérifié sur `47981dc`, rien à reprendre. Reporté : G22 (portail D46), règle de la déconnexion corrigée et retour direct du poste expliqué (point ouvert 8), ordre B2, import, message aux joueurs, puis B3 (portail D31 maintenue). Relu par l'agent dans le contrat §8, le journal du portail et le plugin : tout concorde. Le code de MPPlike ne change pas | portail, propriétaire |
 | 06/11/2026 | Le journal du portail signalait un point jamais rapporté : la fermeture de sa session après le clic de confirmation. Vérifié par l'agent en ouvrant l'accueil du portail dans Chrome : il renvoyait vers sa page de connexion, la session était donc fermée. **Imprévu** : juste après, le formulaire pré-rempli est parti sans clic ni saisie de l'agent (bouton « Connexion… »), et une session du portail s'est ouverte dans le Chrome du propriétaire. Cause non établie (gestionnaire de mots de passe, ou geste du propriétaire). L'agent n'a rien fait sur le portail et a fermé son onglet | agent |
 | 06/11/2026 | Même retour du portail recollé par le propriétaire : ses trois points étaient déjà reportés dans `f6ebdfd`, rien d'ajouté au chantier. Architecture v1.8 mise d'accord avant sa relecture : date du contrat (en-tête) et cas de déconnexion sans retour (§6.2, G22). v1.8 soumise au propriétaire ; première case de B1 décochée jusqu'à sa réponse | agent |
+| 06/11/2026 | **H-08 de B1** : le propriétaire valide l'étape (« je valide B1 »). Première case de B1 cochée sur cette validation : il n'a rien dit à part sur la relecture de la v1.8. Le même retour du portail, recollé une troisième fois, n'ajoute rien (reporté dans `f6ebdfd`). Pas de fusion dans `main`, elle attend la bascule (B3). B2 n'est pas commencée : elle revient à un nouvel agent au contexte vidé, comme le prévoit `avancement.md` | propriétaire |
