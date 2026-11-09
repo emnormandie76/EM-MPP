@@ -1631,6 +1631,7 @@ Depuis l'É10, toute lecture qui calcule un malus charge les règles de la saiso
 | `--color-accent-ink` | `#FFFFFF` | texte sur l'accent |
 | `--color-accent-text` | `#0036B3` | liens et chiffres en accent sur fond clair. v1.2 : la même valeur que l'accent, assez foncé pour le texte ; la maquette avait besoin d'une variante plus foncée (`#1A4FE0`) |
 | `--color-accent-soft` | `rgb(0 54 179 / 0.12)` | fond de ma ligne au classement, halo de mon point |
+| `--color-accent-strong` | `#002A8C` | survol des boutons principaux (B3, 09/11/2026, demandé par l'utilisateur) : depuis la v1.2, `accent-text` vaut l'accent, et l'ancien survol ne se voyait plus. `accent-ink` dessus : 12,3:1. Les boutons actifs prennent aussi le pointeur en main (`cursor-pointer`), que Tailwind v4 ne leur donne plus |
 | `--color-hot` | `#D2352B` | urgence (< 48 h), « À faire », moyenne de l'équipe, actions dangereuses |
 | `--color-warn` | `#A15C00` | « Enregistré » |
 | `--color-up` | `#15803D` | montée ▲, étiquette « Résultat » |

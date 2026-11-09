@@ -4,10 +4,11 @@ type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 type ButtonSize = "md" | "lg" | "icon";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-button font-display font-extrabold uppercase tracking-[0.06em] whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-button font-display font-extrabold uppercase tracking-[0.06em] whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-60";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-accent-ink hover:bg-accent-text",
+  // Tailwind orders `disabled:` after `hover:`: a disabled button keeps its color under the pointer.
+  primary: "bg-accent text-accent-ink hover:bg-accent-strong disabled:bg-accent",
   secondary: "border border-line-strong text-ink hover:bg-chip",
   // White background: `hot` text reaches 4.9:1 on it, but only 4.2:1 on the page background.
   danger: "border border-hot bg-surface text-hot hover:bg-hot hover:text-accent-ink",

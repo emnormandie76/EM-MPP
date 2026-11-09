@@ -18,6 +18,8 @@
   --color-accent-ink: #ffffff;
   --color-accent-text: #0036b3;
   --color-accent-soft: rgb(0 54 179 / 0.12);
+  /* Hover of the primary buttons (B3, 09/11/2026): accent-text equals accent since v1.2, so it did not show. */
+  --color-accent-strong: #002a8c;
   --color-hot: #d2352b;
   --color-warn: #a15c00;
   --color-up: #15803d;
