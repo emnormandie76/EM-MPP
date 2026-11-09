@@ -3,7 +3,7 @@ import { z } from "zod";
 import { PORTAIL_PROVIDER_ID } from "@/lib/auth/portail";
 import { defaultAvatarFor } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
-import { account, allowedEmail, chatMessage, seasonStanding, session, user } from "@/lib/db/schema";
+import { account, chatMessage, seasonStanding, session, user } from "@/lib/db/schema";
 import { type Actor, authorize, type Failure, fail, isFailure, ok, type Result } from "./result";
 import { anonymizedEmail, isAnonymized, isDisplayNameTaken } from "./users";
 
@@ -89,8 +89,6 @@ export async function anonymizeUser(
     await tx.delete(session).where(eq(session.userId, target.id));
     // Whoever comes back gets a new account, never this one (D4). The access is withdrawn on the portal.
     await tx.delete(account).where(and(eq(account.userId, target.id), eq(account.providerId, PORTAIL_PROVIDER_ID)));
-    // The table stays until step B4: this address must not leave in the export of the accounts (B2).
-    await tx.delete(allowedEmail).where(eq(allowedEmail.email, target.email));
     // The palmarès keeps ranks and malus, but not the name (decision of 30/09/2026).
     await tx.update(seasonStanding).set({ nameSnapshot: name }).where(eq(seasonStanding.userId, target.id));
     // The chat messages are erased, as by a deletion (v1.2, §5.15).

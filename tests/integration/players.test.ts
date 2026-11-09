@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { defaultAvatarFor } from "@/lib/avatars";
 import type { Database } from "@/lib/db/client";
-import { account, allowedEmail, prediction, session, user } from "@/lib/db/schema";
+import { account, prediction, session, user } from "@/lib/db/schema";
 import { anonymizeUser } from "@/lib/services/players";
 import type { Actor } from "@/lib/services/result";
 import { makeClock } from "../helpers/clock";
@@ -56,7 +56,6 @@ describe("anonymization (§6.3)", () => {
   it("erases name, address and avatar, disables the account, keeps the predictions", async () => {
     const admin = await createUser(db, { role: "admin" });
     const player = await createUser(db, { email: "sarah@example.test", name: "Sarah" });
-    await db.insert(allowedEmail).values({ email: "sarah@example.test" });
     await db.insert(session).values({ id: "s1", token: "t1", userId: player.id, expiresAt: clock.at("+1h"), updatedAt: now });
     await db.update(user).set({ avatar: "maillot-jaune-raye", lastSeenAt: clock.at("-1d") }).where(eq(user.id, player.id));
     const question = await createQuestion(db, { createdBy: admin.id });
@@ -75,23 +74,24 @@ describe("anonymization (§6.3)", () => {
       previousVisitAt: null,
     });
     expect(await sessionsOf(player.id)).toEqual([]);
-    expect(await db.select().from(allowedEmail).where(eq(allowedEmail.email, "sarah@example.test"))).toEqual([]);
     expect(await db.select().from(prediction).where(eq(prediction.userId, player.id))).toHaveLength(1);
   });
 
   it("cuts the link to the portal, so that whoever comes back gets a new account (D4)", async () => {
     const admin = await createUser(db, { role: "admin" });
     const player = await createUser(db);
+    const other = await createUser(db);
     await db.insert(account).values([
       { id: "a1", accountId: "sub-sarah", providerId: "portail", userId: player.id, updatedAt: now },
-      { id: "a2", accountId: player.id, providerId: "credential", userId: player.id, password: "hachage", updatedAt: now },
+      { id: "a2", accountId: "sub-julien", providerId: "portail", userId: other.id, updatedAt: now },
     ]);
 
     await anonymizeUser(db, actorOf(admin), { userId: player.id }, now);
 
-    expect(await db.select().from(account).where(and(eq(account.userId, player.id), eq(account.providerId, "portail")))).toEqual([]);
-    // The old passwords stay until step B4 (D9).
-    expect(await db.select().from(account).where(eq(account.userId, player.id))).toHaveLength(1);
+    // No password is left since step B4 (D9): the portal link was the account's only one.
+    expect(await db.select().from(account).where(eq(account.userId, player.id))).toEqual([]);
+    // The other players keep theirs.
+    expect(await db.select({ id: account.id }).from(account)).toEqual([{ id: "a2" }]);
   });
 
   it("numbers the anonymized accounts and skips a name already taken", async () => {

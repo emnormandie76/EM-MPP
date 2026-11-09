@@ -49,17 +49,6 @@ export const appMeta = pgTable("app_meta", {
   value: text("value"),
 });
 
-/** Allow list of the former sign-up: only the export of step B2 reads it, until step B4 (D9). Always lower case. */
-export const allowedEmail = pgTable(
-  "allowed_email",
-  {
-    email: text("email").primaryKey(),
-    createdAt: createdAt(),
-    createdBy: text("created_by").references(() => user.id),
-  },
-  (t) => [check("allowed_email_normalized", sql`${t.email} = lower(btrim(${t.email}))`)],
-);
-
 /**
  * One row per season, created by the admin (v1.1, §5.13). A season has no stored end: it ends where
  * the next one starts, and the last one goes on until the next one is created (§5.1).

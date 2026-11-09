@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db/client";
-import { allowedEmail, category, chatMessage, prediction, question, questionExtension, questionOption, season, seasonStanding } from "@/lib/db/schema";
+import { category, chatMessage, prediction, question, questionExtension, questionOption, season, seasonStanding } from "@/lib/db/schema";
 import { createTestDb } from "../helpers/db";
 import { createCategory, createPrediction, createQuestion, createUser } from "../helpers/factories";
 
@@ -229,10 +229,11 @@ describe("database schema", () => {
       expect(await refusal(db.insert(category).values({ name: "SALONS" }))).toContain("category_name_unique");
     });
 
-    it("stores allow-list addresses in lower case, without spaces", async () => {
-      expect(await refusal(db.insert(allowedEmail).values({ email: "Sarah@Example.test" }))).toContain("allowed_email_normalized");
-      expect(await refusal(db.insert(allowedEmail).values({ email: " sarah@example.test" }))).toContain("allowed_email_normalized");
-      await db.insert(allowedEmail).values({ email: "sarah@example.test" });
+    it("has no allow list any more: the accesses are given on the portal (B4, D9)", async () => {
+      const result = (await db.execute(sql`select to_regclass('public.allowed_email') is null as dropped`)) as unknown as {
+        rows: { dropped: boolean }[];
+      };
+      expect(result.rows).toEqual([{ dropped: true }]);
     });
   });
 

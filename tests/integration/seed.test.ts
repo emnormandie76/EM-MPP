@@ -2,7 +2,6 @@ import { and, eq, isNotNull, ne } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   account,
-  allowedEmail,
   announcement,
   category,
   chatMessage,
@@ -281,13 +280,12 @@ describe("seed (scripts/seed.ts)", () => {
     expect(await getUnreadChatCount(db, { id: hugo.id, role: "player" })).toBe(9);
   });
 
-  it("gives no account a password or an allow list entry: the sign-in goes through the portal", async () => {
+  it("gives no account a password: the sign-in goes through the portal", async () => {
     target = await migratedDb();
     const { db } = target;
     await seedDatabase(db, { now: MID_SEASON, env: {} });
 
     expect(await db.select().from(account)).toEqual([]);
-    expect(await db.select().from(allowedEmail)).toEqual([]);
   });
 
   it("erases everything and starts again: same content, identifiers from 1", async () => {

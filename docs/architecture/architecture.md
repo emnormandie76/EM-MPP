@@ -1,8 +1,8 @@
 # Architecture et plan de construction — Les petits pronos de la promo
 
-> **Version 1.8 du 05/11/2026.** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
+> **Version 1.8 du 05/11/2026, complétée le 09/11/2026 (B4).** Référence technique pour les agents IA qui construisent l'application, et pour l'utilisateur qui les pilote. Remplace la proposition v0.1.
 >
-> - **Changements de la v1.8** (chantier « Connexion par le portail », [branchement-portail.md](../features/branchement-portail.md), cahier des charges v1.8, **étapes B1 à B4**) : on se connecte par le **Portail admission**, fournisseur d'identité OIDC et seule source des accès, selon le **contrat portail v1** (précisé en dernier le 2026-11-06). Plus de mot de passe, d'inscription, de liste blanche, d'`ADMIN_EMAILS`, ni de gestion des comptes sur le site ; sessions de 8 h fixes ; préfixe de cookies `mpplike` ; port 3003 sur le poste ; garde-fou des migrations (§3.4). Sections touchées : §1, §2, §3, §4.2, §6, §7.3, §7.4, §8.3, §9, §10, §12, §14. Migration `0006_clear_sessions` ; celle de l'É10 devient la suivante. **Tant que la bascule (B3) n'a pas eu lieu, la production suit la v1.7** ; ces sections décrivent le code de la branche `etape-b1-oidc`.
+> - **Changements de la v1.8** (chantier « Connexion par le portail », [branchement-portail.md](../features/branchement-portail.md), cahier des charges v1.8, **étapes B1 à B4**) : on se connecte par le **Portail admission**, fournisseur d'identité OIDC et seule source des accès, selon le **contrat portail v1** (précisé en dernier le 2026-11-06). Plus de mot de passe, d'inscription, de liste blanche, d'`ADMIN_EMAILS`, ni de gestion des comptes sur le site ; sessions de 8 h fixes ; préfixe de cookies `mpplike` ; port 3003 sur le poste ; garde-fou des migrations (§3.4). Sections touchées : §1, §2, §3, §4.2, §4.3, §6, §7.3, §7.4, §8.3, §9, §10, §11 (É10), §12, §13, §14, annexe A. Migrations `0006_clear_sessions` (vide `session`, B1) et `0007_remove_password_sign_in` (supprime les lignes `credential` d'`account` et la table `allowed_email`, B4, D9) ; celle de l'É10 devient `0008_season_rules`. **En production depuis la bascule du 09/11/2026 (B3)**. Complétée le 09/11/2026 par B4 : documents mis à l'heure de la production, migration `0007`, script d'export des comptes retiré (D29) ; le chantier est clos. Depuis `0007`, aucun retour vers l'ancienne connexion n'est possible.
 >
 > - **Changement de la v1.7** (demandé par l'utilisateur le 13/10/2026, cahier des charges v1.7, **étape É8h**) : questions fun, des questions à nombre notées à la place, `(place − 1) × malus par place`, au coefficient ×1 (§5.5). Sections touchées : §4.3, §5.5, §5.6, §5.11, §5.16, §8.2, §8.3, §11 (É8h, É9, É10), annexes A et B. Migration `0005_fun_questions` (ajouts seulement) ; celle de l'É10 devient `0006_season_rules`.
 > - **Changement de la v1.6** (demandé par l'utilisateur le 13/10/2026, cahier des charges v1.6, **étape É8g avant le lancement**) : les textes d'une question (énoncé, description, unité, source, libellé des réponses) restent modifiables avec des pronos et après la clôture ; les réponses sont renommées sur place (§5.11). Sections touchées : §5.11, §8.3, §11 (É8g, É9). Aucune migration.
@@ -99,7 +99,7 @@ Certaines actions ne peuvent être faites que par l'utilisateur (comptes, tablea
 
 ### 0.5 Secrets
 
-- En local, les variables sont dans `.env.local`, récupéré avec `vercel env pull .env.local` (ignoré par git).
+- En local, les variables sont dans `.env.local`, récupéré avec `vercel env pull .env.local` (ignoré par git). **Depuis le chantier du portail**, les trois `PORTAIL_*` du poste (client `dev`) ne sont pas dans l'environnement Development de Vercel : un `vercel env pull` les effacerait. Ne pas le relancer sans que l'utilisateur les remette ensuite lui-même.
 - Le fichier `.env` qui existe déjà à la racine appartient à l'utilisateur : **ne pas le lire, ne pas le modifier, ne pas le supprimer**.
 - Ne jamais afficher le contenu de `.env.local`. Les scripts de contrôle n'affichent que les **noms** des variables et « OK » ou « MANQUANTE ».
 - `.env.example` est commité, avec les noms des variables et des valeurs factices.
@@ -170,8 +170,8 @@ Neon PostgreSQL (Francfort) : branche « production » et branche « dev »
 | Tests unitaires et d'intégration | — | PGlite en mémoire | jeux de tests | `npm run test` |
 | Tests de bout en bout | http://localhost:3100, faux portail sur le port 3101 | PGlite dans `.pglite-e2e/` | seed | `npm run test:e2e` |
 | Prévisualisation | `*.vercel.app` (une par branche), sans connexion (v1.8, G12) | Neon, branche `dev` | seed | push d'une branche |
-| Recette (v1.8) | adresse fixe de **une** branche, `https://<projet>-git-<branche>-<équipe>.vercel.app`, connectée au portail de production (G21) | Neon, branche `dev` | seed, recette | push de la branche `etape-b1-oidc` ; ses variables sont limitées à cette branche |
-| Production | `https://<projet>.vercel.app`, nom choisi en H-03 | Neon, branche `production` | réelles | push sur `main` |
+| Recette (v1.8) | adresse fixe de **une** branche, `https://<projet>-git-<branche>-<équipe>.vercel.app`, connectée au portail de production (client `recette`, G21) | Neon, branche `dev` | seed, recette | push de la branche `etape-b1-oidc` ; ses variables sont limitées à cette branche. Depuis la fin du chantier, la branche est figée au code de B1 ; elle est gardée telle quelle, avec ses variables et son client, pour une recette future, à réutiliser ou à retirer plus tard (D30 du chantier) |
+| Production | `https://les-petits-pronos-de-la-promo.vercel.app` (H-03, puis H-16), connectée au portail de production (client `production`) depuis la bascule du 09/11/2026 | Neon, branche `production` (`main` dans Neon) | réelles | push sur `main` |
 
 ---
 
@@ -200,8 +200,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 │  ├─ check-env.ts                contrôle des variables (noms seulement)
 │  ├─ check-db.ts                 contrôle de connexion (sans afficher l'URL)
 │  ├─ e2e-prepare.ts              remet à zéro .pglite-e2e, migre, seed, pose les sessions de test (v1.8)
-│  ├─ export-portail.ts           export des comptes pour le portail, en lecture seule (B2)
-│  └─ lib/                        db.ts (ouverture et migration), env-rules.ts, load-env.ts, portail-export.ts (B2), seed.ts,
+│  └─ lib/                        db.ts (ouverture et migration), env-rules.ts, load-env.ts, seed.ts,
 │                                  seed-seasons.ts (saisons du seed, lues aussi par les tests de bout en bout)
 ├─ docs/                          cahier des charges, architecture, maquette, recette (prompt de recette par un agent, É8)
 ├─ e2e/                           tests Playwright (*.spec.ts), fake-portail-server.ts (faux portail, v1.8)
@@ -306,7 +305,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 | `DATABASE_URL_UNPOOLED` | intégration Neon | idem | chaîne directe, utilisée pour les migrations |
 | `BETTER_AUTH_SECRET` | utilisateur (H-06) | tous, **une valeur différente par environnement** | au moins 32 caractères aléatoires |
 | `BETTER_AUTH_URL` | utilisateur (H-06, H-19) | Production : URL de production ; Development : `http://localhost:3003` ; branche de recette : son adresse fixe exacte ; autres Preview : non définie | URL de base de l'application, et base des adresses de retour du portail |
-| `PORTAIL_ISSUER` | utilisateur (H-19, H-22) | poste et branche de recette ; Production à la bascule (H-22) | émetteur du portail, sans barre finale, comparé exactement (contrat §3.3). Le même partout : poste, recette et production (G14, G21). **Jamais en dur dans le code** : le lien vers le portail s'en déduit |
+| `PORTAIL_ISSUER` | utilisateur (H-19, H-22) | poste (`.env.local`, client `dev`), branche de recette (client `recette`) et Production (client `production`, depuis la bascule du 09/11/2026, H-22). Pas dans l'environnement Development de Vercel (§0.5) | émetteur du portail, sans barre finale, comparé exactement (contrat §3.3). Le même partout : poste, recette et production (G14, G21). **Jamais en dur dans le code** : le lien vers le portail s'en déduit |
 | `PORTAIL_CLIENT_ID` | utilisateur (H-19, H-22) | idem | identifiant du client de l'environnement (`dev`, `recette` ou `production`) |
 | `PORTAIL_CLIENT_SECRET` | utilisateur (H-19, H-22) | idem | son secret : jamais lu, demandé ni écrit ailleurs que dans les variables |
 | `DB_DRIVER` | scripts de test ; `.env.development.local` du poste | tests et e2e (`pglite`) ; développement local sur un réseau qui bloque le port 5432 (`neon-ws`) | **jamais défini sur Vercel** |
@@ -335,7 +334,6 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 | `db:seed` | `tsx scripts/seed.ts` | **efface** puis remplit la base de développement ; refuse de tourner sur la production (§9.6) |
 | `db:check` | `tsx scripts/check-db.ts` | test de connexion |
 | `check:env` | `tsx scripts/check-env.ts` | contrôle des variables |
-| `export:portail` | `tsx scripts/export-portail.ts` | écrit `export-portail-mpplike.json`, hors de Git, en lecture seule sur la production (B2, D26). L'adresse de la base arrive par un tube : `neon connection-string main --project-id <projet> \| npm run export:portail`. Seuls des nombres s'affichent |
 | `verify` | `npm run lint && npm run typecheck && npm run test && npm run build` | **porte de sortie de chaque étape** |
 
 ### 3.3 Fichiers de configuration
@@ -361,7 +359,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 
 **`playwright.config.ts`** : `testDir: 'e2e'`, `workers: 1`, `fullyParallel: false`, `use.baseURL: 'http://localhost:3100'`, `webServer` avec `command: 'npm run e2e:serve'`, `url: 'http://localhost:3100/api/health'`, `timeout: 180000`, `reuseExistingServer: false` et l'environnement suivant : `DB_DRIVER=pglite`, `PGLITE_DIR=.pglite-e2e`, `BETTER_AUTH_SECRET=<valeur de test fixe de 32 caractères>`, `BETTER_AUTH_URL=http://localhost:3100`, `PORTAIL_ISSUER=http://localhost:3101/api/auth`, `PORTAIL_CLIENT_ID` et `PORTAIL_CLIENT_SECRET` de test, `TZ=UTC`. Un second `webServer` lance le faux portail (`e2e/fake-portail-server.ts`) sur le port 3101 (§9.4).
 
-**`.gitignore`** : ajouter `.pglite-*`, `playwright-report/`, `test-results/`, `coverage/`, `.vercel/`, `export-portail-*.json` (B2), en plus de ce que génère Next.js. Conserver les entrées existantes (`.env`, `.env.local`, `.env.*.local`).
+**`.gitignore`** : ajouter `.pglite-*`, `playwright-report/`, `test-results/`, `coverage/`, `.vercel/`, `export-portail-*.json` (B2 ; gardée par prudence après le retrait du script d'export à B4, D29), en plus de ce que génère Next.js. Conserver les entrées existantes (`.env`, `.env.local`, `.env.*.local`).
 
 ### 3.4 Migrations au build
 
@@ -397,7 +395,7 @@ Générées par la CLI de Better Auth (paquet `auth` depuis Better Auth 1.7 : `D
     - `last_seen_at` (timestamptz, nullable) ;
     - `previous_visit_at` (timestamptz, nullable).
 - **`session`** (avec `impersonated_by` du plugin admin, inutilisé), **`account`**, **`verification`** (état du flux OIDC), **`rate_limit`** (stockage des limites de tentatives en base).
-- **`account`** porte le lien avec le portail (v1.8) : `provider_id = 'portail'`, `account_id = sub`, `id_token` (rafraîchi à chaque connexion, il sert à la déconnexion). Aucune colonne ajoutée. Les lignes `credential` (hachage des anciens mots de passe) restent jusqu'à B4 (D9).
+- **`account`** porte le lien avec le portail (v1.8) : `provider_id = 'portail'`, `account_id = sub`, `id_token` (rafraîchi à chaque connexion, il sert à la déconnexion). Aucune colonne ajoutée. Les lignes `credential` (hachage des anciens mots de passe) ont été supprimées par la migration `0007` (B4, D9) ; la colonne `password`, générée par Better Auth, reste et n'est plus jamais remplie.
 
 ### 4.3 Tables de l'application (`src/lib/db/schema/app.ts`)
 
@@ -410,13 +408,7 @@ Générées par la CLI de Better Auth (paquet `auth` depuis Better Auth 1.7 : `D
 
 Seule clé utilisée : `environment`, qui vaut `production` sur la base de production (posée par `scripts/migrate.ts`, §3.4).
 
-**`allowed_email`** : ancienne liste blanche. Plus aucun écran ne l'utilise depuis la v1.8 ; elle sert encore à l'export des comptes (B2), et se retire à B4 (D9).
-
-| Colonne | Type | Contraintes |
-|---|---|---|
-| `email` | text | clé primaire, toujours en minuscules |
-| `created_at` | timestamptz | défaut `now()` |
-| `created_by` | text | → `user.id`, nullable |
+**`allowed_email`** (supprimée) : l'ancienne liste blanche de l'inscription (v1.0 à v1.7). Plus aucun écran ne la lisait depuis la v1.8 ; l'export des comptes de B2 l'a lue une dernière fois, puis la migration `0007` l'a supprimée (B4, D9). Les accès se gèrent dans la grille du portail (G2).
 
 **`season`** : une ligne par saison, **créée par l'admin** (v1.1, §5.13).
 
@@ -435,7 +427,7 @@ Seule clé utilisée : `environment`, qui vaut `production` sur la base de produ
 | `proclaimed_at` | timestamptz | nullable |
 | `created_at` | timestamptz | défaut `now()` |
 
-Les six colonnes de la v1.3 arrivent avec la migration `0006_season_rules` de l'É10 (`0005` jusqu'à la v1.6 : le numéro a été pris par les questions fun de l'É8h). Elle ne fait qu'ajouter, et ses valeurs par défaut sont celles de la v1.2 : aucune saison existante ne change de règles.
+Les six colonnes de la v1.3 arrivent avec la migration `0008_season_rules` de l'É10 (`0005` jusqu'à la v1.6, puis `0006` jusqu'à la v1.7 : les numéros ont été pris par les questions fun de l'É8h, puis par les deux migrations du chantier du portail, `0006` et `0007`). Elle ne fait qu'ajouter, et ses valeurs par défaut sont celles de la v1.2 : aucune saison existante ne change de règles.
 
 **`season_rules_event`** (v1.3, É10) : historique des changements de règles d'une saison (§5.16). Jamais lu pour calculer un malus.
 
@@ -1399,7 +1391,7 @@ Effet : met à jour la saison et, si au moins une règle change, ajoute une lign
 | SR10 | `jokerDivisor` 3 | malus divisé par 3 dans le classement, les résultats, le profil et le palmarès proclamé |
 | SR11 | bornes : 0 ou 6 jokers, diviseur 5, seuil 0,4 ou 10,1, plafond 0 ou négatif, plafond à 3 décimales | `INVALID_INPUT` |
 | SR12 | changement de règles et premier résultat lancés en même temps | jamais des règles changées après un résultat (l'un attend l'autre) |
-| SR13 | migration `0006` sur une base avec des données | toutes les saisons prennent `DEFAULT_RULES` ; le classement de chaque saison est identique avant et après |
+| SR13 | migration `0008` sur une base avec des données | toutes les saisons prennent `DEFAULT_RULES` ; le classement de chaque saison est identique avant et après |
 | SR14 | le seul résultat de la saison est sur une question supprimée ensuite (v1.4) ; le seul joker de la saison est sur une question supprimée | les règles se changent de nouveau ; le nombre et l'effet des jokers aussi |
 
 ---
@@ -1462,7 +1454,7 @@ Le contrat est écrit dans `../portail/docs/architecture/contrat-apps.md` ; l'es
 
 **Le pseudo** (D3) : `user.name` reste à MPPlike. À la création, `mapProfileToUser` part du nom du portail, le coupe à 30 caractères et le rend unique sans tenir compte de la casse (« Prénom 2 ») ; ce calcul se fait avant la transaction de création, car une requête hors transaction bloquerait PGlite. Le nom n'est jamais réécrit ensuite. `databaseHooks.user.create.before` pose l'identifiant, l'adresse normalisée et l'avatar.
 
-**La déconnexion** (contrat §3.8) : `signOutAction` appelle `auth.api.signOut` avec `callbackURL: "/connexion"` et `disableRedirect: true`, puis suit l'adresse rendue, celle de `end_session_endpoint` avec `id_token_hint`, `client_id` et `post_logout_redirect_uri`. Sans adresse rendue, elle mène à `/connexion`. La suite dépend du portail : il renvoie vers `/connexion` directement ou après sa page `/deconnexion`. Un seul cas reste sans retour (G22) : sans session au portail, un `id_token_hint` qui ne vaut pas pour ce client s'arrête sur « Logout error » (401, en anglais). La session de MPPlike est déjà fermée, et le code ne change pas. Ce cas existe jusqu'à la bascule, `recette` et `dev` partageant la base `dev`.
+**La déconnexion** (contrat §3.8) : `signOutAction` appelle `auth.api.signOut` avec `callbackURL: "/connexion"` et `disableRedirect: true`, puis suit l'adresse rendue, celle de `end_session_endpoint` avec `id_token_hint`, `client_id` et `post_logout_redirect_uri`. Sans adresse rendue, elle mène à `/connexion`. La suite dépend du portail : il renvoie vers `/connexion` directement ou après sa page `/deconnexion`. Un seul cas reste sans retour (G22) : sans session au portail, un `id_token_hint` qui ne vaut pas pour ce client s'arrête sur « Logout error » (401, en anglais). La session de MPPlike est déjà fermée, et le code ne change pas. Depuis la bascule, ce cas ne se présente en production qu'après un changement du secret (G22) ; il reste possible sur la base `dev`, que `recette` et `dev` partagent.
 
 **La panne** (contrat §3.1) : si la découverte échoue, le plugin écarte le fournisseur pour toute la vie de l'instance. `getPortailAuth()` recrée alors l'instance, au plus une fois toutes les 30 s. La route répond 503 à `/sign-in/social` et mène à `/connexion?error=portail_unavailable` depuis le retour. Les pages n'en dépendent pas : les sessions déjà ouvertes continuent. Le plugin n'a pas de délai d'attente : un portail qui ne répond pas du tout retarde le premier appel d'une instance neuve.
 
@@ -1477,7 +1469,6 @@ Le portail gère les accès et les rôles (G2, G3) : `/admin/joueurs` n'en est p
   - `name = « Ancien joueur n »` ;
   - `email = anonyme-<id>@invalid.local` ;
   - avatar par défaut, compte banni ;
-  - adresse retirée de `allowed_email`, pour qu'elle ne parte pas dans l'export (B2) ;
   - **lien `portail` supprimé** (v1.8, D4) : une personne qui reviendrait aurait un compte neuf, jamais l'ancien. L'accès, lui, se retire au portail ;
   - le nom est aussi remplacé dans le palmarès (`season_standing.name_snapshot`) ; rangs et malus restent figés (décision du 30/09/2026) ;
   - les pronos sont conservés, pour que le classement des autres reste juste ;
@@ -2058,7 +2049,7 @@ Le choix des joueurs (prolongé, sans prono…) tient compte des états laissés
 ## 10. Sécurité et exploitation
 
 - **En-têtes HTTP** : §3.3. **Indexation** : `robots.ts` interdit tout, et chaque page porte `noindex` (site privé).
-- **Connexion** (v1.8) : le site ne reçoit aucun mot de passe. Les anciens hachages restent en base jusqu'à B4 (D9). Jeton d'identité vérifié, PKCE, `state`, `nonce` (§6.1) ; `PORTAIL_CLIENT_SECRET` dans les variables seulement. Les refus du §6.2 sont journalisés sans adresse.
+- **Connexion** (v1.8) : le site ne reçoit aucun mot de passe. Les anciens hachages ont été effacés de la base par la migration `0007` (B4, D9). Jeton d'identité vérifié, PKCE, `state`, `nonce` (§6.1) ; `PORTAIL_CLIENT_SECRET` dans les variables seulement. Les refus du §6.2 sont journalisés sans adresse.
 - **Entrées** : toutes validées par Zod côté serveur, même si le formulaire valide déjà.
 - **Server Actions** : contrôle des droits dans chaque action et dans chaque service (§6.4).
 - **Données sensibles** : les chiffres de l'école ne sont visibles qu'après connexion d'une personne autorisée par le portail. Aucune page publique hormis `/connexion` et `/api/health`, qui renvoie seulement `{ "ok": true }` ou `{ "ok": false }`.
@@ -2758,7 +2749,7 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
 
 **Objectif** : l'admin règle, pour chaque saison et sans développeur, le barème (écart brut ou écart en %), le plafond, le nombre et l'effet des jokers, le malus d'un absent et le seuil du « Dans le mille ». Les règles se figent au premier résultat de la saison. Les valeurs par défaut sont celles de la v1.2 : rien ne change tant que l'admin ne touche à rien (cahier des charges §5.8, §5.16 ici).
 
-**Prérequis** : É9 validée (site lancé). **Ne pas commencer avant le lancement du 14/10** (décision de l'utilisateur du 12/10/2026).
+**Prérequis** : É9 validée (site lancé). **Ne pas commencer avant le lancement du 14/10** (décision de l'utilisateur du 12/10/2026). Depuis le 30/10/2026 : après le chantier du portail (D10), clos le 09/11/2026 ; et pas avant l'année prochaine (D23 du chantier). Les résultats de 2026-2027 se saisissent sans l'attendre, avec les règles du code.
 
 **Branche** : `etape-10-regles`.
 
@@ -2776,7 +2767,7 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
    - `scoreQuestion(…, rules)` et `computeStandings({ …, rules })` (§5.16) ;
    - retrait de `JOKER_DIVISOR`, `JOKERS_PER_SEASON` et `BULLSEYE_PERCENT` de `constants.ts` ;
    - tous les vecteurs du §5.16, et la non-régression avec `DEFAULT_RULES`.
-3. **Schéma et migration `0006_season_rules`** (ajouts seulement) :
+3. **Schéma et migration `0008_season_rules`** (ajouts seulement) :
    - enums `scoring_mode` et `absent_rule` ;
    - six colonnes de `season`, avec leurs contraintes ;
    - table `season_rules_event` (§4.3).
@@ -2791,7 +2782,7 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
    - `proclaimSeason` avec les règles de la saison ;
    - messages d'erreur (§5.16).
 
-   Matrice d'autorisation : 40 services, et `season_rules_event` dans l'instantané des tables.
+   Matrice d'autorisation : 34 services (§7.3 ; 40 prévus avant que la v1.8 ne retire les services des comptes), et `season_rules_event` dans l'instantané des tables.
 5. **Lectures** : charger les règles de la saison partout où un malus se calcule ou un joker s'affiche (§5.16, §7.4) ; `getSeasonsAdmin` (règles, verrous, historique), `suggestedSeasonRules`.
 6. **Interface** :
    - `/admin/saisons` (§8.3 : résumé, `SeasonRulesForm`, historique, formulaire de création) ;
@@ -2803,7 +2794,7 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
    - aide du malus d'une mauvaise réponse.
 7. **Seed** : règles par défaut pour toutes les saisons (aucun attendu ne change), pas de ligne d'historique.
 8. **Après la fusion dans `main`** :
-   - lire la production (migration `0006` appliquée, saisons aux règles par défaut, aucune ligne d'historique) ;
+   - lire la production (migration `0008` appliquée, saisons aux règles par défaut, aucune ligne d'historique) ;
    - test rapide de la production (`e2e/prod-smoke.spec.ts`).
 
 **Tests à écrire**
@@ -2816,10 +2807,10 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
   - un classement en écart en % avec un plafond, des jokers ÷ 3 et des absents en `real_value`, calculé à la main.
 - `tests/integration/season-rules.test.ts` : SR1 à SR12, et SR14 (question supprimée, v1.4).
 - `tests/integration/seasons.test.ts` : SA9 à SA13, qui passent par `updateSeasonRules`.
-- `tests/integration/migrate.test.ts` : SR13, avec la migration `0006` sur une base remplie par le seed.
+- `tests/integration/migrate.test.ts` : SR13, avec la migration `0008` sur une base remplie par le seed.
 - `tests/integration/schema.test.ts` : les cinq contraintes de `season`.
 - `standings`, `results-data`, `badges-data`, `proclaim` : une saison en écart en % avec un plafond, attendus calculés à la main.
-- `tests/integration/authorization-matrix.test.ts` : 40 services.
+- `tests/integration/authorization-matrix.test.ts` : 34 services.
 - Tests transverses (§9.3) : pureté et vocabulaire étendus à `rules.ts`.
 - `e2e/admin-season-rules.spec.ts` (ne jamais toucher aux règles des saisons du seed, dont dépendent les attendus des autres fichiers) :
   - créer une saison de test dans 330 jours ;
@@ -2845,6 +2836,8 @@ Ces changements touchent le même cœur de code (barème, classement, visibilit�
 ## 12. Interventions humaines
 
 H-18 à H-22 appartiennent au chantier du portail : voir le §9 de [branchement-portail.md](../features/branchement-portail.md). Depuis la v1.8, la recette sur un aperçu avec les comptes du seed s'arrête (H-07, D7) : les essais passent par la branche de recette et le portail de production (G21).
+
+**Depuis la v1.8, sans objet sous leur forme d'origine** (gardées pour l'historique) : `ADMIN_EMAILS` de H-06 (retirée des trois environnements le 09/11/2026 ; `BETTER_AUTH_URL` de Development vaut `http://localhost:3003`) ; la connexion par liste blanche de H-07 ; H-09 et H-10 (inscription, liste blanche), remplacées par la grille du portail, où son super-admin donne les accès et les rôles (G2, G3) ; les comptes du seed et leur mot de passe dans H-12 ; le lien vers `/inscription` dans le message de H-15 (on se connecte depuis la tuile du portail ou depuis l'adresse du site, avec son compte du portail).
 
 > Les libellés des interfaces Vercel et Neon peuvent avoir changé. L'agent adapte les instructions à ce que l'utilisateur voit, sans jamais lui demander de coller un secret dans le chat.
 
@@ -2971,8 +2964,8 @@ H-18 à H-22 appartiennent au chantier du portail : voir le §9 de [branchement-
 
 - [ ] `main` est à jour, le dernier déploiement de production a réussi et `/api/health` renvoie `ok: true`.
 - [ ] La production ne contient aucun compte `@example.test`.
-- [ ] Le compte admin est créé et accède à `/admin` (H-09).
-- [ ] La liste blanche contient toute l'équipe (H-10).
+- [ ] Le compte admin est créé et accède à `/admin` (H-09 ; depuis la v1.8 : rôle `admin` dans la grille du portail).
+- [ ] La liste blanche contient toute l'équipe (H-10 ; depuis la v1.8 : toute l'équipe a un accès dans la grille du portail).
 - [ ] Les catégories sont créées.
 - [ ] Toutes les questions de la campagne sont **programmées** : ouverture le 14/10, clôture le 21/10, heures vérifiées en heure de Paris, source et aide remplies, malus d'une mauvaise réponse cohérent pour chaque question à choix (H-11).
 - [ ] La saison 2026-2027 existe avec la bonne date de début et le bon réglage des jokers, ses lots sont saisis. L'annonce de bienvenue est prête.
@@ -3050,7 +3043,7 @@ Points dont l'API peut différer selon la version installée. Vérifier dans la 
 | Classement | `standings` |
 | Palmarès | `seasonStanding` / `palmares` (route) |
 | Proclamer | `proclaim` |
-| Liste blanche | `allowedEmail` |
+| Liste blanche (jusqu'à la v1.7, table supprimée à B4) | `allowedEmail` |
 | Annonce | `announcement` |
 | Lot | `prize` |
 | Désactiver | `disable` (ban Better Auth) |

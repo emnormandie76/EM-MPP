@@ -1,6 +1,6 @@
 # Les petits pronos de la promo
 
-Site de pronostics interne d'une équipe de l'EM Normandie. L'admin pose des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les meilleurs de la saison.
+Site de pronostics interne d'une équipe de l'EM Normandie. L'admin pose des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les meilleurs de la saison. On s'y connecte par le Portail admission (OIDC), seule source des accès : le site n'a ni mot de passe ni inscription.
 
 Next.js (App Router) et Tailwind CSS v4, hébergé sur Vercel, base PostgreSQL Neon.
 
@@ -8,7 +8,7 @@ Next.js (App Router) et Tailwind CSS v4, hébergé sur Vercel, base PostgreSQL N
 
 - **Node.js 24** (LTS). La version est fixée par `.node-version` (lu par fnm) et par `engines` dans `package.json` (lu par Vercel).
 - **Git**.
-- Pour les commandes liées à la base : un fichier `.env.local`, récupéré avec `vercel env pull .env.local` (voir `.env.example` pour la liste des variables). Ne jamais le committer.
+- Pour les commandes liées à la base : un fichier `.env.local`, récupéré avec `vercel env pull .env.local` (voir `.env.example` pour la liste des variables). Ne jamais le committer. Les trois variables `PORTAIL_*` du poste (client `dev` du portail) ne sont pas sur Vercel : un `vercel env pull` les efface, il faut alors les remettre à la main.
 - Sur un réseau qui bloque le port 5432 de PostgreSQL (celui de l'EM Normandie) : un fichier `.env.development.local` contenant `DB_DRIVER=neon-ws`. En local, la base Neon est alors jointe en WebSocket, par le port 443.
 
 Première installation :
@@ -33,7 +33,6 @@ npx playwright install chromium
 | `npm run verify` | lint, types, tests, build : porte de sortie de chaque étape |
 | `npm run check:env` | contrôle des variables de `.env.local` (affiche les noms, jamais les valeurs) |
 | `npm run db:check` | test de connexion à la base, sans afficher l'URL |
-| `npm run export:portail` | export des comptes pour le portail, en lecture seule sur la production ; l'adresse de la base arrive par un tube (architecture §3.2) |
 | `npm run db:generate` | nouvelle migration après un changement de schéma |
 | `npm run db:migrate` | applique les migrations sur la base de `.env.local` |
 | `npm run db:seed -- --yes` | **efface** la base de développement de `.env.local` et la remplit avec les données de test (refusé sur la production) |
@@ -59,5 +58,5 @@ Comptes du seed, sans mot de passe : `admin@example.test` (admin), `joueur1@exam
 - [Cahier des charges](docs/features/cahier-des-charges.md) : les règles du jeu (le **quoi**).
 - [Architecture et plan de construction](docs/architecture/architecture.md) : la référence technique (le **comment**).
 - [Avancement](docs/architecture/avancement.md) : l'étape en cours et le journal des décisions.
-- [Chantier « Connexion par le portail »](docs/features/branchement-portail.md) : passage de la connexion par mot de passe à la connexion par le Portail admission (contrat portail v1), étapes B0 à B4. Jusqu'à la bascule (B3), la connexion, le port 3000 et les comptes du seed décrits ci-dessus restent valables.
+- [Chantier « Connexion par le portail »](docs/features/branchement-portail.md) : passage de la connexion par mot de passe à la connexion par le Portail admission (contrat portail v1), étapes B0 à B4. Production sur le portail depuis le 09/11/2026 ; chantier clos le 09/11/2026.
 - [Maquette B5 « Jour de match »](docs/design/maquette-b5/) : l'apparence de référence.

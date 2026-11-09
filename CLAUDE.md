@@ -1,22 +1,24 @@
 # Les petits pronos de la promo (dépôt EM-MPP)
 
-Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plus). L'admin crée des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les gagnants : ceux qui ont le moins de points de malus (écart brut au résultat, v1.2). Les saisons sont créées par l'admin (nom, date de début, jokers autorisés ou non) et basculent automatiquement à leur date de début (v1.1). Un chat général relie l'équipe (v1.2). Lancement le 14 octobre 2026. Next.js sur Vercel, base Neon. Le site n'envoie aucun email.
+Site de pronostics interne pour une équipe de l'EM Normandie (20 joueurs au plus). L'admin crée des questions sur les chiffres de l'école (participants à une JPO, candidatures, intégrés…), les joueurs pronostiquent et un classement désigne les gagnants : ceux qui ont le moins de points de malus (écart brut au résultat, v1.2). Les saisons sont créées par l'admin (nom, date de début, jokers autorisés ou non) et basculent automatiquement à leur date de début (v1.1). Un chat général relie l'équipe (v1.2). Lancement le 14 octobre 2026. Depuis le 09/11/2026, on s'y connecte par le Portail admission (OIDC), seule source des accès : le site n'a plus ni mot de passe, ni inscription, ni liste d'adresses (v1.8). Next.js sur Vercel, base Neon. Le site n'envoie aucun email.
 
 ## Documents de référence
 
 | Document | Rôle |
 |---|---|
-| [docs/features/cahier-des-charges.md](docs/features/cahier-des-charges.md) | Règles fonctionnelles (v1.2 du 02/10/2026 : malus, jokers par saison, prolongations, chat ; v1.3 du 12/10/2026 : règles réglables par saison, étape É10 après le lancement ; v1.4 du 12/10/2026 : suppression des questions, règlement réservé aux admins, étape É8e avant le lancement ; v1.5 du 12/10/2026 : messages du chat supprimés sans trace, étape É8f ; v1.6 du 13/10/2026 : textes d'une question publiée corrigeables même avec des pronos, étape É8g ; v1.7 du 13/10/2026 : questions fun notées à la place, étape É8h) : le **quoi** |
+| [docs/features/cahier-des-charges.md](docs/features/cahier-des-charges.md) | Règles fonctionnelles (v1.2 du 02/10/2026 : malus, jokers par saison, prolongations, chat ; v1.3 du 12/10/2026 : règles réglables par saison, étape É10 après le lancement ; v1.4 du 12/10/2026 : suppression des questions, règlement réservé aux admins, étape É8e avant le lancement ; v1.5 du 12/10/2026 : messages du chat supprimés sans trace, étape É8f ; v1.6 du 13/10/2026 : textes d'une question publiée corrigeables même avec des pronos, étape É8g ; v1.7 du 13/10/2026 : questions fun notées à la place, étape É8h ; v1.8 du 05/11/2026, complétée le 09/11/2026 : connexion par le Portail admission, chantier B0 à B4) : le **quoi** |
 | [docs/architecture/architecture.md](docs/architecture/architecture.md) | Référence technique et plan de construction par étapes : le **comment** |
 | [docs/architecture/avancement.md](docs/architecture/avancement.md) | Étape en cours, interventions humaines faites, journal des décisions |
 | [docs/design/maquette-b5/](docs/design/maquette-b5/) | Maquette visuelle retenue (style B5 « Jour de match ») ; la couleur principale est #0036B3 depuis la v1.2 (architecture §8.1) |
-| [docs/features/branchement-portail.md](docs/features/branchement-portail.md) | Chantier de la connexion par le Portail admission (prompts guidés P-03 et P-04 du portail, **contrat portail v1**) : décisions G du portail et D de MPPlike, étapes B0 à B4, journal |
+| [docs/features/branchement-portail.md](docs/features/branchement-portail.md) | Chantier de la connexion par le Portail admission (prompts guidés P-03 et P-04 du portail, **contrat portail v1**) : décisions G du portail et D de MPPlike, étapes B0 à B4, journal. Clos le 09/11/2026 |
 
 ## Phase en cours
 
-Construction, étape par étape (architecture §11). **Avant de commencer l'étape 1, obtenir le feu vert de l'utilisateur sur le document d'architecture (intervention H-02).** L'étape en cours est indiquée dans `avancement.md`.
+Le site est en production, avec de vraies données : toute migration doit être additive, sauf accord explicite de l'utilisateur (architecture §0.4). Construction étape par étape (architecture §11) ; l'étape en cours et les points ouverts sont dans `avancement.md`.
 
-**Depuis le 30/10/2026 : chantier « Connexion par le portail »** ([branchement-portail.md](docs/features/branchement-portail.md)), étapes B0 à B4, à faire avant l'É10 (décision D10). Le site ne gérera plus de comptes : on s'y connectera par le Portail admission (OIDC), seule source des accès. Ses décisions G (du portail) ne se rediscutent pas ; le portail lit ce dépôt et n'y écrit jamais, et l'agent de MPPlike ne travaille jamais dans l'administration du portail.
+**Le chantier « Connexion par le portail »** ([branchement-portail.md](docs/features/branchement-portail.md)), étapes B0 à B4, est **clos depuis le 09/11/2026**. Ses décisions G (du portail) ne se rediscutent pas ; le portail lit ce dépôt et n'y écrit jamais, et l'agent de MPPlike ne travaille jamais dans l'administration du portail (G7, G18).
+
+**Prochaine étape : l'É10** (règles réglables par saison, v1.3), **l'année prochaine** (décision D23 du chantier). L'É9 (recette et lancement) reste à clore par l'utilisateur.
 
 ## Règles pour tout agent
 
@@ -36,7 +38,7 @@ Tout le projet se fait avec **Opus 5.5 en effort extra high** : réflexion, arch
 - Échanges et documentation en français.
 - Code en anglais (variables, fonctions, fichiers, messages de commit). Textes de l'interface en français, avec tutoiement. Jamais « pari » ni « mise ».
 - Le poste de développement est sous Windows : scripts npm multiplateformes.
-- Ne jamais lire, afficher ni committer de secrets. Le fichier `.env` existant appartient à l'utilisateur : ne pas y toucher. Les variables locales sont dans `.env.local` (`vercel env pull`).
+- Ne jamais lire, afficher ni committer de secrets. Le fichier `.env` existant appartient à l'utilisateur : ne pas y toucher. Les variables locales sont dans `.env.local`. Ne pas relancer `vercel env pull` : les trois `PORTAIL_*` du poste (client `dev` du portail) ne sont pas sur Vercel et seraient effacées.
 - Pas de commit ni de push sans demande explicite de l'utilisateur. Une branche par étape (`etape-0N-…`).
 
 ## Commandes

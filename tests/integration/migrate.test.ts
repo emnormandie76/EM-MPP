@@ -1,11 +1,11 @@
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterEach, describe, expect, it } from "vitest";
-import { prediction, prize, question, season, seasonStanding, session, user } from "@/lib/db/schema";
+import { account, prediction, prize, question, season, seasonStanding, session, user } from "@/lib/db/schema";
 import {
   countAppliedMigrations,
   isMarkedAsProduction,
@@ -15,7 +15,7 @@ import {
   type ScriptDb,
 } from "../../scripts/lib/db";
 import { runMigrations } from "../../scripts/lib/migrate";
-import { createCategory, createPrediction, createUser } from "../helpers/factories";
+import { createCategory, createPrediction, createQuestion, createUser } from "../helpers/factories";
 
 const migrationFiles = readdirSync(MIGRATIONS_FOLDER).filter((file) => file.endsWith(".sql"));
 
@@ -77,14 +77,18 @@ describe("migrations (scripts/migrate.ts)", () => {
 
   it("empty the sessions of before the switch, and keep the accounts (D6)", async () => {
     target = await openPglite();
+    const folder = migrationsUpTo("0005_fun_questions");
+    try {
+      await migrate(target.db as unknown as PgliteDatabase<Record<string, unknown>>, { migrationsFolder: folder });
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
     const { db } = target;
-    await target.migrate();
     const owner = await createUser(db);
     await db.insert(session).values({ id: "s1", token: "t1", userId: owner.id, expiresAt: new Date("2027-12-03T00:00:00Z"), updatedAt: new Date() });
-    await db.execute(sql`delete from drizzle.__drizzle_migrations where id = (select max(id) from drizzle.__drizzle_migrations)`);
-    expect(migrationFiles.at(-1)).toBe("0006_clear_sessions.sql");
 
-    expect(await runMigrations(target, {})).toMatchObject({ applied: 1 });
+    // 0006_clear_sessions, then the migrations that came after it.
+    expect(await runMigrations(target, {})).toMatchObject({ applied: migrationFiles.length - 6 });
 
     expect(await db.select().from(session)).toEqual([]);
     expect(await db.select().from(user)).toHaveLength(1);
@@ -271,5 +275,57 @@ describe("migration 0003 (malus, jokers by season, extensions, v1.2)", () => {
     expect(await db.select({ jokersEnabled: season.jokersEnabled }).from(season)).toEqual([{ jokersEnabled: true }, { jokersEnabled: true }]);
     const [standing] = await db.select().from(seasonStanding);
     expect(standing).toMatchObject({ rank: 1, points: 185, malus: null, bullseyes: 1, meanError: 0.02, questionsPlayed: 2, nameSnapshot: "Sarah" });
+  });
+});
+
+describe("migration 0007 (password sign-in removed, B4, D9)", () => {
+  let target: ScriptDb | undefined;
+  let folder: string | undefined;
+
+  afterEach(async () => {
+    await target?.close();
+    target = undefined;
+    if (folder) rmSync(folder, { recursive: true, force: true });
+    folder = undefined;
+  });
+
+  it("removes the passwords and the allow list, and keeps accounts, portal links, sessions and predictions", async () => {
+    target = await openPglite();
+    folder = migrationsUpTo("0006_clear_sessions");
+    await migrate(target.db as unknown as PgliteDatabase<Record<string, unknown>>, { migrationsFolder: folder });
+    const { db } = target;
+
+    // The production database as the switch left it (B3): every account with its password, one of
+    // them already linked to the portal, and an allow list with an address that has no account.
+    const owner = await createUser(db, { role: "admin", email: "owner@example.test" });
+    const player = await createUser(db, { email: "player@example.test" });
+    await db.execute(sql`
+      insert into account (id, account_id, provider_id, user_id, password, id_token, created_at, updated_at) values
+        ('a1', ${owner.id}, 'credential', ${owner.id}, 'hachage-1', null, now(), now()),
+        ('a2', ${player.id}, 'credential', ${player.id}, 'hachage-2', null, now(), now()),
+        ('a3', 'sub-owner', 'portail', ${owner.id}, null, 'jeton-owner', now(), now())
+    `);
+    await db.execute(sql`
+      insert into allowed_email (email, created_by) values
+        ('owner@example.test', ${owner.id}), ('player@example.test', ${owner.id}), ('invite@example.test', null)
+    `);
+    await db.insert(session).values({ id: "s1", token: "t1", userId: owner.id, expiresAt: new Date("2026-11-09T18:00:00Z"), updatedAt: new Date() });
+    const asked = await createQuestion(db, { createdBy: owner.id });
+    await createPrediction(db, { questionId: asked.id, userId: player.id, valueNumber: 250 });
+
+    expect(await runMigrations(target, {})).toEqual({ applied: 1, total: migrationFiles.length, markedAsProduction: false });
+
+    expect(await db.select().from(account).where(eq(account.providerId, "credential"))).toEqual([]);
+    expect(await db.select({ id: account.id, accountId: account.accountId, providerId: account.providerId, userId: account.userId, idToken: account.idToken }).from(account)).toEqual([
+      { id: "a3", accountId: "sub-owner", providerId: "portail", userId: owner.id, idToken: "jeton-owner" },
+    ]);
+    const table = (await db.execute(sql`select to_regclass('public.allowed_email') is null as dropped`)) as unknown as { rows: { dropped: boolean }[] };
+    expect(table.rows).toEqual([{ dropped: true }]);
+    expect(await db.select({ id: user.id, email: user.email, role: user.role }).from(user).orderBy(user.email)).toEqual([
+      { id: owner.id, email: "owner@example.test", role: "admin" },
+      { id: player.id, email: "player@example.test", role: "player" },
+    ]);
+    expect(await db.select({ token: session.token, userId: session.userId }).from(session)).toEqual([{ token: "t1", userId: owner.id }]);
+    expect(await db.select({ userId: prediction.userId, value: prediction.valueNumber }).from(prediction)).toEqual([{ userId: player.id, value: 250 }]);
   });
 });

@@ -3,7 +3,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db/client";
 import {
   account,
-  allowedEmail,
   announcement,
   category,
   chatMessage,
@@ -117,7 +116,6 @@ async function snapshot(): Promise<string> {
     user,
     session,
     account,
-    allowedEmail,
     season,
     category,
     question,
