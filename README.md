@@ -33,6 +33,7 @@ npx playwright install chromium
 | `npm run verify` | lint, types, tests, build : porte de sortie de chaque étape |
 | `npm run check:env` | contrôle des variables de `.env.local` (affiche les noms, jamais les valeurs) |
 | `npm run db:check` | test de connexion à la base, sans afficher l'URL |
+| `npm run export:portail` | export des comptes pour le portail, en lecture seule sur la production ; l'adresse de la base arrive par un tube (architecture §3.2) |
 | `npm run db:generate` | nouvelle migration après un changement de schéma |
 | `npm run db:migrate` | applique les migrations sur la base de `.env.local` |
 | `npm run db:seed -- --yes` | **efface** la base de développement de `.env.local` et la remplit avec les données de test (refusé sur la production) |

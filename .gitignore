@@ -41,3 +41,6 @@ playwright-report/
 test-results/
 .pglite-*
 .vercel
+
+# Account exports for the portal: addresses and pseudonyms, never in Git (B2)
+export-portail-*.json

@@ -200,7 +200,8 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 │  ├─ check-env.ts                contrôle des variables (noms seulement)
 │  ├─ check-db.ts                 contrôle de connexion (sans afficher l'URL)
 │  ├─ e2e-prepare.ts              remet à zéro .pglite-e2e, migre, seed, pose les sessions de test (v1.8)
-│  └─ lib/                        db.ts (ouverture et migration), env-rules.ts, load-env.ts, seed.ts,
+│  ├─ export-portail.ts           export des comptes pour le portail, en lecture seule (B2)
+│  └─ lib/                        db.ts (ouverture et migration), env-rules.ts, load-env.ts, portail-export.ts (B2), seed.ts,
 │                                  seed-seasons.ts (saisons du seed, lues aussi par les tests de bout en bout)
 ├─ docs/                          cahier des charges, architecture, maquette, recette (prompt de recette par un agent, É8)
 ├─ e2e/                           tests Playwright (*.spec.ts), fake-portail-server.ts (faux portail, v1.8)
@@ -334,6 +335,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 | `db:seed` | `tsx scripts/seed.ts` | **efface** puis remplit la base de développement ; refuse de tourner sur la production (§9.6) |
 | `db:check` | `tsx scripts/check-db.ts` | test de connexion |
 | `check:env` | `tsx scripts/check-env.ts` | contrôle des variables |
+| `export:portail` | `tsx scripts/export-portail.ts` | écrit `export-portail-mpplike.json`, hors de Git, en lecture seule sur la production (B2, D26). L'adresse de la base arrive par un tube : `neon connection-string main --project-id <projet> \| npm run export:portail`. Seuls des nombres s'affichent |
 | `verify` | `npm run lint && npm run typecheck && npm run test && npm run build` | **porte de sortie de chaque étape** |
 
 ### 3.3 Fichiers de configuration
@@ -359,7 +361,7 @@ Les dossiers de routes sont en français car ils donnent les adresses vues par l
 
 **`playwright.config.ts`** : `testDir: 'e2e'`, `workers: 1`, `fullyParallel: false`, `use.baseURL: 'http://localhost:3100'`, `webServer` avec `command: 'npm run e2e:serve'`, `url: 'http://localhost:3100/api/health'`, `timeout: 180000`, `reuseExistingServer: false` et l'environnement suivant : `DB_DRIVER=pglite`, `PGLITE_DIR=.pglite-e2e`, `BETTER_AUTH_SECRET=<valeur de test fixe de 32 caractères>`, `BETTER_AUTH_URL=http://localhost:3100`, `PORTAIL_ISSUER=http://localhost:3101/api/auth`, `PORTAIL_CLIENT_ID` et `PORTAIL_CLIENT_SECRET` de test, `TZ=UTC`. Un second `webServer` lance le faux portail (`e2e/fake-portail-server.ts`) sur le port 3101 (§9.4).
 
-**`.gitignore`** : ajouter `.pglite-*`, `playwright-report/`, `test-results/`, `coverage/`, `.vercel/`, en plus de ce que génère Next.js. Conserver les entrées existantes (`.env`, `.env.local`, `.env.*.local`).
+**`.gitignore`** : ajouter `.pglite-*`, `playwright-report/`, `test-results/`, `coverage/`, `.vercel/`, `export-portail-*.json` (B2), en plus de ce que génère Next.js. Conserver les entrées existantes (`.env`, `.env.local`, `.env.*.local`).
 
 ### 3.4 Migrations au build
 

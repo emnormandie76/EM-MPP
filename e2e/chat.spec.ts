@@ -159,8 +159,19 @@ test("polls every 10 s, stops while the tab is hidden or the person is idle, and
   });
   await page.clock.install();
   await signIn(page, ACCOUNTS.julien);
+  // The polling loop plans its first turn in an effect, once the page is hydrated, which can come
+  // after the server's HTML shows the title: a clock paused before would never fire that timer. The
+  // read receipt (`markChatReadAction`) leaves from a later effect of the same component, in the same
+  // pass: once it is sent, the first turn is planned.
+  const readMarked = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === "/chat" &&
+      (request.postData() ?? "").includes("lastMessageId"),
+  );
   await page.goto("/chat");
   await expect(page.getByRole("heading", { level: 1, name: "Chat" })).toBeVisible();
+  await readMarked;
   await page.clock.pauseAt(Date.now() + 2_000);
   polls.length = 0;
 
